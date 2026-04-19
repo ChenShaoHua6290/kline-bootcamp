@@ -2,6 +2,7 @@ package com.klinebootcamp.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,10 +28,10 @@ public class JwtService {
     public String generateToken(String subject) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(subject)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(expirationSeconds)))
-                .signWith(secretKey)
+                .setSubject(subject)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusSeconds(expirationSeconds)))
+                .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -44,10 +45,10 @@ public class JwtService {
     }
 
     private Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(secretKey)
+        return Jwts.parserBuilder()
+                .setSigningKey(secretKey)
                 .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .parseClaimsJws(token)
+                .getBody();
     }
 }

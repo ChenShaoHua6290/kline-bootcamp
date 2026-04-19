@@ -1,7 +1,7 @@
 package com.klinebootcamp.entity;
 
 import com.klinebootcamp.enums.AssetClass;
-import jakarta.persistence.*;
+import javax.persistence.*;
 
 @Entity
 @Table(name = "instruments", uniqueConstraints = {

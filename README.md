@@ -2,7 +2,7 @@
 
 ## 技术栈
 - 前端：React + Vite + `@klinecharts/pro`
-- 后端：Java 17 + Spring Boot 3 + Spring Security + JPA
+- 后端：Java 8 (JDK 1.8) + Spring Boot 2.7 + Spring Security + JPA
 - 数据库：MySQL
 
 ## 已实现功能

@@ -6,7 +6,7 @@ import com.klinebootcamp.enums.AssetClass;
 import com.klinebootcamp.enums.Timeframe;
 import com.klinebootcamp.enums.TradeActionType;
 import com.klinebootcamp.repository.*;
-import jakarta.transaction.Transactional;
+import javax.transaction.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -45,11 +45,11 @@ public class TrainingService {
     }
 
     public TrainingSessionResponse createRandomSession(String email, CreateTrainingRequest request) {
-        Timeframe timeframe = request.timeframe() == null ? Timeframe.H1 : request.timeframe();
-        int context = request.contextSize() == null ? 120 : request.contextSize();
-        int target = request.targetSize() == null ? 30 : request.targetSize();
+        Timeframe timeframe = request.getTimeframe() == null ? Timeframe.H1 : request.getTimeframe();
+        int context = request.getContextSize() == null ? 120 : request.getContextSize();
+        int target = request.getTargetSize() == null ? 30 : request.getTargetSize();
 
-        Instrument instrument = resolveInstrument(request.assetClass(), request.symbol());
+        Instrument instrument = resolveInstrument(request.getAssetClass(), request.getSymbol());
         long total = candleRepository.countByInstrumentAndTimeframe(instrument, timeframe);
         if (total < context + target + 1L) {
             throw new ResponseStatusException(BAD_REQUEST, "Not enough candles for this timeframe");
@@ -102,7 +102,7 @@ public class TrainingService {
     @Transactional
     public TrainingPanelResponse performAction(Long sessionId, String email, TrainingActionRequest request) {
         TrainingSession session = loadOwnedSession(sessionId, email);
-        TradeActionType action = request.action();
+        TradeActionType action = request.getAction();
         if (action == null) {
             throw new ResponseStatusException(BAD_REQUEST, "Action is required");
         }
@@ -111,19 +111,35 @@ public class TrainingService {
         }
 
         BigDecimal lastPrice = currentPrice(session);
-        BigDecimal qty = request.quantity() == null ? BigDecimal.ONE : request.quantity();
+        BigDecimal qty = request.getQuantity() == null ? BigDecimal.ONE : request.getQuantity();
         if (qty.compareTo(BigDecimal.ZERO) <= 0) {
             qty = BigDecimal.ONE;
         }
 
         switch (action) {
-            case BUY -> applyBuy(session, qty, lastPrice);
-            case SELL -> applySell(session, qty, lastPrice);
-            case SHORT -> applyShort(session, qty, lastPrice);
-            case COVER -> applyCover(session, qty, lastPrice);
-            case NEXT_BAR -> moveNext(session);
-            case RESTART -> resetSession(session);
-            case FINISH -> session.setFinished(true);
+            case BUY:
+                applyBuy(session, qty, lastPrice);
+                break;
+            case SELL:
+                applySell(session, qty, lastPrice);
+                break;
+            case SHORT:
+                applyShort(session, qty, lastPrice);
+                break;
+            case COVER:
+                applyCover(session, qty, lastPrice);
+                break;
+            case NEXT_BAR:
+                moveNext(session);
+                break;
+            case RESTART:
+                resetSession(session);
+                break;
+            case FINISH:
+                session.setFinished(true);
+                break;
+            default:
+                throw new ResponseStatusException(BAD_REQUEST, "Unsupported action");
         }
 
         if (action == TradeActionType.BUY || action == TradeActionType.SELL
@@ -158,7 +174,7 @@ public class TrainingService {
                     total,
                     session.getCreatedAt()
             );
-        }).toList();
+        }).collect(Collectors.toList());
     }
 
     public TrainingRevealResponse reveal(Long sessionId, String email) {
@@ -171,7 +187,7 @@ public class TrainingService {
         );
         return new TrainingRevealResponse(
                 session.getId(),
-                target.stream().sorted(Comparator.comparing(KlineCandle::getOpenTime)).map(this::toDto).toList()
+                target.stream().sorted(Comparator.comparing(KlineCandle::getOpenTime)).map(this::toDto).collect(Collectors.toList())
         );
     }
 
@@ -198,7 +214,7 @@ public class TrainingService {
         List<TrainingTradeDto> trades = tradeRepository.findBySessionOrderByIdDesc(session).stream()
                 .limit(8)
                 .map(t -> new TrainingTradeDto(t.getAction(), t.getQuantity(), t.getPrice()))
-                .toList();
+                .collect(Collectors.toList());
 
         return new TrainingPanelResponse(
                 session.getId(),
@@ -215,7 +231,7 @@ public class TrainingService {
                 scale4(session.getRealizedPnl()),
                 scale4(floating),
                 scale4(totalPnl),
-                bars.stream().map(this::toDto).toList(),
+                bars.stream().map(this::toDto).collect(Collectors.toList()),
                 trades
         );
     }
@@ -321,7 +337,7 @@ public class TrainingService {
     }
 
     private Instrument resolveInstrument(AssetClass assetClass, String symbol) {
-        if (symbol != null && !symbol.isBlank()) {
+        if (symbol != null && !(symbol.trim().isEmpty())) {
             return instrumentRepository.findBySymbol(symbol.toUpperCase())
                     .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Symbol not found"));
         }

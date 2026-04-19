@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
 import java.util.Map;
 
 @RestController
@@ -13,6 +14,6 @@ public class ProfileController {
 
     @GetMapping("/me")
     public Map<String, String> me(Authentication authentication) {
-        return Map.of("email", authentication.getName());
+        return Collections.singletonMap("email", authentication.getName());
     }
 }

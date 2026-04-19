@@ -1,7 +1,7 @@
 package com.klinebootcamp.entity;
 
 import com.klinebootcamp.enums.Timeframe;
-import jakarta.persistence.*;
+import javax.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;

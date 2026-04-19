@@ -1,7 +1,7 @@
 package com.klinebootcamp.entity;
 
 import com.klinebootcamp.enums.TradeActionType;
-import jakarta.persistence.*;
+import javax.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;

@@ -4,9 +4,10 @@ import com.klinebootcamp.dto.market.CandleBatchUpsertRequest;
 import com.klinebootcamp.dto.market.InstrumentUpsertRequest;
 import com.klinebootcamp.entity.Instrument;
 import com.klinebootcamp.service.MarketDataService;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.Map;
 
 @RestController
@@ -25,6 +26,6 @@ public class MarketDataController {
 
     @PostMapping("/candles:batch-upsert")
     public Map<String, Integer> upsertCandles(@Valid @RequestBody CandleBatchUpsertRequest request) {
-        return Map.of("saved", marketDataService.upsertCandles(request));
+        return Collections.singletonMap("saved", marketDataService.upsertCandles(request));
     }
 }

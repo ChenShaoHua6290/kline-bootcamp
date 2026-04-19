@@ -4,7 +4,7 @@ import com.klinebootcamp.dto.AuthResponse;
 import com.klinebootcamp.dto.LoginRequest;
 import com.klinebootcamp.dto.RegisterRequest;
 import com.klinebootcamp.service.AuthService;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
