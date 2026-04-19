@@ -1,0 +1,39 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+a { color: #38bdf8; text-decoration: none; }
+
+.auth-wrapper { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.auth-card { width: 100%; max-width: 360px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.auth-card input, .auth-card button { border-radius: 8px; border: 1px solid #475569; padding: 10px 12px; font-size: 14px; }
+.auth-card button { cursor: pointer; background: #2563eb; color: white; border: none; }
+.error { color: #f87171; margin: 0; }
+
+.home-wrapper { min-height: 100vh; display: flex; flex-direction: column; }
+.home-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid #334155; background: #111827; }
+.home-brand { font-weight: 700; }
+.menu-row { display: flex; gap: 8px; }
+.menu-row button { border: 1px solid #334155; color: #e2e8f0; background: #1f2937; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.menu-row .primary { background: #14b8a6; color: #031b17; }
+
+.training-toolbar { padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #1f2937; }
+.training-toolbar input, .training-toolbar select { background: #0b1220; color: #dbeafe; border: 1px solid #334155; border-radius: 6px; padding: 8px 10px; }
+.toolbar-message { padding: 0 16px; color: #93c5fd; margin: 8px 0 0; }
+
+.training-layout { display: grid; grid-template-columns: 1fr 320px; gap: 12px; padding: 12px; min-height: 0; flex: 1; }
+.chart-area { min-height: 0; }
+.chart-container { width: 100%; height: calc(100vh - 170px); border-radius: 12px; overflow: hidden; border: 1px solid #334155; background: #020617; }
+
+.side-panel { border: 1px solid #334155; border-radius: 12px; padding: 10px; background: #0b1324; display: flex; flex-direction: column; gap: 10px; }
+.card { border: 1px solid #1e293b; border-radius: 8px; padding: 8px; background: #111827; }
+.card p { margin: 4px 0; font-size: 13px; }
+.card label { font-size: 12px; color: #94a3b8; }
+.card input { width: 100%; margin-top: 4px; margin-bottom: 8px; background: #0b1220; color: #fff; border: 1px solid #334155; border-radius: 6px; padding: 7px; }
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.card button { border: none; border-radius: 7px; padding: 8px; cursor: pointer; color: #fff; background: #334155; }
+.card .buy { background: #10b981; }
+.card .sell { background: #ef4444; }
+.card .buy2 { background: #f59e0b; }
+.card .sell2 { background: #0ea5e9; }
+.card .next { width: 100%; margin-bottom: 8px; background: #2563eb; }
+.history-list { margin: 0; padding-left: 16px; max-height: 160px; overflow: auto; }
+.history-list li { font-size: 12px; margin-bottom: 4px; }
