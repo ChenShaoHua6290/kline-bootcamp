@@ -35,7 +35,24 @@ CREATE TABLE IF NOT EXISTS training_sessions (
     context_size INT NOT NULL,
     target_size INT NOT NULL,
     start_offset BIGINT NOT NULL,
+    current_step INT NOT NULL,
+    initial_balance DECIMAL(20,4) NOT NULL,
+    cash_balance DECIMAL(20,4) NOT NULL,
+    position_qty DECIMAL(20,8) NOT NULL,
+    avg_price DECIMAL(20,8) NOT NULL,
+    realized_pnl DECIMAL(20,4) NOT NULL,
+    finished BIT(1) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_session_instrument FOREIGN KEY (instrument_id) REFERENCES instruments(id)
+);
+
+CREATE TABLE IF NOT EXISTS training_trades (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    session_id BIGINT NOT NULL,
+    action VARCHAR(16) NOT NULL,
+    quantity DECIMAL(20,8) NOT NULL,
+    price DECIMAL(20,8) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    CONSTRAINT fk_trade_session FOREIGN KEY (session_id) REFERENCES training_sessions(id)
 );
