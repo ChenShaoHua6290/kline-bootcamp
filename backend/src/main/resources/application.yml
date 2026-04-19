@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/kline_training?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    time-zone: UTC
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: your-very-long-secret-key-at-least-32-characters-long
+    expiration-seconds: 86400
