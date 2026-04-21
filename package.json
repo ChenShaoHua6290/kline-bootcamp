@@ -11,6 +11,7 @@
     "build": "npm run build -w @kline/api && npm run build -w @kline/web",
     "test": "npm run test -w @kline/api",
     "dev:up": "bash scripts/dev-up.sh",
-    "dev:down": "bash scripts/dev-down.sh"
+    "dev:down": "bash scripts/dev-down.sh",
+    "dev:up:local": "bash scripts/dev-up-local.sh"
   }
 }
