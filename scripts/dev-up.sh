@@ -33,7 +33,7 @@ echo "[1/5] 启动 PostgreSQL + Redis..."
 docker compose up -d postgres redis
 
 echo "[2/5] 安装依赖..."
-npm install
+npm install --legacy-peer-deps
 
 echo "[3/5] 生成 Prisma Client..."
 npm run prisma:generate -w @kline/api

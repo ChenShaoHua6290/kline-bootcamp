@@ -26,7 +26,7 @@ if ! grep -q '^SQLITE_URL=' "$ENV_FILE"; then
 fi
 
 echo "[1/4] 安装依赖..."
-npm install
+npm install --legacy-peer-deps
 
 echo "[2/4] 使用 SQLite schema 生成 Prisma Client..."
 npx prisma generate --schema apps/api/prisma/schema.sqlite.prisma

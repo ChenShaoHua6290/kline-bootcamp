@@ -14,7 +14,7 @@ npm run dev:up
 该命令会自动执行：
 1. 启动 PostgreSQL + Redis（Docker）
 2. 自动生成 `apps/api/.env`（若不存在）
-3. 安装依赖
+3. 安装依赖（脚本内使用 `--legacy-peer-deps` 以规避 npm peer 冲突）
 4. 生成 Prisma Client
 5. 执行 Prisma 开发迁移
 6. 同时启动 API + Web 开发服务
@@ -65,7 +65,7 @@ npm run dev:up:local
 
 1. 安装依赖
 ```bash
-npm install
+npm install --legacy-peer-deps
 ```
 
 2. Backend env (`apps/api/.env`)

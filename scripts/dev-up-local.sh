@@ -41,7 +41,7 @@ else
 fi
 
 echo "[3/5] 安装依赖..."
-npm install
+npm install --legacy-peer-deps
 
 echo "[4/5] 生成 Prisma Client + 执行迁移..."
 npm run prisma:generate -w @kline/api
