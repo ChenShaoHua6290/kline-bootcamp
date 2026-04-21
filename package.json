@@ -12,6 +12,7 @@
     "test": "npm run test -w @kline/api",
     "dev:up": "bash scripts/dev-up.sh",
     "dev:down": "bash scripts/dev-down.sh",
-    "dev:up:local": "bash scripts/dev-up-local.sh"
+    "dev:up:local": "bash scripts/dev-up-local.sh",
+    "dev:up:lite": "bash scripts/dev-up-lite.sh"
   }
 }
