@@ -9,6 +9,8 @@
     "dev:api": "npm --workspace @kline/api run start:dev",
     "dev:web": "npm --workspace @kline/web run dev",
     "build": "npm run build -w @kline/api && npm run build -w @kline/web",
-    "test": "npm run test -w @kline/api"
+    "test": "npm run test -w @kline/api",
+    "dev:up": "bash scripts/dev-up.sh",
+    "dev:down": "bash scripts/dev-down.sh"
   }
 }

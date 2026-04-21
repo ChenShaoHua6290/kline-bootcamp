@@ -1,8 +1,38 @@
 # Kline Blind Training MVP
 
-## Quick Start
+## 一键启动（推荐）
 
-1. Install dependencies
+### 前置要求
+- Docker（含 `docker compose`）
+- Node.js + npm（建议 Node 20+）
+
+### 启动命令
+```bash
+npm run dev:up
+```
+
+该命令会自动执行：
+1. 启动 PostgreSQL + Redis（Docker）
+2. 自动生成 `apps/api/.env`（若不存在）
+3. 安装依赖
+4. 生成 Prisma Client
+5. 执行 Prisma 开发迁移
+6. 同时启动 API + Web 开发服务
+
+访问地址：
+- API: http://localhost:4000
+- Web: http://localhost:3000
+
+### 停止基础服务
+```bash
+npm run dev:down
+```
+
+---
+
+## 手动启动（可选）
+
+1. 安装依赖
 ```bash
 npm install
 ```
@@ -25,6 +55,3 @@ npm run prisma:generate -w @kline/api
 npm run dev:api
 npm run dev:web
 ```
-
-- API: http://localhost:4000
-- Web: http://localhost:3000
