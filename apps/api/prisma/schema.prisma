@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Market {
+  STOCK
+  FOREX
+  FUTURES
+  GOLD
+  CRYPTO
+}
+
+enum ActionType {
+  OPEN_LONG
+  OPEN_SHORT
+  CLOSE
+  HOLD
+  TP
+  SL
+  LIQUIDATED
+  END
+}
+
+enum PositionSide {
+  LONG
+  SHORT
+}
+
+enum CloseReason {
+  USER
+  TAKE_PROFIT
+  STOP_LOSS
+  LIQUIDATED
+  END_OF_DATA
+}
+
+model User {
+  id        String            @id @default(cuid())
+  email     String            @unique
+  password  String
+  createdAt DateTime          @default(now())
+  sessions  TrainingSession[]
+}
+
+model Symbol {
+  id        String      @id @default(cuid())
+  market    Market
+  code      String      @unique
+  bars      MarketBar[]
+  createdAt DateTime    @default(now())
+}
+
+model MarketBar {
+  id        String   @id @default(cuid())
+  symbolId  String
+  timeframe String
+  openTime  DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  symbol    Symbol   @relation(fields: [symbolId], references: [id])
+
+  @@index([symbolId, timeframe, openTime])
+}
+
+model TrainingSession {
+  id                 String            @id @default(cuid())
+  userId             String
+  market             Market
+  symbol             String
+  drivingTimeframe   String
+  totalBars          Int
+  initialVisibleBars Int
+  initialBalance     Float
+  finalBalance       Float?
+  isLiquidated       Boolean           @default(false)
+  resetCount         Int               @default(0)
+  status             String            @default("ACTIVE")
+  pointer            Int
+  viewTimeframe      String
+  barsData           Json
+  position           Position?
+  actions            TrainingAction[]
+  snapshots          AccountSnapshot[]
+  user               User              @relation(fields: [userId], references: [id])
+  createdAt          DateTime          @default(now())
+  endedAt            DateTime?
+}
+
+model Position {
+  id              String          @id @default(cuid())
+  sessionId       String          @unique
+  side            PositionSide
+  entryPrice      Float
+  positionPercent Float
+  positionAmount  Float
+  stopLossRatio   Float?
+  takeProfitRatio Float?
+  stopLossPrice   Float?
+  takeProfitPrice Float?
+  feePaid         Float
+  openedAtPointer Int
+  session         TrainingSession @relation(fields: [sessionId], references: [id])
+}
+
+model TrainingAction {
+  id              String          @id @default(cuid())
+  sessionId       String
+  actionType      ActionType
+  timePointer     Int
+  price           Float
+  positionPercent Float?
+  stopLossRatio   Float?
+  takeProfitRatio Float?
+  pnl             Float?
+  reason          CloseReason?
+  session         TrainingSession @relation(fields: [sessionId], references: [id])
+  createdAt       DateTime        @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model AccountSnapshot {
+  id          String          @id @default(cuid())
+  sessionId   String
+  timePointer Int
+  balance     Float
+  floatingPnl Float
+  totalEquity Float
+  session     TrainingSession @relation(fields: [sessionId], references: [id])
+  createdAt   DateTime        @default(now())
+
+  @@index([sessionId, timePointer])
+}
