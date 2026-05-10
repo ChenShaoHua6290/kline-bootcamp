@@ -1,0 +1,10 @@
+{
+  "crypto": [
+    {
+      "market": "CRYPTO",
+      "symbol": "BTCUSDT",
+      "baseTimeframe": "15m",
+      "source": "BINANCE"
+    }
+  ]
+}

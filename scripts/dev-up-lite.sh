@@ -25,6 +25,20 @@ if ! grep -q '^SQLITE_URL=' "$ENV_FILE"; then
   echo 'SQLITE_URL="file:./dev.db"' >> "$ENV_FILE"
 fi
 
+# Load lite env vars for prisma commands in this shell.
+set -a
+# shellcheck source=/dev/null
+source "$ENV_FILE"
+set +a
+
+if [ "${SQLITE_URL:-}" = "file:./dev.db" ]; then
+  export SQLITE_URL="file:${ROOT_DIR}/apps/api/prisma/dev.db"
+fi
+
+if [ "${DATABASE_URL:-}" = "file:./dev.db" ]; then
+  export DATABASE_URL="$SQLITE_URL"
+fi
+
 echo "[1/4] 安装依赖..."
 npm install --legacy-peer-deps
 
@@ -32,7 +46,17 @@ echo "[2/4] 使用 SQLite schema 生成 Prisma Client..."
 npx prisma generate --schema apps/api/prisma/schema.sqlite.prisma
 
 echo "[3/4] 使用 SQLite push 数据结构..."
-npx prisma db push --schema apps/api/prisma/schema.sqlite.prisma
+if ! npx prisma db push --schema apps/api/prisma/schema.sqlite.prisma; then
+  echo "[WARN] Prisma db push 失败，回退到 sqlite3 初始化表结构..."
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    echo "[ERROR] 未找到 sqlite3，无法完成 Lite 数据库初始化。"
+    exit 1
+  fi
+  SQLITE_DB_PATH="${SQLITE_URL#file:}"
+  mkdir -p "$(dirname "$SQLITE_DB_PATH")"
+  sqlite3 "$SQLITE_DB_PATH" < scripts/sqlite-init.sql
+  echo "[INFO] 已使用 sqlite3 初始化: $SQLITE_DB_PATH"
+fi
 
 echo "[4/4] 启动前后端开发服务..."
 echo "[INFO] API: http://localhost:4000"

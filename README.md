@@ -75,14 +75,28 @@ REDIS_URL="redis://localhost:6379"
 JWT_SECRET="dev-secret"
 ```
 
-3. Prisma
+3. Prisma（按环境选择）
 ```bash
-npm run prisma:generate -w @kline/api
-# then run prisma migrate in your own environment
+# Lite / SQLite（本地开发默认）
+npm run prisma:generate:sqlite -w @kline/api
+npm run prisma:push:sqlite -w @kline/api
+
+# PostgreSQL（联调/部署）
+npm run prisma:generate:pg -w @kline/api
+npm run prisma:migrate:dev:pg -w @kline/api
 ```
 
 4. Run
 ```bash
 npm run dev:api
 npm run dev:web
+```
+
+5. Real Kline data (Phase 1: CRYPTO BTCUSDT)
+```bash
+# 1) import Binance 15m history bars into bars_crypto
+npm run import:crypto
+
+# 2) aggregate from 15m -> 30m/1H/2H/4H/D/W/M
+npm run aggregate:bars
 ```

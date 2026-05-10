@@ -6,7 +6,19 @@
     "build": "tsc -p tsconfig.build.json",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "test": "vitest run",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "npm run prisma:generate:sqlite",
+    "prisma:generate:sqlite": "prisma generate --schema prisma/schema.sqlite.prisma",
+    "prisma:generate:pg": "prisma generate --schema prisma/schema.prisma",
+    "prisma:push": "npm run prisma:push:sqlite",
+    "prisma:push:sqlite": "prisma db push --schema prisma/schema.sqlite.prisma",
+    "prisma:push:pg": "prisma db push --schema prisma/schema.prisma",
+    "prisma:migrate:dev:pg": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:migrate:deploy:pg": "prisma migrate deploy --schema prisma/schema.prisma",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "import:crypto": "ts-node --transpile-only src/scripts/import-market-data.ts",
+    "import:crypto:offline": "ts-node --transpile-only src/scripts/import-market-data-offline.ts",
+    "aggregate:bars": "ts-node --transpile-only src/scripts/aggregate-bars.ts",
+    "migrate:sqlite:to:pg": "ts-node --transpile-only src/scripts/migrate-sqlite-to-pg.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.2",
@@ -15,6 +27,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.2",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^5.19.1",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
