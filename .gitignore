@@ -1,0 +1,29 @@
+.next/
+apps/web/.next/
+node_modules/
+dist/
+build/
+*.log
+
+# build artifacts
+apps/api/dist/
+apps/web/.next/
+dist/
+.next/
+build/
+node_modules/
+
+# logs
+*.log
+
+# env
+.env
+.env.local
+.env.*.local
+
+# local market data
+data/
+*.csv
+*.zip
+*.sqlite
+*.db

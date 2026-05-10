@@ -1,39 +1,82 @@
-import { Market } from '@prisma/client';
-import { IsEnum, IsIn, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { MARKET_VALUES, type Market } from '../common/domain-enums';
+import { REAL_MARKET_TIMEFRAMES } from '../market-data/timeframes';
 
 export class StartTrainingDto {
-  @IsEnum(Market)
+  @IsIn(MARKET_VALUES)
   market!: Market;
 
-  @IsIn(['15m', '30m', '1H', '2H', '3H', '4H', '6H', '8H', '12H', 'D', '2D', 'W', 'M'])
+  @IsIn(REAL_MARKET_TIMEFRAMES as unknown as string[])
   drivingTimeframe!: string;
 
-  @IsIn([150, 300, 500])
+  @IsInt()
+  @Min(50)
+  @Max(5000)
   totalBars!: number;
 
-  @IsIn([60, 150, 300, 500])
-  initialVisibleBars!: number;
-}
+  @IsOptional()
+  @IsInt()
+  @Min(50)
+  @Max(300)
+  trainingBars?: number;
 
-export class TrainingActionDto {
-  @IsIn(['BUY_LONG', 'BUY_SHORT', 'CLOSE', 'HOLD'])
-  action!: 'BUY_LONG' | 'BUY_SHORT' | 'CLOSE' | 'HOLD';
+  @IsOptional()
+  @IsInt()
+  @Min(500)
+  @Max(500)
+  initialVisibleBars?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0.01)
-  @Max(1)
+  initialBalance?: number;
+}
+
+export class TrainingActionDto {
+  @IsOptional()
+  @IsIn(['BUY_LONG', 'BUY_SHORT', 'CLOSE', 'HOLD'])
+  action?: 'BUY_LONG' | 'BUY_SHORT' | 'CLOSE' | 'HOLD';
+
+  @IsOptional()
+  @IsIn(['OPEN_LONG', 'OPEN_SHORT', 'ADD_LONG', 'ADD_SHORT', 'PARTIAL_CLOSE', 'FULL_CLOSE', 'HOLD'])
+  actionType?: 'OPEN_LONG' | 'OPEN_SHORT' | 'ADD_LONG' | 'ADD_SHORT' | 'PARTIAL_CLOSE' | 'FULL_CLOSE' | 'HOLD';
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.0001)
+  @Max(100)
   positionPercent?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(1)
-  stopLossRatio?: number;
+  @Min(1)
+  @Max(100)
+  closePercent?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(1)
-  takeProfitRatio?: number;
+  @Min(0.000001)
+  stopLossPrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.000001)
+  takeProfitPrice?: number;
+}
+
+export class SaveTrainingReviewDto {
+  @IsString()
+  @MaxLength(5000)
+  content!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(30, { each: true })
+  problemTags?: string[];
+}
+
+export class FinishTrainingDto {
+  @IsIn(['completed', 'terminated', 'liquidated'])
+  reason!: 'completed' | 'terminated' | 'liquidated';
 }

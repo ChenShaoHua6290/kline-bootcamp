@@ -5,18 +5,39 @@ export type Session = {
   drivingTimeframe: string;
   totalBars: number;
   initialVisibleBars: number;
+  initialBalance: number;
   pointer: number;
+  trainPointer?: number;
   finalBalance: number;
   isLiquidated: boolean;
   resetCount: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'TERMINATED' | 'LIQUIDATED' | 'ENDED';
   barsData: Array<{ open: number; high: number; low: number; close: number; time: string }>;
+  contextStartTime?: string | null;
+  trainStartTime?: string | null;
+  trainEndTime?: string | null;
+  currentTimePointer?: string | null;
   position: {
     side: 'LONG' | 'SHORT';
     entryPrice: number;
     positionPercent: number;
+    positionAmount?: number;
     stopLossRatio?: number;
     takeProfitRatio?: number;
+    stopLossPrice?: number;
+    takeProfitPrice?: number;
   } | null;
-  actions: Array<{ id: string; actionType: string; price: number; pnl?: number; createdAt: string }>;
-  status: string;
+  actions: Array<{ id: string; actionType: string; timePointer: number; price: number; pnl?: number; createdAt: string }>;
+  snapshots?: Array<{ id: string; timePointer: number; balance: number; floatingPnl: number; totalEquity: number; createdAt: string }>;
+  hasReview?: boolean;
+};
+
+export type TrainingReview = {
+  id: string;
+  sessionId: string;
+  userId: string;
+  content: string;
+  problemTags: string[];
+  createdAt: string;
+  updatedAt: string;
 };

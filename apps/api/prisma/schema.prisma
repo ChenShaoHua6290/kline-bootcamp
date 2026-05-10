@@ -18,8 +18,13 @@ enum Market {
 enum ActionType {
   OPEN_LONG
   OPEN_SHORT
+  ADD_LONG
+  ADD_SHORT
+  PARTIAL_CLOSE
+  FULL_CLOSE
   CLOSE
   HOLD
+  WAIT
   TP
   SL
   LIQUIDATED
@@ -39,20 +44,51 @@ enum CloseReason {
   END_OF_DATA
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AuditAction {
+  USER_BAN
+  USER_UNBAN
+  INVITE_CREATE
+  INVITE_UPDATE
+  INVITE_DELETE
+  LOGIN_FAILED
+}
+
 model User {
-  id        String            @id @default(cuid())
-  email     String            @unique
-  password  String
-  createdAt DateTime          @default(now())
-  sessions  TrainingSession[]
+  id            String                 @id @default(cuid())
+  email         String                 @unique
+  password      String
+  role          UserRole               @default(USER)
+  isBanned      Boolean                @default(false)
+  bannedAt      DateTime?
+  banReason     String?
+  createdAt     DateTime               @default(now())
+  sessions      TrainingSession[]
+  redemptions   InviteCodeRedemption[]
+  createdInviteCodes InviteCode[]
+  refreshTokens RefreshToken[]
+  adminLogs     AdminAuditLog[]        @relation("AdminActorLogs")
+  securityLogs  SecurityLog[]
+  reviews       TrainingReview[]
 }
 
 model Symbol {
   id        String      @id @default(cuid())
   market    Market
-  code      String      @unique
+  code      String
   bars      MarketBar[]
+  barsCrypto BarCrypto[]
+  barsStock BarStock[]
+  barsForex BarForex[]
+  barsFutures BarFutures[]
+  barsGold BarGold[]
   createdAt DateTime    @default(now())
+
+  @@unique([market, code])
 }
 
 model MarketBar {
@@ -70,10 +106,106 @@ model MarketBar {
   @@index([symbolId, timeframe, openTime])
 }
 
+model BarCrypto {
+  id        String   @id @default(cuid())
+  symbolId  String
+  timeframe String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  source    String
+  createdAt DateTime @default(now())
+  symbol    Symbol   @relation(fields: [symbolId], references: [id])
+
+  @@unique([symbolId, timeframe, timestamp])
+  @@index([symbolId, timeframe, timestamp])
+  @@map("bars_crypto")
+}
+
+model BarStock {
+  id        String   @id @default(cuid())
+  symbolId  String
+  timeframe String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  source    String
+  createdAt DateTime @default(now())
+  symbol    Symbol   @relation(fields: [symbolId], references: [id])
+
+  @@unique([symbolId, timeframe, timestamp])
+  @@index([symbolId, timeframe, timestamp])
+  @@map("bars_stock")
+}
+
+model BarForex {
+  id        String   @id @default(cuid())
+  symbolId  String
+  timeframe String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  source    String
+  createdAt DateTime @default(now())
+  symbol    Symbol   @relation(fields: [symbolId], references: [id])
+
+  @@unique([symbolId, timeframe, timestamp])
+  @@index([symbolId, timeframe, timestamp])
+  @@map("bars_forex")
+}
+
+model BarFutures {
+  id        String   @id @default(cuid())
+  symbolId  String
+  timeframe String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  source    String
+  createdAt DateTime @default(now())
+  symbol    Symbol   @relation(fields: [symbolId], references: [id])
+
+  @@unique([symbolId, timeframe, timestamp])
+  @@index([symbolId, timeframe, timestamp])
+  @@map("bars_futures")
+}
+
+model BarGold {
+  id        String   @id @default(cuid())
+  symbolId  String
+  timeframe String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  source    String
+  createdAt DateTime @default(now())
+  symbol    Symbol   @relation(fields: [symbolId], references: [id])
+
+  @@unique([symbolId, timeframe, timestamp])
+  @@index([symbolId, timeframe, timestamp])
+  @@map("bars_gold")
+}
+
 model TrainingSession {
   id                 String            @id @default(cuid())
   userId             String
   market             Market
+  symbolId           String?
   symbol             String
   drivingTimeframe   String
   totalBars          Int
@@ -89,9 +221,29 @@ model TrainingSession {
   position           Position?
   actions            TrainingAction[]
   snapshots          AccountSnapshot[]
+  review             TrainingReview?
   user               User              @relation(fields: [userId], references: [id])
+  startedAt          DateTime          @default(now())
+  completedAt        DateTime?
+  terminatedAt       DateTime?
+  liquidatedAt       DateTime?
+  lastActiveAt       DateTime          @default(now())
   createdAt          DateTime          @default(now())
   endedAt            DateTime?
+}
+
+model TrainingReview {
+  id          String          @id @default(cuid())
+  sessionId   String          @unique
+  userId      String
+  content     String
+  problemTags Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  session     TrainingSession @relation(fields: [sessionId], references: [id])
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
 }
 
 model Position {
@@ -114,11 +266,18 @@ model TrainingAction {
   id              String          @id @default(cuid())
   sessionId       String
   actionType      ActionType
+  direction       PositionSide?
   timePointer     Int
   price           Float
+  amount          Float?
   positionPercent Float?
+  closePercent    Float?
   stopLossRatio   Float?
   takeProfitRatio Float?
+  avgEntryPriceAfter Float?
+  positionAmountAfter Float?
+  realizedPnl     Float?
+  fee             Float?
   pnl             Float?
   reason          CloseReason?
   session         TrainingSession @relation(fields: [sessionId], references: [id])
@@ -138,4 +297,74 @@ model AccountSnapshot {
   createdAt   DateTime        @default(now())
 
   @@index([sessionId, timePointer])
+}
+
+model InviteCode {
+  id          String                 @id @default(cuid())
+  code        String                 @unique
+  isActive    Boolean                @default(true)
+  maxUses     Int
+  usedCount   Int                    @default(0)
+  expiresAt   DateTime?
+  createdBy   String?
+  updatedAt   DateTime               @updatedAt
+  deletedAt   DateTime?
+  createdAt   DateTime               @default(now())
+  redemptions InviteCodeRedemption[]
+  creator     User?                  @relation(fields: [createdBy], references: [id])
+}
+
+model InviteCodeRedemption {
+  id           String     @id @default(cuid())
+  inviteCodeId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  inviteCode   InviteCode @relation(fields: [inviteCodeId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@unique([inviteCodeId, userId])
+  @@index([inviteCodeId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model AdminAuditLog {
+  id          String      @id @default(cuid())
+  adminUserId String
+  targetUserId String?
+  action      AuditAction
+  resourceType String
+  resourceId  String?
+  detail      String?
+  createdAt   DateTime    @default(now())
+  admin       User        @relation("AdminActorLogs", fields: [adminUserId], references: [id])
+
+  @@index([adminUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+model SecurityLog {
+  id        String      @id @default(cuid())
+  userId    String?
+  action    AuditAction
+  ip        String?
+  userAgent String?
+  detail    String?
+  createdAt DateTime    @default(now())
+  user      User?       @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }

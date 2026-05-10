@@ -1,63 +1,157 @@
 'use client';
 
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useTrainingStore } from '@/stores/training.store';
-import { TopNav } from '@/components/TopNav';
-import { TrainingConfigModal } from '@/components/TrainingConfigModal';
-import { KLineChart } from '@/components/KLineChart';
-import { TimeframeSwitcher } from '@/components/TimeframeSwitcher';
-import { TrainingInfoPanel } from '@/components/TrainingInfoPanel';
-import { AccountPanel } from '@/components/AccountPanel';
-import { TradePanel } from '@/components/TradePanel';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { TopNav } from '@/components/TopNav';
+import { DashboardPanel } from '@/components/DashboardPanel';
+import { NoticeModal } from '@/components/NoticeModal';
+import { clearAuthSession, getAuthUser, getToken, type AuthUser } from '@/lib/auth';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingState } from '@/components/ui/LoadingState';
+
+type ProfileStats = {
+  liquidationCount: number;
+  totalResetCount: number;
+  accountBalance: number;
+  needResetAfterLiquidation: boolean;
+};
+
+type DashboardData = {
+  summary: {
+    trainingCount: number;
+    winRate: number;
+    accountScore: number;
+    liquidationCount: number;
+  };
+  equityCurve: Array<{ time: string; equity: number }>;
+  leaderboard: {
+    top10: Array<{
+      rank: number;
+      userId: string;
+      displayName: string;
+      accountScore: number;
+      trainingCount: number;
+      winRate: number;
+      liquidationCount: number;
+      isMe: boolean;
+    }>;
+    me: {
+      rank: number;
+      userId: string;
+      displayName: string;
+      accountScore: number;
+      trainingCount: number;
+      winRate: number;
+      liquidationCount: number;
+      isMe: boolean;
+    } | null;
+  };
+};
+
+function normalizeErrorMessage(msg: string | string[] | undefined, fallback: string) {
+  if (Array.isArray(msg)) return msg.join('，');
+  if (typeof msg === 'string' && msg.trim()) return msg;
+  return fallback;
+}
 
 export default function HomePage() {
-  const [showConfig, setShowConfig] = useState(false);
-  const { session, setSession, viewTimeframe, setViewTimeframe } = useTrainingStore();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [ready, setReady] = useState(false);
+  const [notice, setNotice] = useState<{ title: string; message: string; tone?: 'error' | 'warning' | 'info' } | null>(null);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const router = useRouter();
 
-  const startMutation = useMutation({
-    mutationFn: async (payload: any) => (await api.post('/training/start', payload)).data,
-    onSuccess: setSession,
+  const profileStatsQuery = useQuery({
+    queryKey: ['training-profile-stats'],
+    enabled: ready && Boolean(user),
+    queryFn: async () => (await api.get<ProfileStats>('/training/profile')).data,
   });
 
-  const actionMutation = useMutation({
-    mutationFn: async (payload: any) => (await api.post(`/training/${session?.id}/action`, payload)).data,
-    onSuccess: (data) => {
-      setSession(data);
-      if (data.status !== 'ACTIVE') router.push(`/replay/${data.id}`);
+  const dashboardQuery = useQuery({
+    queryKey: ['training-dashboard'],
+    enabled: ready && Boolean(user),
+    queryFn: async () => (await api.get<DashboardData>('/training/dashboard')).data,
+    refetchInterval: 30000,
+  });
+
+  useEffect(() => {
+    const token = getToken();
+    const currentUser = getAuthUser();
+    if (token && currentUser) {
+      setUser(currentUser);
+    } else {
+      if (token && !currentUser) clearAuthSession();
+      setUser(null);
+    }
+    setReady(true);
+  }, []);
+
+  const resetAccountMutation = useMutation({
+    mutationFn: async () => (await api.post('/training/reset-account')).data,
+    onMutate: () => setNotice(null),
+    onSuccess: () => {
+      profileStatsQuery.refetch();
+      dashboardQuery.refetch();
+      setNotice({
+        title: '重置成功',
+        message: '账户金额已重置为初始值，可重新开始训练。',
+        tone: 'info',
+      });
+    },
+    onError: (error: unknown) => {
+      const msg = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+      setNotice({
+        title: '重置失败',
+        message: normalizeErrorMessage(msg, '重置金额失败，请重试'),
+        tone: 'warning',
+      });
     },
   });
 
+  if (!ready) return <main className="app-shell p-6"><LoadingState message="正在检查登录状态..." /></main>;
+
   return (
-    <main>
-      <TopNav onStart={() => setShowConfig(true)} />
-      {showConfig && <TrainingConfigModal onClose={() => setShowConfig(false)} onSubmit={(v) => startMutation.mutate(v)} />}
-      <div className="grid grid-cols-4 gap-4 p-4">
-        <div className="col-span-3 rounded border border-slate-700 p-2">
-          {session ? (
-            <>
-              <TimeframeSwitcher value={viewTimeframe} onChange={setViewTimeframe} />
-              <KLineChart data={session.barsData.slice(0, session.pointer + 1)} />
-            </>
-          ) : (
-            <div className="flex h-[550px] items-center justify-center text-slate-400">点击“开始训练”进入双盲模式。</div>
-          )}
-        </div>
-        <div className="space-y-3">
-          {session ? (
-            <>
-              <TrainingInfoPanel session={session} viewTimeframe={viewTimeframe} />
-              <AccountPanel session={session} />
-              <TradePanel session={session} onAction={(payload) => actionMutation.mutate(payload)} />
-            </>
-          ) : (
-            <div className="rounded bg-slate-800 p-3 text-sm">开始训练后可查看账户、交易与推进控制。</div>
-          )}
-        </div>
-      </div>
+    <main className="flex min-h-screen flex-col overflow-x-hidden overflow-y-auto">
+      <TopNav
+        onStart={() => router.push('/train?start=1')}
+        onHistory={() => router.push('/history')}
+        onAdmin={() => router.push('/admin')}
+        user={user}
+        liquidationCount={profileStatsQuery.data?.liquidationCount ?? 0}
+        totalResetCount={profileStatsQuery.data?.totalResetCount ?? 0}
+        onRequestReset={() => setConfirmResetOpen(true)}
+        resetBalanceBusy={resetAccountMutation.isPending}
+      />
+
+      {notice ? <NoticeModal open title={notice.title} message={notice.message} tone={notice.tone} onClose={() => setNotice(null)} /> : null}
+      {confirmResetOpen ? (
+        <NoticeModal
+          open
+          title="确认重置金额"
+          message="重置后当前训练资金将恢复为初始金额，并会计入重置次数。是否继续？"
+          tone="warning"
+          confirmText="确认重置"
+          cancelText="取消"
+          onClose={() => setConfirmResetOpen(false)}
+          onConfirm={() => {
+            setConfirmResetOpen(false);
+            resetAccountMutation.mutate();
+          }}
+        />
+      ) : null}
+
+      {user ? (
+        <DashboardPanel
+          data={dashboardQuery.data}
+          loading={dashboardQuery.isLoading}
+          error={dashboardQuery.isError}
+          currentUserId={user.id}
+        />
+      ) : (
+        <div className="p-4"><EmptyState title="请先登录" description="登录后即可查看首页统计与资金曲线。" /></div>
+      )}
     </main>
   );
 }
