@@ -85,14 +85,14 @@ export function NoticeModal({
       >
         <div className="flex items-center justify-between border-b border-slate-700/70 px-5 py-4">
           <div>
-            <div className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold ${toneStyle.badge}`}>系统提示</div>
-            <div className="mt-1 text-xs text-slate-400">请确认后继续操作</div>
+            <div className={`inline-flex rounded-lg border px-2.5 py-1 text-[18px] font-semibold ${toneStyle.badge}`}>系统提示</div>
+            <div className="mt-1 text-[11px] text-slate-400">请确认后继续操作</div>
           </div>
           <Button
             onClick={onClose}
             variant="default"
             size="sm"
-            className="!px-2.5 !py-1"
+            className="!h-8 !w-8 !px-0 text-sm"
             aria-label="关闭"
           >
             ×
@@ -100,33 +100,35 @@ export function NoticeModal({
         </div>
 
         <div className="space-y-3 px-5 py-5">
-          <h3 className={`text-xl font-semibold ${toneStyle.title}`}>{title}</h3>
-          <p className="text-sm leading-6 text-slate-300">{message}</p>
+          <h3 className={`text-[22px] font-semibold leading-tight ${toneStyle.title}`}>{title}</h3>
+          <p className="text-[15px] leading-7 text-slate-300">{message}</p>
           {onConfirm ? (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button
                 onClick={onClose}
                 variant="default"
-                className="w-full py-2.5"
+                className="h-10 min-w-[88px] px-4 text-sm"
               >
                 {cancelText}
               </Button>
               <Button
                 onClick={onConfirm}
                 variant="primary"
-                className={`w-full border-0 bg-gradient-to-r py-2.5 ${toneStyle.button}`}
+                className={`h-10 min-w-[104px] border-0 bg-gradient-to-r px-5 text-sm ${toneStyle.button}`}
               >
                 {confirmText}
               </Button>
             </div>
           ) : (
-            <Button
-              onClick={onClose}
-              variant="primary"
-              className={`w-full border-0 bg-gradient-to-r py-2.5 ${toneStyle.button}`}
-            >
-              我知道了
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                onClick={onClose}
+                variant="primary"
+                className={`h-10 min-w-[104px] border-0 bg-gradient-to-r px-5 text-sm ${toneStyle.button}`}
+              >
+                我知道了
+              </Button>
+            </div>
           )}
         </div>
       </div>

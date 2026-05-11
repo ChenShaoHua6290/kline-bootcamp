@@ -377,15 +377,26 @@ export class TrainingService {
         select: { createdAt: true, totalEquity: true },
         take: 1200,
       }),
-      this.getLeaderboard(userId, 10),
+      this.getLeaderboard(userId, 50),
     ]);
 
-    const myClosedSessions = await this.prisma.trainingSession.findMany({
-      where: { userId, status: { in: CLOSED_SESSION_STATUSES } },
-      select: { finalBalance: true, initialBalance: true },
-    });
-    const myWinSessions = myClosedSessions.filter((s) => (s.finalBalance ?? s.initialBalance) > s.initialBalance);
-    const winRate = myClosedSessions.length > 0 ? (myWinSessions.length / myClosedSessions.length) * 100 : 0;
+    const [closedTradeCount, winTradeCount] = await Promise.all([
+      this.prisma.trainingAction.count({
+        where: {
+          session: { userId },
+          actionType: { in: [ActionType.CLOSE, ActionType.PARTIAL_CLOSE, ActionType.FULL_CLOSE, ActionType.TP, ActionType.SL, ActionType.LIQUIDATED] },
+          pnl: { not: null },
+        },
+      }),
+      this.prisma.trainingAction.count({
+        where: {
+          session: { userId },
+          actionType: { in: [ActionType.CLOSE, ActionType.PARTIAL_CLOSE, ActionType.FULL_CLOSE, ActionType.TP, ActionType.SL, ActionType.LIQUIDATED] },
+          pnl: { gt: 0 },
+        },
+      }),
+    ]);
+    const winRate = closedTradeCount > 0 ? (winTradeCount / closedTradeCount) * 100 : 0;
     const accountScore = latestSession ? latestSession.finalBalance ?? latestSession.initialBalance : 10000;
 
     const sampledSnapshots = this.sampleEquityCurve(
@@ -452,12 +463,23 @@ export class TrainingService {
         SELECT
           ts."userId",
           COUNT(*) FILTER (WHERE ts."status" IN ('COMPLETED', 'TERMINATED', 'LIQUIDATED', 'ENDED'))::int AS "trainingCount",
-          COUNT(*) FILTER (WHERE ts."isLiquidated" = true)::int AS "liquidationCount",
-          COUNT(*) FILTER (
-            WHERE ts."status" IN ('COMPLETED', 'TERMINATED', 'LIQUIDATED', 'ENDED')
-              AND COALESCE(ts."finalBalance", ts."initialBalance") > ts."initialBalance"
-          )::int AS "winCount"
+          COUNT(*) FILTER (WHERE ts."isLiquidated" = true)::int AS "liquidationCount"
         FROM "TrainingSession" ts
+        GROUP BY ts."userId"
+      ),
+      trade_stats AS (
+        SELECT
+          ts."userId",
+          COUNT(*) FILTER (
+            WHERE ta."actionType" IN ('CLOSE', 'PARTIAL_CLOSE', 'FULL_CLOSE', 'TP', 'SL', 'LIQUIDATED')
+              AND ta."pnl" IS NOT NULL
+          )::int AS "closedTradeCount",
+          COUNT(*) FILTER (
+            WHERE ta."actionType" IN ('CLOSE', 'PARTIAL_CLOSE', 'FULL_CLOSE', 'TP', 'SL', 'LIQUIDATED')
+              AND ta."pnl" > 0
+          )::int AS "winTradeCount"
+        FROM "TrainingAction" ta
+        INNER JOIN "TrainingSession" ts ON ts.id = ta."sessionId"
         GROUP BY ts."userId"
       ),
       ranked AS (
@@ -471,13 +493,14 @@ export class TrainingService {
           ROUND(COALESCE(ls.points, 10000)::numeric, 2)::float8 AS points,
           COALESCE(ss."trainingCount", 0)::int AS "trainingCount",
           CASE
-            WHEN COALESCE(ss."trainingCount", 0) = 0 THEN 0
-            ELSE ROUND((ss."winCount"::numeric / ss."trainingCount"::numeric) * 100, 2)::float8
+            WHEN COALESCE(ts2."closedTradeCount", 0) = 0 THEN 0
+            ELSE ROUND((ts2."winTradeCount"::numeric / ts2."closedTradeCount"::numeric) * 100, 2)::float8
           END AS "winRate",
           COALESCE(ss."liquidationCount", 0)::int AS "liquidationCount"
         FROM "User" u
         LEFT JOIN latest_session ls ON ls."userId" = u.id
         LEFT JOIN session_stats ss ON ss."userId" = u.id
+        LEFT JOIN trade_stats ts2 ON ts2."userId" = u.id
       )
       SELECT rank, "userId", nickname, email, points, "trainingCount", "winRate", "liquidationCount"
       FROM ranked

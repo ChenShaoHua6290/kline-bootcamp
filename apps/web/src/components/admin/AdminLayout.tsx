@@ -7,6 +7,7 @@ import { getAuthUser, getToken } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { AdminSidebar } from './AdminSidebar';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { PageTitle } from '@/components/ui/PageHeader';
 
 export function AdminLayout({ title, children }: { title: string; children: ReactNode }) {
   const router = useRouter();
@@ -29,7 +30,6 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
     }
   }, [router]);
 
-  // Keep SSR and first client render identical to prevent hydration mismatch.
   if (!ready || !isAdmin) {
     return (
       <main className="p-6">
@@ -40,17 +40,15 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
 
   return (
     <main className="min-h-screen p-3 sm:p-4">
-      <header className="app-nav mb-3">
-        <div>
-          <h1 className="app-title text-sm sm:text-base">{title}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/">
-            <Button variant="default" size='sm'>返回首页</Button>
+      <header className="app-nav mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <PageTitle className="text-lg sm:text-xl">{title}</PageTitle>
+          <Link href="/" className="shrink-0">
+            <Button variant="ghost" size='sm' className="hover:shadow-[0_8px_20px_rgba(2,132,199,0.22)]">返回首页</Button>
           </Link>
         </div>
       </header>
-      <section className="grid grid-cols-1 gap-3 xl:grid-cols-[220px_minmax(0,1fr)]">
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
         <AdminSidebar />
         <div className="min-w-0">{children}</div>
       </section>

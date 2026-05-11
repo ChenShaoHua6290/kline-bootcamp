@@ -55,12 +55,9 @@ export function TopNav({
 
   return (
     <div className="app-nav flex flex-wrap items-center justify-between gap-2 sm:gap-2">
-      <h1 className="app-title flex items-center gap-1.5 text-sm sm:text-base">
-        <span className="rounded-md border border-cyan-300/35 bg-cyan-500/10 px-1.5 py-0.5 text-[11px] font-bold tracking-[0.08em] text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.28)] sm:text-xs">
-          只做一种模式
-        </span>
-        <span className="bg-gradient-to-r from-slate-100 via-sky-100 to-cyan-200 bg-clip-text text-[13px] font-semibold tracking-[0.01em] text-transparent sm:text-[15px]">
-          K线训练系统
+      <h1 className="app-title flex items-center gap-2">
+        <span className="rounded-md border border-cyan-300/35 bg-cyan-500/10 px-1.5 py-0.5 text-xs font-bold tracking-[0.08em] text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.28)] sm:text-[20px]">
+          只做一种模式K线训练系统
         </span>
       </h1>
       <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
@@ -70,11 +67,12 @@ export function TopNav({
               className="surface-muted max-w-[210px] cursor-pointer px-2.5 py-1.5 text-left transition hover:border-slate-500 xl:max-w-[260px]"
               onClick={() => setMenuOpen((v) => !v)}
             >
-              <div className="truncate text-[13px] font-medium text-slate-200">{displayName}</div>
-              <div className="truncate text-[11px] text-slate-400">{user.email}</div>
+              <div className="truncate text-[15px] font-medium text-slate-200">{displayName}</div>
+              <div className="truncate text-[10px] text-slate-400">{user.email}</div>
             </button>
             {menuOpen ? (
-              <Panel className="absolute right-0 z-[140] mt-2 w-[180px] p-3 shadow-2xl backdrop-blur">
+              <Panel className="absolute right-0 z-[140] mt-2 w-[190px] p-3 shadow-2xl backdrop-blur">
+                <div className="text-xs text-slate-400">爆仓次数: <span className="font-semibold text-rose-300">{liquidationCount}</span></div>
                 <div className="mt-1 text-[13px] text-slate-300">
                   重置次数: <span className="font-semibold text-cyan-300">{totalResetCount}</span>
                 </div>
@@ -96,17 +94,17 @@ export function TopNav({
         {user ? (
           <>
             {user.role === 'ADMIN' ? (
-              <Button variant="default" size="sm" className="h-8 sm:h-8 sm:px-3 sm:text-[13px]" onClick={onAdmin}>
+              <Button variant="ghost" size="sm" className="h-8 sm:px-3 sm:text-[15px]" onClick={onAdmin}>
                 管理后台
               </Button>
             ) : null}
-            <Button variant="default" size="sm" className="h-8 sm:h-8 sm:px-3 sm:text-[13px]" onClick={onHistory}>
+            <Button variant="ghost" size="sm" className="h-8 sm:px-3 sm:text-[15px]" onClick={onHistory}>
               历史记录
             </Button>
-            <Button variant="primary" size="sm" className="h-8 sm:h-8 sm:px-3 sm:text-[13px]" onClick={onStart}>
+            <Button variant="primary" size="sm" className="h-8 sm:px-3 sm:text-[15px ]" onClick={onStart}>
               开始训练
             </Button>
-            <Button variant="default" size="sm" className="h-8 sm:h-8 sm:px-3 sm:text-[13px]" onClick={logout}>
+            <Button variant="ghost" size="sm" className="h-8 sm:px-3 sm:text-[15px]" onClick={logout}>
               退出
             </Button>
           </>

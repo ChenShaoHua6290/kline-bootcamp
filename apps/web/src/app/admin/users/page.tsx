@@ -77,13 +77,13 @@ export default function AdminUsersPage() {
     <AdminLayout title="用户管理">
       <PageHeader>
         <div>
-          <PageTitle className="text-base sm:text-lg">用户管理</PageTitle>
-          <PageDescription>可按邮箱检索用户并执行封禁/解封操作。</PageDescription>
+          <PageTitle>用户管理</PageTitle>
+          <PageDescription>可按昵称或邮箱检索用户并执行封禁/解封操作。</PageDescription>
         </div>
       </PageHeader>
-      <Card className="mb-2 p-3">
+      <Card className="mb-3 p-4">
         <div className="flex items-center gap-2">
-          <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索邮箱..." />
+          <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索昵称或邮箱..." />
           <Button variant="default" onClick={() => reload()}>搜索</Button>
         </div>
       </Card>

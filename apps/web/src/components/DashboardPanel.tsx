@@ -1,9 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { Card, CardBody } from '@/components/ui/Card';
-import { Table, TableWrap } from '@/components/ui/Table';
+import { TableWrap } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
-import { StatCard } from '@/components/ui/StatCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -63,7 +62,6 @@ function selectCurveByRange(rows: Array<{ time: string; equity: number }>, range
   });
   if (filteredByNow.length >= 2) return filteredByNow;
 
-  // 数据更新时间滞后时，回退为“以最新数据时间为锚点”的最近窗口
   const fromByLatest = latestTs - spanMs;
   const filteredByLatest = rows.filter((r) => {
     const ts = Date.parse(r.time);
@@ -99,25 +97,55 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
   const h = 180;
   const path = buildPath(visibleCurve, w, h);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [expandedName, setExpandedName] = useState<string | null>(null);
   const hoverRow = useMemo(() => {
     if (hoverIdx == null || hoverIdx < 0 || hoverIdx >= visibleCurve.length) return null;
     return visibleCurve[hoverIdx];
   }, [visibleCurve, hoverIdx]);
-  const myInTop10 = board.some((x) => x.userId === currentUserId);
 
   return (
-    <section className="space-y-3 px-2 pb-1 sm:px-3">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <StatCard label="训练场次" value={summary ? fmtNum(summary.trainingCount) : '--'} hint="累计完成训练局数" />
-        <StatCard label="总胜率" value={summary ? fmtPct(summary.winRate) : '--'} tone="green" hint="已平仓盈利交易占比" />
-        <StatCard label="账户积分" value={summary ? fmtNum(summary.accountScore) : '--'} tone="cyan" hint="账户当前积分" />
-        <StatCard label="爆仓次数" value={summary ? fmtNum(summary.liquidationCount) : '--'} tone="rose" hint="历史累计爆仓次数" />
-      </div>
+    <section className="space-y-4 px-2 pb-2 sm:px-3">
+      <Card className="border-amber-400/40 bg-[linear-gradient(115deg,rgba(30,41,59,0.82),rgba(37,99,235,0.12),rgba(30,41,59,0.82))] shadow-[0_18px_36px_rgba(0,0,0,0.3)]">
+        <CardBody className="p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-6 w-6 items-center justify-center rounded-xl border border-amber-400/35 bg-amber-400/10 text-amber-300">↗</div>
+              <div className="text-[20px] font-semibold text-amber-300">我的战绩</div>
+            </div>
+            <div className="rounded-2xl border border-amber-400/25 bg-slate-900/50 px-3.5 py-1.5 text-xs text-slate-300">
+              当前排名 <span className="mx-1 text-[20px] font-bold text-amber-300">{me ? `#${me.rank}` : '--'}</span>
+              <span className="text-xs text-slate-400">/ {board.length || '--'} 人</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="bg-slate-900/35"><CardBody className="p-3">
+              <div className="text-[11px] text-slate-400">训练场次</div>
+              <div className="mt-1 text-[22px] font-bold text-slate-100">{summary ? fmtNum(summary.trainingCount) : '--'}</div>
+              <div className="mt-1 text-[11px] text-slate-500">累计完成训练局数</div>
+            </CardBody></Card>
+            <Card className="bg-slate-900/35"><CardBody className="p-3">
+              <div className="text-[11px] text-slate-400">总胜率</div>
+              <div className="mt-1 text-[22px] font-bold text-emerald-300">{summary ? fmtPct(summary.winRate) : '--'}</div>
+              <div className="mt-1 text-[11px] text-slate-500">已平仓盈利交易占比</div>
+            </CardBody></Card>
+            <Card className="bg-slate-900/35"><CardBody className="p-3">
+              <div className="text-[11px] text-slate-400">账户积分</div>
+              <div className="mt-1 text-[22px] font-bold text-cyan-300">{summary ? fmtNum(summary.accountScore) : '--'}</div>
+              <div className="mt-1 text-[11px] text-slate-500">账户当前积分</div>
+            </CardBody></Card>
+            <Card className="bg-slate-900/35"><CardBody className="p-3">
+              <div className="text-[11px] text-slate-400">爆仓次数</div>
+              <div className="mt-1 text-[22px] font-bold text-rose-300">{summary ? fmtNum(summary.liquidationCount) : '--'}</div>
+              <div className="mt-1 text-[11px] text-slate-500">历史累计爆仓次数</div>
+            </CardBody></Card>
+          </div>
+        </CardBody>
+      </Card>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.5fr_1fr]">
-        <Card><CardBody className="p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <SectionTitle>资金曲线</SectionTitle>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1.3fr]">
+        <Card><CardBody className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <SectionTitle className="text-slate-100">资金曲线</SectionTitle>
             <div className="flex items-center gap-1">
               <Button size="sm" variant={curveRange === 'day' ? 'primary' : 'ghost'} className="px-2 py-1 text-[11px]" onClick={() => setCurveRange('day')}>日</Button>
               <Button size="sm" variant={curveRange === 'week' ? 'primary' : 'ghost'} className="px-2 py-1 text-[11px]" onClick={() => setCurveRange('week')}>周</Button>
@@ -125,14 +153,14 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
               <Button size="sm" variant={curveRange === 'year' ? 'primary' : 'ghost'} className="px-2 py-1 text-[11px]" onClick={() => setCurveRange('year')}>年</Button>
             </div>
           </div>
-          <div className="rounded-lg border border-slate-700/60 bg-slate-900/55 p-2">
-            {loading ? <LoadingState message="资金曲线加载中..." className="h-[200px] min-h-0" /> : null}
-            {error ? <ErrorState message="资金曲线加载失败" className="h-[200px] min-h-0" /> : null}
+          <div className="rounded-xl border border-slate-700/60 bg-slate-900/55 p-3">
+            {loading ? <LoadingState message="资金曲线加载中..." className="h-[220px] min-h-0" /> : null}
+            {error ? <ErrorState message="资金曲线加载失败" className="h-[220px] min-h-0" /> : null}
             {!loading && !error && visibleCurve.length > 0 ? (
-              <div className="relative h-[220px] w-full overflow-hidden">
+              <div className="relative h-[240px] w-full overflow-hidden">
                 <svg
                   viewBox={`0 0 ${w} ${h}`}
-                  className="h-[180px] w-full"
+                  className="h-[190px] w-full"
                   onMouseMove={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left;
@@ -152,49 +180,60 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
                   <path d={path.line} fill="none" stroke={path.positive ? '#34d399' : '#fb7185'} strokeWidth="2.2" strokeLinecap="round" />
                 </svg>
                 {hoverRow ? (
-                  <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-slate-600/70 bg-slate-900/85 px-2 py-1 text-[11px] text-slate-200">
+                  <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-slate-600/70 bg-slate-900/85 px-2 py-1 text-xs text-slate-200">
                     <div>{new Date(hoverRow.time).toLocaleString('zh-CN')}</div>
                     <div className="text-cyan-300">权益：{fmtNum(hoverRow.equity)}</div>
                   </div>
                 ) : null}
-                <div className="mt-1 flex items-center justify-between px-1 text-[11px] text-slate-400">
+                <div className="mt-2 flex items-center justify-between px-1 text-xs text-slate-400">
                   <span>{visibleCurve[0]?.time ? new Date(visibleCurve[0].time).toLocaleDateString('zh-CN') : '--'}</span>
                   <span>{visibleCurve[visibleCurve.length - 1]?.time ? new Date(visibleCurve[visibleCurve.length - 1].time).toLocaleDateString('zh-CN') : '--'}</span>
                 </div>
               </div>
             ) : null}
-            {!loading && !error && visibleCurve.length === 0 ? <EmptyState title="暂无资金曲线" description="完成训练后将展示资金走势。" className="h-[200px] min-h-0" /> : null}
+            {!loading && !error && visibleCurve.length === 0 ? <EmptyState title="暂无资金曲线" description="完成训练后将展示资金走势。" className="h-[220px] min-h-0" /> : null}
           </div>
         </CardBody></Card>
 
-        <Card><CardBody className="p-3">
-          <SectionTitle className="mb-2">排行榜（TOP 10）</SectionTitle>
+        <Card><CardBody className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <SectionTitle className="text-slate-100">实时排行榜</SectionTitle>
+            <span className="text-xs text-slate-400">总参与 {board.length} 人</span>
+          </div>
           <TableWrap>
-            <Table>
-              <thead>
-                <tr className="grid grid-cols-[46px_1.2fr_84px_64px_62px_58px] gap-2 border-b border-slate-700/60 px-2.5 py-2 text-[11px] text-slate-400">
-                  <th className="text-left font-medium">排名</th><th className="text-left font-medium">用户</th><th className="text-right font-medium">积分</th><th className="text-right font-medium">胜率</th><th className="text-right font-medium">训练</th><th className="text-right font-medium">爆仓</th>
-                </tr>
-              </thead>
-            </Table>
-            <div className="max-h-[230px] overflow-y-auto">
+            <div className="max-h-[300px] overflow-y-auto">
+              <div className="sticky top-0 z-10 grid grid-cols-[64px_1.35fr_110px_92px_84px_76px] gap-2 border-b border-slate-700/60 bg-slate-900/95 px-3 py-2.5 text-xs text-slate-400 backdrop-blur">
+                <div className="text-center font-medium">排名</div>
+                <div className="text-center font-medium">用户</div>
+                <div className="text-center font-medium">积分</div>
+                <div className="text-center font-medium">胜率</div>
+                <div className="text-center font-medium">训练次数</div>
+                <div className="text-center font-medium">爆仓</div>
+              </div>
               {board.map((row) => (
-                <div key={`${row.rank}-${row.userId}`} className={`grid grid-cols-[46px_1.2fr_84px_64px_62px_58px] gap-2 border-b border-slate-800/80 px-2.5 py-2.5 text-xs transition hover:bg-slate-800/45 ${row.isMe ? 'bg-cyan-500/10 text-cyan-100' : 'text-slate-200'}`}>
-                  <span className={row.rank <= 3 ? 'font-semibold text-amber-300' : ''}>#{row.rank}</span>
-                  <span className="truncate">{row.displayName}</span>
-                  <span className="text-right">{fmtNum(row.accountScore)}</span>
-                  <span className="text-right">{fmtPct(row.winRate)}</span>
-                  <span className="text-right">{row.trainingCount}</span>
-                  <span className="text-right">{row.liquidationCount}</span>
+                <div key={`${row.rank}-${row.userId}`} className={`grid grid-cols-[64px_1.35fr_110px_92px_84px_76px] gap-2 border-b border-slate-800/80 px-3 py-3 text-[13px] transition hover:bg-slate-800/45 ${row.isMe ? 'bg-cyan-500/10 text-cyan-100' : 'text-slate-200'}`}>
+                  <div className="flex items-center justify-center"><span className={`${row.rank <= 3 ? 'text-base font-bold text-amber-300' : 'font-semibold'}`}>#{row.rank}</span></div>
+                  <div className="flex items-center justify-center">
+                    <span className="relative min-w-0 w-full max-w-[180px]">
+                      <button
+                        className="block w-full truncate text-center"
+                        onMouseEnter={() => setExpandedName(row.userId)}
+                        onMouseLeave={() => setExpandedName((v) => (v === row.userId ? null : v))}
+                        onClick={() => setExpandedName((v) => (v === row.userId ? null : row.userId))}
+                      >
+                        {row.displayName}
+                      </button>
+                      <span className={`app-tooltip left-1/2 top-[calc(100%+6px)] -translate-x-1/2 ${expandedName === row.userId ? 'show' : ''}`}>{row.displayName}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center"><span className="font-semibold">{fmtNum(row.accountScore)}</span></div>
+                  <div className="flex items-center justify-center"><span>{fmtPct(row.winRate)}</span></div>
+                  <div className="flex items-center justify-center"><span>{row.trainingCount}</span></div>
+                  <div className="flex items-center justify-center"><span>{row.liquidationCount}</span></div>
                 </div>
               ))}
               {board.length === 0 ? <div className="px-2.5 py-6"><EmptyState title="暂无排行榜数据" className="min-h-[96px]" /></div> : null}
             </div>
-            {!myInTop10 && me ? (
-              <div className="border-t border-slate-700/60 bg-slate-800/45 px-2.5 py-2 text-xs text-cyan-200">
-                我的排名：#{me.rank} · 积分 {fmtNum(me.accountScore)} · 胜率 {fmtPct(me.winRate)} · 训练 {me.trainingCount} · 爆仓 {me.liquidationCount}
-              </div>
-            ) : null}
           </TableWrap>
         </CardBody></Card>
       </div>

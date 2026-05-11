@@ -171,6 +171,7 @@ export class AdminService {
           Array<{
             id: string;
             email: string;
+            nickname: string | null;
             role: string | null;
             isBanned: boolean | null;
             bannedAt: Date | null;
@@ -178,15 +179,16 @@ export class AdminService {
             createdAt: Date;
           }>
         >`
-          SELECT id, email, role, "isBanned", "bannedAt", "banReason", "createdAt"
+          SELECT id, email, nickname, role, "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
-          WHERE email LIKE ${kw}
+          WHERE email LIKE ${kw} OR nickname LIKE ${kw}
           ORDER BY "createdAt" DESC
         `
       : await this.prisma.$queryRaw<
           Array<{
             id: string;
             email: string;
+            nickname: string | null;
             role: string | null;
             isBanned: boolean | null;
             bannedAt: Date | null;
@@ -194,7 +196,7 @@ export class AdminService {
             createdAt: Date;
           }>
         >`
-          SELECT id, email, role, "isBanned", "bannedAt", "banReason", "createdAt"
+          SELECT id, email, nickname, role, "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
           ORDER BY "createdAt" DESC
         `;
@@ -214,6 +216,7 @@ export class AdminService {
       out.push({
         id: u.id,
         email: u.email,
+        nickname: u.nickname ?? '',
         role: u.role ?? 'USER',
         isBanned: Boolean(u.isBanned),
         bannedAt: u.bannedAt?.toISOString() ?? null,

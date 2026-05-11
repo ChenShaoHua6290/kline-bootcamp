@@ -7,6 +7,7 @@ import { Table, TableWrap } from '@/components/ui/Table';
 export type AdminUserRow = {
   id: string;
   email: string;
+  nickname: string;
   role: 'USER' | 'ADMIN';
   isBanned: boolean;
   bannedAt?: string | null;
@@ -29,18 +30,19 @@ export function UserManagementTable({
   onBan: (row: AdminUserRow) => void;
   onUnban: (row: AdminUserRow) => void;
 }) {
-  const desktopCols = 'grid-cols-[1.4fr_0.55fr_0.7fr_1fr_0.55fr_0.55fr_1fr_0.9fr]';
+  const desktopCols = 'grid-cols-[1fr_1.1fr_0.5fr_0.6fr_1fr_0.5fr_0.5fr_1fr_0.8fr]';
   return (
     <>
       <div className="space-y-2 md:hidden">
         {rows.map((row) => (
-          <div key={row.id} className="ui-card p-3 text-xs text-slate-200">
+          <div key={row.id} className="ui-card p-3 text-[13px] text-slate-200">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="truncate font-medium">{row.email}</div>
+              <div className="truncate text-sm font-semibold">{row.nickname || '--'}</div>
               <Badge tone={row.isBanned ? 'danger' : 'success'}>{row.isBanned ? '已封禁' : '正常'}</Badge>
             </div>
-            <div className="grid grid-cols-2 gap-1.5 text-slate-400">
-              <div>角色: <span className={row.role === 'ADMIN' ? 'text-cyan-300' : 'text-slate-200'}>{row.role}</span></div>
+            <div className="mb-1 truncate text-xs text-slate-300">{row.email}</div>
+            <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-400">
+              <div>角色: <span className={row.role === 'ADMIN' ? 'font-semibold text-cyan-300' : 'text-slate-200'}>{row.role}</span></div>
               <div>训练: <span className="text-slate-200">{row.trainingCount}</span></div>
               <div>爆仓: <span className="text-slate-200">{row.liquidationCount}</span></div>
               <div>封禁原因: <span className="text-slate-200">{row.banReason ?? '--'}</span></div>
@@ -66,31 +68,33 @@ export function UserManagementTable({
       <TableWrap className="hidden md:block">
       <Table>
         <thead>
-          <tr className={`grid ${desktopCols} gap-2.5 border-b border-slate-700/70 px-3 py-2 text-[11px] text-slate-400`}>
-            <th className="text-left font-medium">邮箱</th>
+          <tr className={`grid ${desktopCols} gap-3 border-b border-slate-700/70 px-4 py-3 text-xs text-slate-400`}>
+            <th className="text-center font-medium">昵称</th>
+            <th className="text-center font-medium">邮箱</th>
             <th className="text-center font-medium">角色</th>
-            <th className="text-center font-medium">封禁状态</th>
-            <th className="text-left font-medium">封禁原因</th>
-            <th className="text-right font-medium">训练</th>
-            <th className="text-right font-medium">爆仓</th>
-            <th className="text-left font-medium">注册时间</th>
-            <th className="text-right font-medium">操作</th>
+            <th className="text-center font-medium">状态</th>
+            <th className="text-center font-medium">封禁原因</th>
+            <th className="text-center font-medium">训练</th>
+            <th className="text-center font-medium">爆仓</th>
+            <th className="text-center font-medium">注册时间</th>
+            <th className="text-center font-medium">操作</th>
           </tr>
         </thead>
       </Table>
       <div className="max-h-[64vh] overflow-y-auto">
         {rows.map((row) => (
-          <div key={row.id} className={`grid ${desktopCols} items-center gap-2.5 border-b border-slate-800/80 px-3 py-2.5 text-xs text-slate-200 transition hover:bg-slate-800/45`}>
-            <div className="truncate">{row.email}</div>
+          <div key={row.id} className={`grid ${desktopCols} items-center gap-3 border-b border-slate-800/80 px-4 py-3 text-[13px] text-slate-200 transition hover:bg-slate-800/45`}>
+            <div className="truncate text-center font-semibold">{row.nickname || '--'}</div>
+            <div className="truncate text-center">{row.email}</div>
             <div className={`text-center font-semibold ${row.role === 'ADMIN' ? 'text-cyan-300' : 'text-slate-200'}`}>{row.role}</div>
             <div className="flex items-center justify-center">
               <Badge tone={row.isBanned ? 'danger' : 'success'}>{row.isBanned ? '已封禁' : '正常'}</Badge>
             </div>
-            <div className="truncate text-slate-400">{row.banReason ?? '--'}</div>
-            <div className="text-right tabular-nums">{row.trainingCount}</div>
-            <div className="text-right tabular-nums">{row.liquidationCount}</div>
-            <div className="tabular-nums">{new Date(row.createdAt).toLocaleString('zh-CN')}</div>
-            <div className="flex justify-end gap-1.5">
+            <div className="truncate text-center text-xs text-slate-400">{row.banReason ?? '--'}</div>
+            <div className="text-center tabular-nums">{row.trainingCount}</div>
+            <div className="text-center tabular-nums">{row.liquidationCount}</div>
+            <div className="text-center text-xs tabular-nums text-slate-400">{new Date(row.createdAt).toLocaleString('zh-CN')}</div>
+            <div className="flex justify-center gap-1.5">
               {row.role !== 'ADMIN' ? (
                 row.isBanned ? (
                   <Button

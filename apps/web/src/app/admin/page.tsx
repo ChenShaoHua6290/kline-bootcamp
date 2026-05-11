@@ -22,7 +22,7 @@ export default function AdminHomePage() {
     <AdminLayout title="后台概览">
       <PageHeader>
         <div>
-          <PageTitle className="text-base sm:text-lg">管理总览</PageTitle>
+          <PageTitle>管理总览</PageTitle>
           <PageDescription>实时查看用户、封禁和邀请码使用情况。</PageDescription>
         </div>
       </PageHeader>

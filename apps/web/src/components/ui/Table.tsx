@@ -6,5 +6,5 @@ export function TableWrap({ className, ...props }: HTMLAttributes<HTMLDivElement
 }
 
 export function Table({ className, ...props }: TableHTMLAttributes<HTMLTableElement>) {
-  return <table className={cn('min-w-full text-sm', className)} {...props} />;
+  return <table className={cn('min-w-full text-[13px]', className)} {...props} />;
 }

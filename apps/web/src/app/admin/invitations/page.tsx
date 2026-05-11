@@ -84,11 +84,11 @@ export default function AdminInvitationsPage() {
     <AdminLayout title="邀请码管理">
       <PageHeader>
         <div>
-          <PageTitle className="text-base sm:text-lg">邀请码管理</PageTitle>
+          <PageTitle>邀请码管理</PageTitle>
           <PageDescription>创建、启停、维护邀请码有效期和使用次数。</PageDescription>
         </div>
       </PageHeader>
-      <Card className="mb-3 p-1">
+      <Card className="mb-3 p-4">
         <div className="flex items-center justify-between">
           <div className="text-sm text-slate-300">管理邀请码的创建、启用、停用与删除。</div>
           <Button variant="primary" onClick={() => setCreateOpen(true)}>创建邀请码</Button>

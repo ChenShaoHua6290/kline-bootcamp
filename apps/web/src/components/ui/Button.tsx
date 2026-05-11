@@ -17,14 +17,14 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-[background-color,border-color,box-shadow,opacity,color] duration-150 disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' && 'h-8 px-3 text-xs',
         size === 'md' && 'h-10 px-3.5 text-sm',
-        size === 'lg' && 'h-12 px-4 text-base',
+        size === 'lg' && 'h-11 px-4 text-base',
         normalizedVariant === 'default' &&
           'border border-[color:var(--line-soft)] bg-[color:var(--surface-2)] text-[color:var(--text-1)] hover:border-[color:var(--line-strong)] hover:text-[color:var(--text-0)]',
         normalizedVariant === 'primary' &&
-          'border-0 text-white bg-[linear-gradient(135deg,var(--brand),var(--brand-strong))] shadow-[0_10px_24px_rgba(37,99,235,0.35)]',
+          'border-0 text-white bg-[linear-gradient(135deg,var(--brand),var(--brand-strong))] shadow-[0_10px_24px_rgba(37,99,235,0.35)] hover:shadow-[0_12px_28px_rgba(37,99,235,0.42)]',
         normalizedVariant === 'success' &&
           'border-0 text-slate-950 bg-[linear-gradient(135deg,#2dd4bf,#22c55e)] shadow-[0_10px_20px_rgba(16,185,129,0.28)]',
         normalizedVariant === 'danger' &&

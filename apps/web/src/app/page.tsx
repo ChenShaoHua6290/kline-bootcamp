@@ -73,7 +73,7 @@ export default function HomePage() {
     queryKey: ['training-dashboard'],
     enabled: ready && Boolean(user),
     queryFn: async () => (await api.get<DashboardData>('/training/dashboard')).data,
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   useEffect(() => {
