@@ -12,7 +12,7 @@ export type Session = {
   isLiquidated: boolean;
   resetCount: number;
   status: 'ACTIVE' | 'COMPLETED' | 'TERMINATED' | 'LIQUIDATED' | 'ENDED';
-  barsData: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>;
+  barsData: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>;
   contextStartTime?: string | null;
   trainStartTime?: string | null;
   trainEndTime?: string | null;

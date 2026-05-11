@@ -623,7 +623,15 @@ export class TrainingService {
       return { timeframe, from, to, currentTimePointer: new Date(currentTs).toISOString(), bars: [] };
     }
     const symbolId = await this.resolveSymbolId(session.market, session.symbol);
-    const bars = await this.marketDataService.getBarsByTimeRange(session.market as never, symbolId, timeframe, fromTs, safeTo);
+    const bars = await this.marketDataService.getBarsByTimeRangeForTraining({
+      market: session.market as never,
+      symbolId,
+      timeframe,
+      drivingTimeframe: session.drivingTimeframe,
+      fromTs,
+      toTs: safeTo,
+      currentTimePointerTs: currentTs,
+    });
     if (bars.length === 0) {
       throw new NotFoundException(`No bars found for symbol=${session.symbol}, timeframe=${timeframe}`);
     }
@@ -653,6 +661,9 @@ export class TrainingService {
     const position = await this.prisma.position.findUnique({ where: { sessionId } });
 
     const normalizedAction = this.normalizeIncomingAction(dto);
+    if (session.market === 'STOCK' && (normalizedAction === 'OPEN_SHORT' || normalizedAction === 'ADD_SHORT')) {
+      throw new BadRequestException('Stock market only supports long positions');
+    }
     if (normalizedAction === 'OPEN_LONG' || normalizedAction === 'OPEN_SHORT' || normalizedAction === 'ADD_LONG' || normalizedAction === 'ADD_SHORT') {
       const wantsLong = normalizedAction === 'OPEN_LONG' || normalizedAction === 'ADD_LONG';
       const side: PositionSideValue = wantsLong ? PositionSide.LONG : PositionSide.SHORT;

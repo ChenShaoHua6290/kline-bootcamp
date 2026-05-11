@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Toast } from '@/components/ui/Toast';
-import { PageDescription, PageTitle } from '@/components/ui/PageHeader';
+import { PageTitle } from '@/components/ui/PageHeader';
 import { ReplayChart } from '@/components/ReplayChart';
 import { ReviewSummary } from '@/components/review/ReviewSummary';
 import { ReviewTradeList } from '@/components/review/ReviewTradeList';
@@ -30,11 +30,11 @@ const TIMEFRAME_TO_STEP: Record<string, number> = {
 };
 
 function aggregateBars(
-  bars: Array<{ open: number; high: number; low: number; close: number; time: string }>,
+  bars: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>,
   step: number,
 ) {
   if (step <= 1) return bars;
-  const out: Array<{ open: number; high: number; low: number; close: number; time: string }> = [];
+  const out: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> = [];
   for (let i = 0; i < bars.length; i += step) {
     const chunk = bars.slice(i, i + step);
     if (chunk.length === 0) continue;
@@ -44,6 +44,7 @@ function aggregateBars(
       low: Math.min(...chunk.map((x) => x.low)),
       close: chunk[chunk.length - 1].close,
       time: chunk[chunk.length - 1].time,
+      volume: chunk.reduce((sum, x) => sum + Number(x.volume ?? 0), 0),
     });
   }
   return out;
@@ -121,33 +122,33 @@ export default function HistoryReviewPage() {
   const highlightedActionId = activeTradeId ? tradeActionMap.get(activeTradeId)?.closeId ?? tradeActionMap.get(activeTradeId)?.openId : null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] p-4 text-slate-100 sm:p-5">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <PageTitle className="text-base sm:text-lg">训练复盘详情</PageTitle>
-            <PageDescription>查看K线回放、交易记录并填写你的复盘总结。</PageDescription>
-          </div>
+    <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] p-3 text-slate-100 sm:p-3">
+      <div className="mx-auto flex h-full max-w-[1400px] min-h-0 flex-col gap-3">
+        <div className="flex h-8 shrink-0 items-center justify-between">
+          <PageTitle className="text-sm sm:text-base">训练复盘详情</PageTitle>
           <Link href="/history">
-            <Button variant="default">返回历史记录</Button>
+            <Button variant="default" size="sm">返回历史记录</Button>
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
-          <Card className="p-2">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
+          <Card className="h-full min-h-0 p-2">
             <ReplayChart
               data={visibleBars}
               actions={chartActions}
               timeframe={viewTimeframe}
               onTimeframeChange={setViewTimeframe}
-              showTradeLegend={false}
-              showActionSummary={false}
+              fitContainerHeight
               highlightedActionId={highlightedActionId}
               focusedTimestamp={focusedTimestamp}
             />
           </Card>
-          <div className="space-y-3">
-            <Card className="space-y-3 p-3">
+          <div className="min-h-0 overflow-y-auto space-y-3 pr-1">
+            <Card className="space-y-3 border-slate-700/80 bg-slate-900/62 p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] tracking-[0.08em] text-slate-400">复盘面板</div>
+                <div className="text-[11px] text-slate-500">按模块查看与记录</div>
+              </div>
               <Tabs>
                 <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>训练摘要</TabButton>
                 <TabButton active={activeTab === 'trades'} onClick={() => setActiveTab('trades')}>交易记录</TabButton>

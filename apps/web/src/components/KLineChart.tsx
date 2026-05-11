@@ -224,10 +224,11 @@ export function KLineChart({
   highlightedActionId,
   focusedTimestamp,
   fitContainerHeight = false,
+  disableScrollZoom = false,
   showTradeLegend = true,
   showActionSummary = true,
 }: {
-  data: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>;
+  data: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>;
   actions?: Action[];
   timeframe?: string;
   onTimeframeChange?: (v: string) => void;
@@ -239,6 +240,7 @@ export function KLineChart({
   highlightedActionId?: string | null;
   focusedTimestamp?: number;
   fitContainerHeight?: boolean;
+  disableScrollZoom?: boolean;
   showTradeLegend?: boolean;
   showActionSummary?: boolean;
 }) {
@@ -514,6 +516,8 @@ export function KLineChart({
     });
     chart.setSymbol({ ticker: 'TRAIN', pricePrecision: 2, volumePrecision: 2 });
     chart.setPeriod({ type: 'minute', span: 1 });
+    chart.setScrollEnabled(!disableScrollZoom);
+    chart.setZoomEnabled(!disableScrollZoom);
     chart.resetData();
     const maybeTriggerLoadOlder = () => {
       if (!hasMoreOlder || loadingOlder || leftEdgeLockRef.current) return;
@@ -559,8 +563,10 @@ export function KLineChart({
       }
     };
     chart.subscribeAction('onCrosshairChange', onCrosshairChange);
-    chart.subscribeAction('onScroll', maybeTriggerLoadOlder);
-    chart.subscribeAction('onZoom', maybeTriggerLoadOlder);
+    if (!disableScrollZoom) {
+      chart.subscribeAction('onScroll', maybeTriggerLoadOlder);
+      chart.subscribeAction('onZoom', maybeTriggerLoadOlder);
+    }
     setChartReady(true);
 
     const paneEl = chartPaneRef.current;
@@ -578,13 +584,15 @@ export function KLineChart({
       resizeObserver?.disconnect();
       window.removeEventListener('resize', handleResize);
       chart.unsubscribeAction('onCrosshairChange', onCrosshairChange);
-      chart.unsubscribeAction('onScroll', maybeTriggerLoadOlder);
-      chart.unsubscribeAction('onZoom', maybeTriggerLoadOlder);
+      if (!disableScrollZoom) {
+        chart.unsubscribeAction('onScroll', maybeTriggerLoadOlder);
+        chart.unsubscribeAction('onZoom', maybeTriggerLoadOlder);
+      }
       dispose(chart);
       chartRef.current = null;
       setChartReady(false);
     };
-  }, []);
+  }, [disableScrollZoom]);
 
   useEffect(() => {
     if (!loadingOlder) leftEdgeLockRef.current = false;
@@ -639,15 +647,46 @@ export function KLineChart({
     chart.resetData();
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
+    chart.removeOverlay({ groupId: 'partial-candle-hint' });
 
     if (showTradeOverlays) {
       const actionRows = Array.isArray(actions) ? actions : [];
+      let sideContext: 'LONG' | 'SHORT' | null = null;
+      const getPlacement = (actionType: string): 'above' | 'below' => {
+        if (actionType === 'OPEN_LONG' || actionType === 'ADD_LONG') {
+          sideContext = 'LONG';
+          return 'below';
+        }
+        if (actionType === 'OPEN_SHORT' || actionType === 'ADD_SHORT') {
+          sideContext = 'SHORT';
+          return 'above';
+        }
+        if (actionType === 'PARTIAL_CLOSE' || actionType === 'FULL_CLOSE' || actionType === 'CLOSE' || actionType === 'TP' || actionType === 'SL') {
+          const placement = sideContext === 'SHORT' ? 'below' : 'above';
+          if (actionType === 'FULL_CLOSE' || actionType === 'CLOSE' || actionType === 'TP' || actionType === 'SL') sideContext = null;
+          return placement;
+        }
+        if (actionType === 'LIQUIDATED') {
+          sideContext = null;
+          return 'above';
+        }
+        return 'above';
+      };
+      const timestampToCandle = new Map<number, KLineData>();
+      for (const row of rowsRef.current) timestampToCandle.set(row.timestamp, row);
       actionRows.forEach((a) => {
       const timestamp = typeof a.timestamp === 'number' ? a.timestamp : typeof a.timePointer === 'number' ? rowsRef.current[a.timePointer]?.timestamp : undefined;
       if (typeof timestamp !== 'number') return;
       const meta = getActionMeta(a.actionType);
       if (!meta) return;
       const emphasized = highlightedActionId === a.id;
+      const candle = timestampToCandle.get(timestamp);
+      const anchorPlacement = getPlacement(a.actionType);
+      const baseValue = candle ? (anchorPlacement === 'above' ? candle.high : candle.low) : a.price;
+      const span = candle ? Math.max(0.000001, candle.high - candle.low) : Math.max(0.000001, Math.abs(a.price) * 0.006);
+      const minAbsGap = Math.max(0.000001, Math.abs(a.price) * 0.003);
+      const gap = Math.max(span * 1.6, minAbsGap);
+      const labelValue = anchorPlacement === 'above' ? baseValue + gap : baseValue - gap;
       const palette =
         meta.tone === 'buy'
           ? { bg: '#059669', border: '#047857', line: '#34d399' }
@@ -663,10 +702,13 @@ export function KLineChart({
       chart.createOverlay({
         name: 'simpleAnnotation',
         groupId: 'trade-actions',
-        points: [{ timestamp, value: a.price }],
+        points: [
+          { timestamp, value: baseValue },
+          { timestamp, value: labelValue },
+        ],
         extendData: `${meta.label} ${a.price.toFixed(2)}`,
         styles: {
-          line: { color: palette.line, size: emphasized ? 2 : 1.2 },
+          line: { color: palette.line, size: emphasized ? 2 : 1 },
           polygon: { color: palette.line, borderColor: palette.line },
           text: {
             backgroundColor: palette.bg,
@@ -682,7 +724,37 @@ export function KLineChart({
       });
 
       const lastTimestamp = rowsRef.current[rowsRef.current.length - 1]?.timestamp;
+      const lastInput = rows[rows.length - 1];
       if (typeof lastTimestamp === 'number') {
+        if (lastInput?.isPartial) {
+          chart.createOverlay({
+            name: 'horizontalStraightLine',
+            groupId: 'partial-candle-hint',
+            points: [{ timestamp: lastTimestamp, value: lastInput.close }],
+            styles: {
+              line: { color: 'rgba(148,163,184,0.55)', size: 1, style: 'dashed', dashedValue: [4, 4] },
+            },
+          });
+          chart.createOverlay({
+            name: 'simpleAnnotation',
+            groupId: 'partial-candle-hint',
+            points: [{ timestamp: lastTimestamp, value: lastInput.high }],
+            extendData: '进行中',
+            styles: {
+              text: {
+                backgroundColor: 'rgba(51,65,85,0.75)',
+                borderColor: 'rgba(148,163,184,0.6)',
+                color: '#e2e8f0',
+                paddingLeft: 5,
+                paddingRight: 5,
+                paddingTop: 2,
+                paddingBottom: 2,
+              },
+              line: { color: 'rgba(148,163,184,0.5)', size: 1 },
+              polygon: { color: 'rgba(148,163,184,0.55)', borderColor: 'rgba(148,163,184,0.55)' },
+            },
+          });
+        }
         if (typeof stopLossPrice === 'number' && Number.isFinite(stopLossPrice)) {
         chart.createOverlay({
           name: 'horizontalStraightLine',
@@ -939,42 +1011,7 @@ export function KLineChart({
           设置
         </button>
       </div>
-      {showTradeLegend ? (
-        <div className="rounded-xl border border-slate-700/70 bg-slate-900/55 px-2.5 py-1.5 shadow-[0_10px_25px_rgba(2,6,23,0.35)]">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-200">
-            <span className="font-semibold text-slate-400">图例:</span>
-            <span className="rounded-md bg-emerald-600/30 px-1.5 py-0.5">开多</span>
-            <span className="rounded-md bg-rose-600/30 px-1.5 py-0.5">开空</span>
-            <span className="rounded-md bg-yellow-500/30 px-1.5 py-0.5">平仓</span>
-            <span className="rounded-md bg-sky-600/30 px-1.5 py-0.5">止盈 TP</span>
-            <span className="rounded-md bg-orange-600/30 px-1.5 py-0.5">止损 SL</span>
-            <span className="rounded-md bg-red-700/40 px-1.5 py-0.5">爆仓</span>
-          </div>
-        </div>
-      ) : null}
-      {showActionSummary ? (
-        <div className={`min-h-[40px] rounded-xl border px-3 py-2 text-xs ${focusedAction ? 'border-cyan-500/35 bg-cyan-500/10 text-slate-100' : 'border-slate-700/70 bg-slate-900/45 text-slate-500'}`}>
-          {focusedAction ? (
-            <>
-              <span className="font-semibold text-cyan-200">{getActionMeta(focusedAction.actionType)?.label ?? focusedAction.actionType}</span>
-              <span className="mx-2 text-slate-400">|</span>
-              <span>时间: {focusedAction.displayTime ?? formatTime(focusedAction.timestamp)}</span>
-              <span className="mx-2 text-slate-400">|</span>
-              <span>价格: {focusedAction.price?.toFixed?.(2) ?? '--'}</span>
-              <span className="mx-2 text-slate-400">|</span>
-              <span>仓位: {focusedAction.positionPercent != null ? `${(focusedAction.positionPercent * 100).toFixed(0)}%` : '--'}</span>
-              <span className="mx-2 text-slate-400">|</span>
-              <span className={(focusedAction.pnl ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
-                盈亏: {focusedAction.pnl == null ? '--' : `${focusedAction.pnl >= 0 ? '+' : ''}${focusedAction.pnl.toFixed(2)}`}
-              </span>
-              <span className="mx-2 text-slate-400">|</span>
-              <span>平仓原因: {focusedAction.closeReason ?? '--'}</span>
-            </>
-          ) : (
-            <span>移动到任意K线附近可查看最近交易动作详情</span>
-          )}
-        </div>
-      ) : null}
+
       <div className="flex min-h-0 flex-1 items-stretch gap-1.5">
         <div ref={drawToolbarRef} className="relative flex w-[44px] flex-col rounded-xl border border-slate-700/50 bg-slate-900/80">
           {drawMenus.map((menu) => (

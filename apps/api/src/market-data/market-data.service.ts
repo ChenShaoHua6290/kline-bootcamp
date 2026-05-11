@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { type Market } from '../common/domain-enums';
 import { PrismaService } from '../common/prisma.service';
+import { getNextBucketStart, getTimeframeBucketStart, timeframeRank } from './timeframes';
 
-export type Bar = { open: number; high: number; low: number; close: number; time: string; volume?: number | null };
+export type Bar = { open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean };
 export type WindowSeries = {
   symbolId: string;
   symbol: string;
@@ -69,7 +70,93 @@ export class MarketDataService {
       close: r.close,
       time: new Date(r.timestamp).toISOString(),
       volume: r.volume ?? 0,
+      isPartial: false,
     }));
+  }
+
+  async getBarsByTimeRangeForTraining(params: {
+    market: Market;
+    symbolId: string;
+    timeframe: string;
+    drivingTimeframe: string;
+    fromTs: number;
+    toTs: number;
+    currentTimePointerTs: number;
+  }): Promise<Bar[]> {
+    const { market, symbolId, timeframe, drivingTimeframe, fromTs, toTs, currentTimePointerTs } = params;
+    const safeTo = Math.min(toTs, currentTimePointerTs);
+    if (safeTo <= fromTs) return [];
+
+    const isHigherView = timeframeRank(timeframe) > timeframeRank(drivingTimeframe);
+
+    if (!isHigherView) {
+      return this.getBarsByTimeRange(market, symbolId, timeframe, fromTs, safeTo);
+    }
+
+    const currentBucketStart = getTimeframeBucketStart(currentTimePointerTs, timeframe);
+    const completeUpperBound = Math.min(safeTo, currentBucketStart - 1);
+    const completedRows =
+      completeUpperBound >= fromTs
+        ? await this.queryBarsByMarket(market, symbolId, timeframe, fromTs, completeUpperBound, 3000)
+        : [];
+
+    const completedBars: Bar[] = completedRows.map((r) => ({
+      open: r.open,
+      high: r.high,
+      low: r.low,
+      close: r.close,
+      time: new Date(r.timestamp).toISOString(),
+      volume: r.volume ?? 0,
+      isPartial: false,
+    }));
+
+    const partialFrom = Math.max(fromTs, currentBucketStart);
+    if (partialFrom > safeTo) return completedBars;
+
+    const partialRows = await this.queryBarsByMarket(market, symbolId, drivingTimeframe, partialFrom, safeTo, 3000);
+    if (partialRows.length === 0) return completedBars;
+
+    const partial = this.aggregatePartialFromRows(partialRows, timeframe);
+    if (!partial) return completedBars;
+
+    const out = [...completedBars, partial].sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+    return out;
+  }
+
+  private aggregatePartialFromRows(
+    rows: Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: string | Date }>,
+    timeframe: string,
+  ): Bar | null {
+    if (rows.length === 0) return null;
+    const sorted = rows
+      .map((r) => ({ ...r, ts: new Date(r.timestamp).getTime() }))
+      .filter((r) => Number.isFinite(r.ts))
+      .sort((a, b) => a.ts - b.ts);
+    if (sorted.length === 0) return null;
+
+    const last = sorted[sorted.length - 1];
+    const bucketStart = getTimeframeBucketStart(last.ts, timeframe);
+    const bucketEnd = getNextBucketStart(bucketStart, timeframe);
+    const inBucket = sorted.filter((r) => r.ts >= bucketStart && r.ts < bucketEnd);
+    if (inBucket.length === 0) return null;
+    const first = inBucket[0];
+    let high = Number.NEGATIVE_INFINITY;
+    let low = Number.POSITIVE_INFINITY;
+    let volume = 0;
+    for (const row of inBucket) {
+      high = Math.max(high, row.high);
+      low = Math.min(low, row.low);
+      volume += row.volume ?? 0;
+    }
+    return {
+      time: new Date(bucketStart).toISOString(),
+      open: first.open,
+      high,
+      low,
+      close: inBucket[inBucket.length - 1].close,
+      volume,
+      isPartial: true,
+    };
   }
 
   private async queryBarsByMarket(

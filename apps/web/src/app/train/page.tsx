@@ -45,6 +45,7 @@ function translateErrorMessage(raw: string) {
     ['No bars found for symbol=', '所选周期暂无数据，请先执行聚合或切换周期'],
     ['Unsupported timeframe:', '不支持的周期，请重新选择'],
     ['Active training session already exists', '当前已有进行中的训练，请先继续或结束当前训练'],
+    ['Stock market only supports long positions', '股票市场仅支持做多与平多，不支持做空'],
   ];
   const hit = dict.find(([en]) => text.includes(en));
   if (hit) return hit[1];
@@ -75,11 +76,11 @@ export default function TrainPage() {
   const [startConflictOpen, setStartConflictOpen] = useState(false);
   const [startConflictSessionId, setStartConflictSessionId] = useState<string | null>(null);
   const [endSummarySession, setEndSummarySession] = useState<Session | null>(null);
-  const [timeframeBars, setTimeframeBars] = useState<Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>>([]);
+  const [timeframeBars, setTimeframeBars] = useState<Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>([]);
   const [barsFromTime, setBarsFromTime] = useState<string | null>(null);
   const [hasMoreOlderBars, setHasMoreOlderBars] = useState(false);
   const [loadingOlderBars, setLoadingOlderBars] = useState(false);
-  const barsCacheRef = useRef<Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>>>({});
+  const barsCacheRef = useRef<Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>>({});
   const pendingLeaveActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const { session, setSession, clearTrainingState, viewTimeframe, setViewTimeframe } = useTrainingStore();
   const router = useRouter();

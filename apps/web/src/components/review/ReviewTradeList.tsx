@@ -13,13 +13,13 @@ export function ReviewTradeList({
 }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-base font-semibold text-cyan-300">交易记录</h3>
+      <h3 className="text-[15px] font-semibold text-cyan-300">交易记录</h3>
       {trades.length === 0 ? (
         <EmptyState title="暂无交易记录" className="min-h-[120px]" />
       ) : (
         <div className="max-h-[400px] overflow-auto rounded-xl border border-slate-700/80">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-900/80 text-slate-400">
+          <table className="w-full text-left text-[13px]">
+            <thead className="bg-slate-900/80 text-[12px] text-slate-400">
               <tr>
                 <th className="px-3 py-2">方向</th>
                 <th className="px-3 py-2">开仓价</th>
@@ -28,7 +28,7 @@ export function ReviewTradeList({
                 <th className="px-3 py-2">原因</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-slate-200">
               {trades.map((trade) => (
                 <tr
                   key={trade.id}

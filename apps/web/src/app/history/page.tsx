@@ -67,9 +67,13 @@ function pnlAmount(item: HistoryItem) {
 
 function ActionTag({ actionType }: { actionType: string }) {
   const map: Record<string, string> = {
-    OPEN_LONG: '买涨',
-    OPEN_SHORT: '买跌',
+    OPEN_LONG: '开多',
+    ADD_LONG: '加多',
+    OPEN_SHORT: '开空',
+    ADD_SHORT: '加空',
     CLOSE: '平仓',
+    PARTIAL_CLOSE: '部分平仓',
+    FULL_CLOSE: '全部平仓',
     TP: '止盈',
     SL: '止损',
     HOLD: '观望',
@@ -77,11 +81,11 @@ function ActionTag({ actionType }: { actionType: string }) {
   };
   const text = map[actionType] ?? actionType;
   const cls =
-    actionType === 'OPEN_LONG'
+    actionType === 'OPEN_LONG' || actionType === 'ADD_LONG'
       ? 'bg-emerald-500/20 text-emerald-300'
-      : actionType === 'OPEN_SHORT'
+      : actionType === 'OPEN_SHORT' || actionType === 'ADD_SHORT'
         ? 'bg-amber-500/20 text-amber-300'
-        : actionType === 'CLOSE' || actionType === 'TP'
+        : actionType === 'CLOSE' || actionType === 'PARTIAL_CLOSE' || actionType === 'FULL_CLOSE' || actionType === 'TP'
           ? 'bg-sky-500/20 text-sky-300'
           : actionType === 'SL' || actionType === 'LIQUIDATED'
             ? 'bg-rose-500/20 text-rose-300'
@@ -130,12 +134,12 @@ export default function HistoryPage() {
   }, [historyQuery.data?.items, statusFilter]);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-700/80 bg-slate-900/80 backdrop-blur px-4 py-3 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-3">
+    <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] text-slate-100">
+      <header className="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
+        <div className="app-nav mx-auto flex w-full max-w-[1400px] items-center justify-between gap-3">
           <div>
-            <PageTitle className="text-base sm:text-lg">历史训练记录</PageTitle>
-            <PageDescription className="text-[clamp(11px,1vw,13px)]">查看历史成绩并复盘操作细节</PageDescription>
+            <PageTitle className="app-title text-sm sm:text-base">历史训练记录</PageTitle>
+            <PageDescription className="text-[11px] text-slate-400 sm:text-xs">查看历史成绩并复盘操作细节</PageDescription>
           </div>
           <Link href="/">
             <Button variant="default" size="sm">返回训练</Button>
@@ -143,8 +147,8 @@ export default function HistoryPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-4 p-3 sm:p-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,1fr)]">
-        <Card>
+      <section className="mx-auto grid h-[calc(100vh-90px)] min-h-0 w-full max-w-[1400px] grid-cols-1 gap-4 p-3 sm:h-[calc(100vh-96px)] sm:p-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,1fr)]">
+        <Card className="min-h-0 overflow-hidden">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-700/70 px-4 py-3 sm:px-5">
             <span className="ml-2 text-xs text-slate-400">状态:</span>
             <Button size="sm" variant={statusFilter === 'CLOSED' ? 'primary' : 'default'} onClick={() => { setStatusFilter('CLOSED'); setPage(1); }}>已结束</Button>
@@ -155,7 +159,7 @@ export default function HistoryPage() {
             <Button size="sm" variant={statusFilter === 'ALL' ? 'primary' : 'default'} onClick={() => { setStatusFilter('ALL'); setPage(1); }}>全部</Button>
           </div>
 
-          <div className="max-h-[72vh] overflow-y-auto p-3 sm:p-4">
+          <div className="h-full min-h-0 overflow-y-auto p-3 sm:p-4">
             {historyQuery.isLoading ? <LoadingState message="正在加载历史记录..." className="min-h-[220px]" /> : null}
             {historyQuery.isError ? <ErrorState message="加载历史记录失败，请稍后重试。" className="min-h-[220px]" /> : null}
             {!historyQuery.isLoading && !historyQuery.isError && items.length === 0 ? (
@@ -265,12 +269,12 @@ export default function HistoryPage() {
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-5">
+        <Card className="min-h-0 overflow-hidden p-4 sm:p-5">
           {!selectedId ? <EmptyState title="请选择一条记录" description="从左侧选择训练记录后，这里会显示详情与操作轨迹。" className="min-h-[200px]" /> : null}
           {detailQuery.isLoading ? <LoadingState message="正在加载详情..." className="min-h-[200px]" /> : null}
           {detailQuery.isError ? <ErrorState message="加载详情失败，请重试。" className="min-h-[200px]" /> : null}
           {detailQuery.data ? (
-            <div className="space-y-4">
+            <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
               <section className="space-y-2">
                 <h3 className="text-[clamp(1rem,1.2vw,1.2rem)] font-semibold text-cyan-300">基本信息</h3>
                 <div className="space-y-2 text-sm">

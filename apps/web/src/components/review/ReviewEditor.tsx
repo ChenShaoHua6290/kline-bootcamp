@@ -38,7 +38,8 @@ export function ReviewEditor({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-base font-semibold text-cyan-300">复盘总结</h3>
+      <h3 className="text-[15px] font-semibold text-cyan-300">复盘总结</h3>
+      <p className="text-[12px] leading-5 text-slate-400">记录本次训练中的关键决策、错误模式与下一步改进计划。</p>
       <ProblemTagSelector value={tags} onChange={setTags} />
       <Textarea
         rows={5}

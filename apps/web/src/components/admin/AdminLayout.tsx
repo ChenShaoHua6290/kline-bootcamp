@@ -40,9 +40,9 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
 
   return (
     <main className="min-h-screen p-3 sm:p-4">
-      <header className="app-nav mb-3 flex flex-wrap items-center justify-between gap-2">
+      <header className="app-nav mb-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">{title}</h1>
+          <h1 className="app-title text-sm sm:text-base">{title}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/">
