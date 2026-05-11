@@ -21,36 +21,36 @@ export function TradeStatsPanel({ session }: { session: Session }) {
 
   return (
     <Card className="shrink-0 p-2">
-      <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-300">
-        <span className="font-semibold text-slate-100">交易记录</span>
+      <div className="mb-2 flex items-center justify-between text-[11px] text-slate-300">
+        <span className="text-[13px] font-semibold text-slate-100">交易记录</span>
         <Badge tone="info">{closedTrades.length} 笔</Badge>
       </div>
-      <div className="mb-1.5 grid grid-cols-2 gap-1.5 text-[11px]">
+      <div className="mb-1.5 grid grid-cols-2 gap-1.5">
         <div className="text-slate-300">
-          总交易次数: <span className="font-semibold text-slate-100">{closedTrades.length}</span>
+          <span className="text-[10px] text-slate-400">总交易次数:</span> <span className="text-[11px] font-semibold text-slate-100">{closedTrades.length}</span>
         </div>
-        <div className="text-right font-semibold text-rose-300">{winRate.toFixed(2)}%</div>
+        <div className="text-right text-[11px] font-semibold text-rose-300">{winRate.toFixed(2)}%</div>
         <div className="text-slate-300">
-          盈利次数: <span className="font-semibold text-emerald-300">{wins}</span>
+          <span className="text-[10px] text-slate-400">盈利次数:</span> <span className="text-[11px] font-semibold text-emerald-300">{wins}</span>
         </div>
         <div className="text-right text-slate-300">
-          亏损次数: <span className="font-semibold text-rose-300">{losses}</span>
+          <span className="text-[10px] text-slate-400">亏损次数:</span> <span className="text-[11px] font-semibold text-rose-300">{losses}</span>
         </div>
       </div>
       <div className="max-h-24 space-y-1 overflow-y-auto pr-1">
         {recentActions.length === 0 ? (
-          <div className="surface-muted px-2 py-1.5 text-[11px] text-slate-500">暂无交易记录</div>
+          <div className="surface-muted px-2 py-1.5 text-[10px] text-slate-500">暂无交易记录</div>
         ) : (
           recentActions.map((a) => (
-            <div key={a.id} className="surface-muted flex items-center justify-between px-2 py-1.5 text-[11px]">
-              <div className="text-slate-400">{new Date(a.createdAt).toLocaleTimeString('zh-CN', { hour12: false })}</div>
+            <div key={a.id} className="surface-muted flex items-center justify-between px-2 py-1.5">
+              <div className="text-[10px] text-slate-400">{new Date(a.createdAt).toLocaleTimeString('zh-CN', { hour12: false })}</div>
               <Badge
                 tone={a.actionType === 'OPEN_LONG' ? 'success' : a.actionType === 'OPEN_SHORT' ? 'warning' : 'default'}
                 className="px-2 py-0.5 text-[10px] font-semibold"
               >
                 {formatActionText(a.actionType)}
               </Badge>
-              <div className="font-semibold text-slate-100">¥{a.price.toFixed(2)}</div>
+              <div className="text-[11px] font-semibold text-slate-100">¥{a.price.toFixed(2)}</div>
             </div>
           ))
         )}

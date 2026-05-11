@@ -75,11 +75,11 @@ export default function TrainPage() {
   const [startConflictOpen, setStartConflictOpen] = useState(false);
   const [startConflictSessionId, setStartConflictSessionId] = useState<string | null>(null);
   const [endSummarySession, setEndSummarySession] = useState<Session | null>(null);
-  const [timeframeBars, setTimeframeBars] = useState<Array<{ open: number; high: number; low: number; close: number; time: string }>>([]);
+  const [timeframeBars, setTimeframeBars] = useState<Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>>([]);
   const [barsFromTime, setBarsFromTime] = useState<string | null>(null);
   const [hasMoreOlderBars, setHasMoreOlderBars] = useState(false);
   const [loadingOlderBars, setLoadingOlderBars] = useState(false);
-  const barsCacheRef = useRef<Record<string, Array<{ open: number; high: number; low: number; close: number; time: string }>>>({});
+  const barsCacheRef = useRef<Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>>>({});
   const pendingLeaveActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const { session, setSession, clearTrainingState, viewTimeframe, setViewTimeframe } = useTrainingStore();
   const router = useRouter();

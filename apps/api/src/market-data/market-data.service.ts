@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { type Market } from '../common/domain-enums';
 import { PrismaService } from '../common/prisma.service';
 
-export type Bar = { open: number; high: number; low: number; close: number; time: string };
+export type Bar = { open: number; high: number; low: number; close: number; time: string; volume?: number | null };
 export type WindowSeries = {
   symbolId: string;
   symbol: string;
@@ -45,6 +45,7 @@ export class MarketDataService {
         low: b.low,
         close: b.close,
         time: new Date(b.timestamp).toISOString(),
+        volume: b.volume ?? 0,
       }));
       return {
         symbolId: symbol.id,
@@ -67,6 +68,7 @@ export class MarketDataService {
       low: r.low,
       close: r.close,
       time: new Date(r.timestamp).toISOString(),
+      volume: r.volume ?? 0,
     }));
   }
 
@@ -77,7 +79,7 @@ export class MarketDataService {
     fromTs?: number,
     toTs?: number,
     take?: number,
-  ): Promise<Array<{ open: number; high: number; low: number; close: number; timestamp: string | Date }>> {
+  ): Promise<Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: string | Date }>> {
     if (market === 'CRYPTO') {
       const where = Prisma.sql`
         "symbolId" = ${symbolId}
@@ -85,8 +87,8 @@ export class MarketDataService {
         ${fromTs != null ? Prisma.sql`AND "timestamp" >= ${new Date(fromTs)}` : Prisma.empty}
         ${toTs != null ? Prisma.sql`AND "timestamp" <= ${new Date(toTs)}` : Prisma.empty}
       `;
-      const rows = await this.prisma.$queryRaw<Array<{ open: number; high: number; low: number; close: number; timestamp: Date | string }>>(
-        Prisma.sql`SELECT "open","high","low","close","timestamp" FROM "bars_crypto" WHERE ${where} ORDER BY "timestamp" ASC`,
+      const rows = await this.prisma.$queryRaw<Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: Date | string }>>(
+        Prisma.sql`SELECT "open","high","low","close","volume","timestamp" FROM "bars_crypto" WHERE ${where} ORDER BY "timestamp" ASC`,
       );
       return take ? rows.slice(0, take) : rows;
     }

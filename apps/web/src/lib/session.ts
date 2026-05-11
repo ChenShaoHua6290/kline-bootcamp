@@ -10,7 +10,8 @@ function isBar(value: unknown): value is Bar {
     typeof v.high === 'number' &&
     typeof v.low === 'number' &&
     typeof v.close === 'number' &&
-    typeof v.time === 'string'
+    typeof v.time === 'string' &&
+    (v.volume === undefined || v.volume === null || typeof v.volume === 'number')
   );
 }
 

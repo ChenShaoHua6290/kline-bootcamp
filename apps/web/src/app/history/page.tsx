@@ -30,8 +30,18 @@ type HistoryItem = {
   hasReview?: boolean;
 };
 
-const LENGTH_FILTERS = [50, 100, 150, 200, 250, 300] as const;
 type StatusFilter = 'CLOSED' | 'ALL' | 'ACTIVE' | 'LIQUIDATED' | 'COMPLETED' | 'TERMINATED';
+type HistoryResponse = {
+  items: HistoryItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+};
 
 function isCompletedLike(status: HistoryItem['status']) {
   return status === 'COMPLETED' || status === 'ENDED';
@@ -80,14 +90,24 @@ function ActionTag({ actionType }: { actionType: string }) {
 }
 
 export default function HistoryPage() {
-  const [lengthFilter, setLengthFilter] = useState<number | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('CLOSED');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const historyQuery = useQuery({
-    queryKey: ['training-history'],
-    queryFn: async () => (await api.get<HistoryItem[]>('/training/history')).data,
+    queryKey: ['training-history', page, pageSize, statusFilter],
+    queryFn: async () =>
+      (
+        await api.get<HistoryResponse>('/training/history', {
+          params: {
+            page,
+            pageSize,
+            status: statusFilter === 'CLOSED' || statusFilter === 'ALL' ? undefined : statusFilter,
+            isLiquidated: statusFilter === 'LIQUIDATED' ? true : undefined,
+          },
+        })
+      ).data,
   });
 
   const detailQuery = useQuery({
@@ -97,9 +117,8 @@ export default function HistoryPage() {
   });
 
   const items = useMemo(() => {
-    const raw = historyQuery.data ?? [];
-    const filteredByLength = lengthFilter === 'ALL' ? raw : raw.filter((item) => item.totalBars === lengthFilter);
-    const filtered = filteredByLength.filter((item) => {
+    const raw = historyQuery.data?.items ?? [];
+    const filtered = raw.filter((item) => {
       if (statusFilter === 'ALL') return true;
       if (statusFilter === 'LIQUIDATED') return item.isLiquidated;
       if (statusFilter === 'ACTIVE') return item.status === 'ACTIVE';
@@ -107,12 +126,8 @@ export default function HistoryPage() {
       if (statusFilter === 'TERMINATED') return item.status === 'TERMINATED';
       return item.status !== 'ACTIVE';
     });
-    return filtered.slice().sort((a, b) => {
-      const av = new Date(a.createdAt).getTime();
-      const bv = new Date(b.createdAt).getTime();
-      return sortOrder === 'desc' ? bv - av : av - bv;
-    });
-  }, [historyQuery.data, lengthFilter, statusFilter, sortOrder]);
+    return filtered;
+  }, [historyQuery.data?.items, statusFilter]);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] text-slate-100">
@@ -131,45 +146,13 @@ export default function HistoryPage() {
       <section className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-4 p-3 sm:p-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,1fr)]">
         <Card>
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-700/70 px-4 py-3 sm:px-5">
-            <span className="text-xs text-slate-400">训练长度:</span>
-            {LENGTH_FILTERS.map((n) => (
-              <Button
-                key={n}
-                size="sm"
-                variant={lengthFilter === n ? 'primary' : 'default'}
-                className={`${
-                  lengthFilter === n
-                    ? '!bg-cyan-500/25 !text-cyan-100'
-                    : ''
-                }`}
-                onClick={() => setLengthFilter(n)}
-              >
-                {n}根
-              </Button>
-            ))}
-            <Button
-              size="sm"
-              variant={lengthFilter === 'ALL' ? 'primary' : 'default'}
-              className={`${
-                lengthFilter === 'ALL'
-                  ? '!bg-cyan-500/25 !text-cyan-100'
-                  : ''
-              }`}
-              onClick={() => setLengthFilter('ALL')}
-            >
-              全部
-            </Button>
-            <span className="ml-2 text-xs text-slate-400">排序:</span>
-            <Button size="sm" variant="default" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
-              {sortOrder === 'desc' ? '按时间 ↓' : '按时间 ↑'}
-            </Button>
             <span className="ml-2 text-xs text-slate-400">状态:</span>
-            <Button size="sm" variant={statusFilter === 'CLOSED' ? 'primary' : 'default'} onClick={() => setStatusFilter('CLOSED')}>已结束</Button>
-            <Button size="sm" variant={statusFilter === 'COMPLETED' ? 'primary' : 'default'} onClick={() => setStatusFilter('COMPLETED')}>已完成</Button>
-            <Button size="sm" variant={statusFilter === 'TERMINATED' ? 'primary' : 'default'} onClick={() => setStatusFilter('TERMINATED')}>已终止</Button>
-            <Button size="sm" variant={statusFilter === 'ACTIVE' ? 'primary' : 'default'} onClick={() => setStatusFilter('ACTIVE')}>进行中</Button>
-            <Button size="sm" variant={statusFilter === 'LIQUIDATED' ? 'primary' : 'default'} onClick={() => setStatusFilter('LIQUIDATED')}>已爆仓</Button>
-            <Button size="sm" variant={statusFilter === 'ALL' ? 'primary' : 'default'} onClick={() => setStatusFilter('ALL')}>全部</Button>
+            <Button size="sm" variant={statusFilter === 'CLOSED' ? 'primary' : 'default'} onClick={() => { setStatusFilter('CLOSED'); setPage(1); }}>已结束</Button>
+            <Button size="sm" variant={statusFilter === 'COMPLETED' ? 'primary' : 'default'} onClick={() => { setStatusFilter('COMPLETED'); setPage(1); }}>已完成</Button>
+            <Button size="sm" variant={statusFilter === 'TERMINATED' ? 'primary' : 'default'} onClick={() => { setStatusFilter('TERMINATED'); setPage(1); }}>已终止</Button>
+            <Button size="sm" variant={statusFilter === 'ACTIVE' ? 'primary' : 'default'} onClick={() => { setStatusFilter('ACTIVE'); setPage(1); }}>进行中</Button>
+            <Button size="sm" variant={statusFilter === 'LIQUIDATED' ? 'primary' : 'default'} onClick={() => { setStatusFilter('LIQUIDATED'); setPage(1); }}>已爆仓</Button>
+            <Button size="sm" variant={statusFilter === 'ALL' ? 'primary' : 'default'} onClick={() => { setStatusFilter('ALL'); setPage(1); }}>全部</Button>
           </div>
 
           <div className="max-h-[72vh] overflow-y-auto p-3 sm:p-4">
@@ -253,6 +236,31 @@ export default function HistoryPage() {
                   </button>
                 );
               })}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/70 pt-3">
+              <div className="text-xs text-slate-400">
+                第 {historyQuery.data?.pagination.page ?? page} / {historyQuery.data?.pagination.totalPages ?? 1} 页
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                >
+                  <option value={10}>10 / 页</option>
+                  <option value={20}>20 / 页</option>
+                  <option value={50}>50 / 页</option>
+                </select>
+                <Button size="sm" variant="default" disabled={!historyQuery.data?.pagination.hasPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  上一页
+                </Button>
+                <Button size="sm" variant="default" disabled={!historyQuery.data?.pagination.hasNext} onClick={() => setPage((p) => p + 1)}>
+                  下一页
+                </Button>
+              </div>
             </div>
           </div>
         </Card>

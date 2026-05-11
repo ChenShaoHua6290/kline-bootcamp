@@ -73,8 +73,8 @@ export function TradePanel({
       {ended ? <div className="surface-muted mb-1.5 px-2 py-1 text-[11px] text-slate-300 md:py-1.5">本局已结束，无法继续下单。</div> : null}
 
       <Card className="mb-1.5 shrink-0 p-2">
-        <div className="mb-1 flex items-center justify-between text-[10px] text-slate-300 md:mb-1.5 md:text-[11px]">
-          <span className="field-label normal-case tracking-normal">下单数量</span>
+        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-300 md:mb-1.5 md:text-[12px]">
+          <span className="text-[11px] font-medium tracking-normal text-slate-300 md:text-[12px]">下单数量</span>
           <span className="text-sm font-semibold text-slate-100">{quantity}</span>
         </div>
         <Slider
@@ -82,25 +82,24 @@ export function TradePanel({
           max={100}
           value={positionPercent * 100}
           onChange={(e) => setPositionPercent(Number(e.target.value) / 100)}
-          className="h-2 w-full [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_rgba(6,182,212,0.14)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4"
+          className="slider-compact w-full"
           disabled={busy}
         />
-        <div className="mt-1 grid grid-cols-6 gap-1 text-[9px]">
-          <Button variant="outline" size="sm" className="h-8 px-1 text-[9px] md:px-1" onClick={() => setPositionPercent(0.5)} disabled={busy}>1/2</Button>
-          <Button variant="outline" size="sm" className="h-8 px-1 text-[9px] md:px-1" onClick={() => setPositionPercent(1 / 3)} disabled={busy}>1/3</Button>
-          <Button variant="outline" size="sm" className="h-8 px-1 text-[9px] md:px-1" onClick={() => setPositionPercent(0.25)} disabled={busy}>1/4</Button>
-          <Button variant="outline" size="sm" className="h-8 px-1 text-[9px] md:px-1" onClick={() => setPositionPercent(0.2)} disabled={busy}>1/5</Button>
-          <Button variant="outline" size="sm" className="col-span-2 h-8 px-1 text-[9px] md:px-1.5" onClick={() => setPositionPercent(1)} disabled={busy}>全部</Button>
+        <div className="mt-1 grid grid-cols-5 gap-1 text-[10px] md:text-[11px]">
+          <Button variant="outline" size="sm" className="h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.1)} disabled={busy}>10%</Button>
+          <Button variant="outline" size="sm" className="h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.2)} disabled={busy}>20%</Button>
+          <Button variant="outline" size="sm" className="h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.5)} disabled={busy}>50%</Button>
+          <Button variant="outline" size="sm" className="col-span-2 h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(1)} disabled={busy}>100%</Button>
         </div>
         {hasPosition ? (
           <>
-            <div className="mt-2 flex items-center justify-between text-[9px] text-slate-300 md:text-[10px]">
-              <span className="field-label normal-case tracking-normal">平仓比例</span>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300 md:text-[12px]">
+              <span className="text-[11px] font-medium tracking-normal text-slate-300 md:text-[12px]">平仓比例</span>
               <span className="text-[13px] font-semibold text-cyan-200">{closePercent}%</span>
             </div>
             <div className="mt-1 grid grid-cols-4 gap-1">
               {[25, 50, 75, 100].map((n) => (
-                <Button key={n} variant={closePercent === n ? 'primary' : 'outline'} size="sm" className="h-8 text-[9px]" onClick={() => setClosePercent(n)} disabled={busy}>
+                <Button key={n} variant={closePercent === n ? 'primary' : 'outline'} size="sm" className="h-8 text-[10px] md:text-[11px]" onClick={() => setClosePercent(n)} disabled={busy}>
                   {n}%
                 </Button>
               ))}

@@ -11,7 +11,7 @@ import {
 } from '../common/domain-enums';
 import { MarketDataService, type Bar } from '../market-data/market-data.service';
 import { REAL_MARKET_TIMEFRAME_SET } from '../market-data/timeframes';
-import { SaveTrainingReviewDto, StartTrainingDto, TrainingActionDto } from './dto';
+import { HistoryQueryDto, SaveTrainingReviewDto, StartTrainingDto, TrainingActionDto } from './dto';
 import { applyExecutionPrice, calcFloatingPnl, ensureSeries, FEE_RATE } from './training.engine';
 
 type BarsPayload = {
@@ -200,25 +200,90 @@ export class TrainingService {
     return this.getById(userId, sessionId);
   }
 
-  async history(userId: string) {
-    const rows = await this.prisma.trainingSession.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
-    const ids = rows.map((r) => r.id);
-    let reviewSessionIds = new Set<string>();
-    if (ids.length > 0) {
-      try {
-        const reviewRows = await this.prisma.$queryRaw<Array<{ sessionId: string }>>(
-          Prisma.sql`SELECT "sessionId" FROM "TrainingReview" WHERE "sessionId" IN (${Prisma.join(ids)})`,
-        );
-        reviewSessionIds = new Set(reviewRows.map((r) => r.sessionId));
-      } catch {
-        reviewSessionIds = new Set<string>();
-      }
-    }
-    return rows.map((s) => ({ ...this.toClientSession(s), hasReview: reviewSessionIds.has(s.id) }));
+  async history(userId: string, query: HistoryQueryDto) {
+    const page = Math.max(1, Number(query.page ?? 1));
+    const pageSize = Math.min(50, Math.max(1, Number(query.pageSize ?? 10)));
+    const skip = (page - 1) * pageSize;
+    const from = query.from ? new Date(query.from) : undefined;
+    const to = query.to ? new Date(query.to) : undefined;
+    const where: Prisma.TrainingSessionWhereInput = {
+      userId,
+      ...(query.market ? { market: query.market } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(typeof query.isLiquidated === 'boolean' ? { isLiquidated: query.isLiquidated } : {}),
+      ...((from || to)
+        ? {
+            createdAt: {
+              ...(from ? { gte: from } : {}),
+              ...(to ? { lte: to } : {}),
+            },
+          }
+        : {}),
+      ...(typeof query.hasReview === 'boolean'
+        ? {
+            review: query.hasReview ? { isNot: null } : { is: null },
+          }
+        : {}),
+    };
+    const [total, rows] = await Promise.all([
+      this.prisma.trainingSession.count({ where }),
+      this.prisma.trainingSession.findMany({
+        where,
+        orderBy: [{ endedAt: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          userId: true,
+          market: true,
+          symbol: true,
+          drivingTimeframe: true,
+          totalBars: true,
+          initialVisibleBars: true,
+          initialBalance: true,
+          finalBalance: true,
+          isLiquidated: true,
+          resetCount: true,
+          status: true,
+          pointer: true,
+          viewTimeframe: true,
+          createdAt: true,
+          endedAt: true,
+          review: { select: { id: true } },
+        },
+      }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      items: rows.map((s) => ({
+        id: s.id,
+        userId: s.userId,
+        market: s.market,
+        symbol: s.symbol,
+        drivingTimeframe: s.drivingTimeframe,
+        totalBars: s.totalBars,
+        initialVisibleBars: s.initialVisibleBars,
+        initialBalance: s.initialBalance,
+        finalBalance: s.finalBalance,
+        isLiquidated: s.isLiquidated,
+        resetCount: s.resetCount,
+        status: s.status,
+        pointer: s.pointer,
+        viewTimeframe: s.viewTimeframe,
+        createdAt: s.createdAt,
+        endedAt: s.endedAt,
+        hasReview: Boolean(s.review?.id),
+      })),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   async resetAccountBalance(userId: string) {
@@ -294,7 +359,7 @@ export class TrainingService {
   }
 
   async dashboard(userId: string) {
-    const [trainingCount, liquidationCount, latestSession, snapshots, users, allSessions] = await Promise.all([
+    const [trainingCount, liquidationCount, latestSession, snapshots, leaderboard] = await Promise.all([
       this.prisma.trainingSession.count({
         where: { userId, status: { in: CLOSED_SESSION_STATUSES } },
       }),
@@ -312,82 +377,16 @@ export class TrainingService {
         select: { createdAt: true, totalEquity: true },
         take: 1200,
       }),
-      this.prisma.user.findMany({
-        select: { id: true, email: true },
-      }),
-      this.prisma.trainingSession.findMany({
-        select: {
-          id: true,
-          userId: true,
-          status: true,
-          isLiquidated: true,
-          finalBalance: true,
-          initialBalance: true,
-          createdAt: true,
-        },
-      }),
+      this.getLeaderboard(userId, 10),
     ]);
 
-    const myClosedSessions = allSessions.filter((s) => s.userId === userId && CLOSED_SESSION_STATUSES.includes(s.status));
+    const myClosedSessions = await this.prisma.trainingSession.findMany({
+      where: { userId, status: { in: CLOSED_SESSION_STATUSES } },
+      select: { finalBalance: true, initialBalance: true },
+    });
     const myWinSessions = myClosedSessions.filter((s) => (s.finalBalance ?? s.initialBalance) > s.initialBalance);
     const winRate = myClosedSessions.length > 0 ? (myWinSessions.length / myClosedSessions.length) * 100 : 0;
     const accountScore = latestSession ? latestSession.finalBalance ?? latestSession.initialBalance : 10000;
-
-    const sessionByUser = new Map<string, typeof allSessions>();
-    allSessions.forEach((s) => {
-      const list = sessionByUser.get(s.userId) ?? [];
-      list.push(s);
-      sessionByUser.set(s.userId, list);
-    });
-    const rankingRows = users.map((u) => {
-      const sessions = (sessionByUser.get(u.id) ?? []).slice().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-      const latest = sessions[0];
-      const account = latest ? latest.finalBalance ?? latest.initialBalance : 10000;
-      const closedSessions = sessions.filter((s) => CLOSED_SESSION_STATUSES.includes(s.status));
-      const trainingCnt = closedSessions.length;
-      const liqCnt = sessions.filter((s) => s.isLiquidated).length;
-      const winSessions = closedSessions.filter((s) => (s.finalBalance ?? s.initialBalance) > s.initialBalance);
-      const rate = closedSessions.length > 0 ? (winSessions.length / closedSessions.length) * 100 : 0;
-      return {
-        userId: u.id,
-        email: u.email,
-        accountScore: Number((account ?? 0).toFixed(2)),
-        trainingCount: trainingCnt,
-        winRate: Number(rate.toFixed(2)),
-        liquidationCount: liqCnt,
-      };
-    });
-
-    const sortedRows = rankingRows
-      .slice()
-      .sort((a, b) => b.accountScore - a.accountScore || b.trainingCount - a.trainingCount || a.userId.localeCompare(b.userId))
-      .map((x, idx) => ({ ...x, rank: idx + 1 }));
-
-    const top10Rows = sortedRows.slice(0, 10).map((row) => ({
-      rank: row.rank,
-      userId: row.userId,
-      displayName: this.maskEmail(row.email),
-      accountScore: row.accountScore,
-      trainingCount: row.trainingCount,
-      winRate: row.winRate,
-      liquidationCount: row.liquidationCount,
-      isMe: row.userId === userId,
-    }));
-
-    const meRow = sortedRows.find((x) => x.userId === userId);
-    const myRanking =
-      meRow == null
-        ? null
-        : {
-            rank: meRow.rank,
-            userId: meRow.userId,
-            displayName: this.maskEmail(meRow.email),
-            accountScore: meRow.accountScore,
-            trainingCount: meRow.trainingCount,
-            winRate: meRow.winRate,
-            liquidationCount: meRow.liquidationCount,
-            isMe: true,
-          };
 
     const sampledSnapshots = this.sampleEquityCurve(
       snapshots.map((s) => ({ time: s.createdAt.toISOString(), equity: s.totalEquity })),
@@ -403,9 +402,115 @@ export class TrainingService {
       },
       equityCurve: sampledSnapshots,
       leaderboard: {
-        top10: top10Rows,
-        me: myRanking,
+        top10: leaderboard.items.map((row) => ({
+          rank: row.rank,
+          userId: row.userId,
+          displayName: row.nickname,
+          accountScore: row.points,
+          trainingCount: row.trainingCount,
+          winRate: row.winRate,
+          liquidationCount: row.liquidationCount,
+          isMe: row.isCurrentUser,
+        })),
+        me: leaderboard.myRank
+          ? {
+              rank: leaderboard.myRank.rank,
+              userId: leaderboard.myRank.userId,
+              displayName: leaderboard.myRank.nickname,
+              accountScore: leaderboard.myRank.points,
+              trainingCount: leaderboard.myRank.trainingCount,
+              winRate: leaderboard.myRank.winRate,
+              liquidationCount: leaderboard.myRank.liquidationCount,
+              isMe: true,
+            }
+          : null,
       },
+    };
+  }
+
+  async getLeaderboard(currentUserId: string, limit = 10) {
+    const safeLimit = Math.max(1, Math.min(50, Math.floor(limit || 10)));
+    type RankedRow = {
+      rank: number;
+      userId: string;
+      nickname: string | null;
+      email: string;
+      points: number;
+      trainingCount: number;
+      winRate: number;
+      liquidationCount: number;
+    };
+    const rankedCte = Prisma.sql`
+      WITH latest_session AS (
+        SELECT DISTINCT ON ("userId")
+          "userId",
+          COALESCE("finalBalance", "initialBalance", 10000) AS points
+        FROM "TrainingSession"
+        ORDER BY "userId", "createdAt" DESC
+      ),
+      session_stats AS (
+        SELECT
+          ts."userId",
+          COUNT(*) FILTER (WHERE ts."status" IN ('COMPLETED', 'TERMINATED', 'LIQUIDATED', 'ENDED'))::int AS "trainingCount",
+          COUNT(*) FILTER (WHERE ts."isLiquidated" = true)::int AS "liquidationCount",
+          COUNT(*) FILTER (
+            WHERE ts."status" IN ('COMPLETED', 'TERMINATED', 'LIQUIDATED', 'ENDED')
+              AND COALESCE(ts."finalBalance", ts."initialBalance") > ts."initialBalance"
+          )::int AS "winCount"
+        FROM "TrainingSession" ts
+        GROUP BY ts."userId"
+      ),
+      ranked AS (
+        SELECT
+          ROW_NUMBER() OVER (
+            ORDER BY COALESCE(ls.points, 10000) DESC, COALESCE(ss."trainingCount", 0) DESC, u."createdAt" ASC, u.id ASC
+          )::int AS rank,
+          u.id AS "userId",
+          u.nickname,
+          u.email,
+          ROUND(COALESCE(ls.points, 10000)::numeric, 2)::float8 AS points,
+          COALESCE(ss."trainingCount", 0)::int AS "trainingCount",
+          CASE
+            WHEN COALESCE(ss."trainingCount", 0) = 0 THEN 0
+            ELSE ROUND((ss."winCount"::numeric / ss."trainingCount"::numeric) * 100, 2)::float8
+          END AS "winRate",
+          COALESCE(ss."liquidationCount", 0)::int AS "liquidationCount"
+        FROM "User" u
+        LEFT JOIN latest_session ls ON ls."userId" = u.id
+        LEFT JOIN session_stats ss ON ss."userId" = u.id
+      )
+      SELECT rank, "userId", nickname, email, points, "trainingCount", "winRate", "liquidationCount"
+      FROM ranked
+    `;
+    const [topRows, myRows] = await Promise.all([
+      this.prisma.$queryRaw<RankedRow[]>(Prisma.sql`${rankedCte} ORDER BY rank ASC LIMIT ${safeLimit}`),
+      this.prisma.$queryRaw<RankedRow[]>(Prisma.sql`${rankedCte} WHERE "userId" = ${currentUserId} LIMIT 1`),
+    ]);
+
+    const items = topRows.map((row) => ({
+      rank: row.rank,
+      userId: row.userId,
+      nickname: this.displayName(row.nickname, row.email),
+      points: row.points,
+      trainingCount: row.trainingCount,
+      winRate: row.winRate,
+      liquidationCount: row.liquidationCount,
+      isCurrentUser: row.userId === currentUserId,
+    }));
+    const me = myRows[0];
+    return {
+      items,
+      myRank: me
+        ? {
+            rank: me.rank,
+            userId: me.userId,
+            nickname: this.displayName(me.nickname, me.email),
+            points: me.points,
+            trainingCount: me.trainingCount,
+            winRate: me.winRate,
+            liquidationCount: me.liquidationCount,
+          }
+        : null,
     };
   }
 
@@ -1029,6 +1134,13 @@ export class TrainingService {
     if (!domain) return email;
     if (name.length <= 2) return `${name[0] ?? '*'}*@${domain}`;
     return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
+  }
+
+  private displayName(nickname: string | null | undefined, email: string) {
+    const trimmed = (nickname ?? '').trim();
+    if (trimmed) return trimmed;
+    const [name] = email.split('@');
+    return name || this.maskEmail(email);
   }
 
   private sanitizeReviewContent(content: string) {

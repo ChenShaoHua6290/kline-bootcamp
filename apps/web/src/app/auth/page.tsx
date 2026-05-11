@@ -18,7 +18,7 @@ type Mode = 'login' | 'register';
 type AuthResponse = {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string; role: 'USER' | 'ADMIN' };
+  user: { id: string; email: string; nickname?: string | null; role: 'USER' | 'ADMIN' };
 };
 
 function normalizeAuthErrorToZh(msg: string | undefined, mode: Mode) {
@@ -41,6 +41,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [contactOpen, setContactOpen] = useState(false);
@@ -67,12 +68,13 @@ export default function AuthPage() {
   };
 
   const mutation = useMutation({
-    mutationFn: async (payload: { email: string; password: string; mode: Mode; inviteCode?: string }) => {
+    mutationFn: async (payload: { email: string; password: string; mode: Mode; inviteCode?: string; nickname?: string }) => {
       const endpoint = payload.mode === 'login' ? '/auth/login' : '/auth/register';
       const resp = await api.post<AuthResponse>(endpoint, {
         email: payload.email,
         password: payload.password,
         inviteCode: payload.inviteCode,
+        nickname: payload.nickname,
       });
       return resp.data;
     },
@@ -94,28 +96,98 @@ export default function AuthPage() {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage('');
-    mutation.mutate({ email: email.trim(), password, mode, inviteCode: mode === 'register' ? inviteCode.trim() : undefined });
+    mutation.mutate({
+      email: email.trim(),
+      password,
+      mode,
+      inviteCode: mode === 'register' ? inviteCode.trim() : undefined,
+      nickname: mode === 'register' ? nickname.trim() : undefined,
+    });
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-lg items-center px-4">
-      <Card className="w-full">
-        <CardBody className="p-7 sm:p-8">
-        <PageTitle className="text-2xl">欢迎使用 K 线训练</PageTitle>
-        <PageDescription className="text-slate-300">登录后即可开始双盲训练。</PageDescription>
+    <main className="relative mx-auto flex h-screen w-full items-center justify-center overflow-hidden px-3 py-5 md:px-4 md:py-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(34,211,238,0.14),transparent_35%),radial-gradient(circle_at_82%_8%,rgba(59,130,246,0.16),transparent_32%),radial-gradient(circle_at_50%_95%,rgba(14,165,233,0.10),transparent_38%)]" />
+      <Card className="relative max-h-[calc(100vh-56px)] w-full max-w-[900px] origin-top border-cyan-400/25 bg-[linear-gradient(145deg,rgba(16,25,42,0.96)_0%,rgba(10,17,31,0.98)_52%,rgba(7,13,24,0.99)_100%)] shadow-[0_0_0_1px_rgba(34,211,238,0.14),0_28px_80px_rgba(2,6,23,0.72)] max-[420px]:scale-[0.9] max-[360px]:scale-[0.84]">
+        <CardBody className="p-0">
+        <div className="grid md:grid-cols-[1fr_1.15fr]">
+          <section className="border-b border-slate-700/45 bg-slate-900/20 p-4 md:max-h-[calc(100vh-56px)] md:overflow-hidden md:border-b-0 md:border-r md:p-6">
+            <div className="rounded-2xl border border-slate-700/45 bg-slate-900/20 p-3.5 md:p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-cyan-300/35 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.28)]">
+                  欢迎使用
+                </span>
+              <PageTitle className="text-[clamp(1.15rem,1.55vw,1.55rem)] tracking-[0.01em]">
+                <span className="bg-gradient-to-r from-cyan-200 via-sky-100 to-indigo-200 bg-clip-text text-transparent">
+                  只做一种模式K线训练
+                </span>
+              </PageTitle>
+            </div>
+            <PageDescription className="mt-1 text-[12px] text-slate-300">登录后即可开始双盲训练。</PageDescription>
+            <div className="mt-4 space-y-2.5">
+              <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-3.5 py-3">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-cyan-400/20 text-[11px] text-cyan-200">◆</span>
+                  <div>
+                    <div className="text-[12px] font-semibold text-cyan-100">只做一种模式</div>
+                    <div className="mt-0.5 text-[11px] text-cyan-200/90">聚焦执行与盘感，不被复杂策略干扰</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-700/80 bg-slate-900/45 px-3.5 py-3">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-sky-400/20 text-[11px] text-sky-200">▦</span>
+                  <div>
+                    <div className="text-[12px] font-semibold text-slate-200">真实K线回放</div>
+                    <div className="mt-0.5 text-[11px] text-slate-400">按周期推进训练，支持复盘总结</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 hidden rounded-2xl border border-slate-700/80 bg-slate-900/45 p-2 md:block">
+              <div className="mb-2 text-[11px] font-semibold tracking-[0.03em] text-slate-400">训练界面预览</div>
+              <div className="rounded-xl border border-cyan-500/25 bg-[linear-gradient(135deg,rgba(6,182,212,0.16),rgba(15,23,42,0.85))] p-2">
+                <div className="mb-1.5 h-1.5 w-20 rounded-full bg-cyan-300/70" />
+                <div className="grid grid-cols-6 gap-1">
+                  {Array.from({ length: 18 }).map((_, idx) => (
+                    <div key={idx} className={`rounded-sm ${idx % 2 === 0 ? 'bg-emerald-400/65' : 'bg-rose-400/65'}`} style={{ height: `${6 + (idx % 4) * 3}px` }} />
+                  ))}
+                </div>
+                <div className="mt-2 h-5 rounded-lg border border-slate-600/70 bg-slate-900/60" />
+              </div>
+            </div>
+            </div>
+          </section>
 
-        <div className="mt-5 grid grid-cols-2 gap-2 text-sm">
-          <Button type="button" variant={mode === 'login' ? 'primary' : 'default'} onClick={() => setMode('login')}>
+          <section className="flex items-center px-3.5 py-6 md:max-h-[calc(100vh-56px)] md:px-6 md:py-8">
+        <div className="w-full rounded-2xl border border-slate-700/45 bg-slate-900/20 p-3 md:p-3.5">
+        <div className="grid grid-cols-2 gap-2 text-[12px]">
+          <Button type="button" variant={mode === 'login' ? 'primary' : 'default'} className={mode === 'login' ? '!shadow-[0_8px_22px_rgba(37,99,235,0.35)]' : ''} onClick={() => setMode('login')}>
             登录
           </Button>
-          <Button type="button" variant={mode === 'register' ? 'primary' : 'default'} onClick={() => setMode('register')}>
+          <Button type="button" variant={mode === 'register' ? 'primary' : 'default'} className={mode === 'register' ? '!shadow-[0_8px_22px_rgba(37,99,235,0.35)]' : ''} onClick={() => setMode('register')}>
             注册
           </Button>
         </div>
 
-        <form className="mt-5 space-y-4" onSubmit={submit}>
-          <label className="block text-sm">
-            <span className="field-label mb-1.5 block">邮箱</span>
+        <form className="mt-3.5 space-y-2.5 md:mt-4 md:space-y-3 md:min-h-[350px]" onSubmit={submit}>
+          <label className={`block text-[12px] transition-opacity ${mode === 'register' ? 'opacity-100' : 'pointer-events-none select-none opacity-0'}`}>
+              <span className="field-label mb-1 block">昵称（2-20位，中文/英文/数字/下划线）</span>
+              <Input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                required={mode === 'register'}
+                disabled={mode !== 'register'}
+                minLength={2}
+                maxLength={20}
+                pattern="[\u4e00-\u9fa5A-Za-z0-9_]+"
+                placeholder="请输入昵称"
+              />
+            </label>
+
+          <label className="block text-[12px]">
+            <span className="field-label mb-1 block">邮箱</span>
             <Input
               type="email"
               value={email}
@@ -125,8 +197,8 @@ export default function AuthPage() {
             />
           </label>
 
-          <label className="block text-sm">
-            <span className="field-label mb-1.5 block">密码（至少 6 位）</span>
+          <label className="block text-[12px]">
+            <span className="field-label mb-1 block">密码（至少 6 位）</span>
             <Input
               type="password"
               value={password}
@@ -137,28 +209,27 @@ export default function AuthPage() {
             />
           </label>
 
-          {mode === 'register' ? (
-            <label className="block text-sm">
-              <span className="field-label mb-1.5 block">邀请码（必填）</span>
+            <label className={`block text-[12px] transition-opacity ${mode === 'register' ? 'opacity-100' : 'pointer-events-none select-none opacity-0'}`}>
+              <span className="field-label mb-1 block">邀请码（必填）</span>
               <Input
                 type="text"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                required
+                required={mode === 'register'}
+                disabled={mode !== 'register'}
                 placeholder="请输入邀请码"
               />
             </label>
-          ) : null}
 
           {errorMessage ? (
             <div className="space-y-2">
-              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200">{errorMessage}</p>
+              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-[12px] text-rose-200">{errorMessage}</p>
               <button
                 type="button"
                 onClick={() => setContactOpen(true)}
-                className="text-xs text-cyan-300 hover:text-cyan-200"
+                className="inline-flex items-center rounded-lg border border-cyan-400/45 bg-cyan-500/12 px-2.5 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
               >
-                如需帮助，请联系管理员
+                遇到问题？立即联系管理员
               </button>
             </div>
           ) : null}
@@ -168,21 +239,24 @@ export default function AuthPage() {
             disabled={mutation.isPending}
             variant="primary"
             size="lg"
-            className="w-full"
+            className="h-9 w-full text-[13px] font-semibold"
           >
             {mutation.isPending ? '提交中...' : mode === 'login' ? '登录' : '注册并登录'}
           </Button>
 
-          <div className="pt-1 text-center">
+          <div className="pt-2 text-center">
             <button
               type="button"
               onClick={() => setContactOpen(true)}
-              className="text-xs text-slate-400 underline-offset-4 hover:text-cyan-300 hover:underline"
+              className="inline-flex items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-500/12 px-4 py-2 text-[12px] font-semibold text-cyan-200 shadow-[0_6px_18px_rgba(6,182,212,0.18)] transition hover:bg-cyan-500/22 hover:text-cyan-100"
             >
               联系管理员
             </button>
           </div>
         </form>
+        </div>
+          </section>
+        </div>
         </CardBody>
       </Card>
       <ContactTeacherModal

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dispose, getSupportedIndicators, init, type Chart, type IndicatorCreate, type KLineData } from 'klinecharts';
+import { dispose, getSupportedIndicators, getSupportedOverlays, init, type Chart, type IndicatorCreate, type KLineData } from 'klinecharts';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -227,7 +227,7 @@ export function KLineChart({
   showTradeLegend = true,
   showActionSummary = true,
 }: {
-  data: Array<{ open: number; high: number; low: number; close: number; time: string }>;
+  data: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>;
   actions?: Action[];
   timeframe?: string;
   onTimeframeChange?: (v: string) => void;
@@ -261,6 +261,8 @@ export function KLineChart({
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [activeDrawTool, setActiveDrawTool] = useState<string | null>(null);
+  const [drawLocked, setDrawLocked] = useState(false);
+  const [showTradeOverlays, setShowTradeOverlays] = useState(true);
   const [openDrawMenu, setOpenDrawMenu] = useState<string | null>(null);
   const [focusDataIndex, setFocusDataIndex] = useState<number | null>(null);
   const [mainIndicatorLegend, setMainIndicatorLegend] = useState<Array<{ name: string; values: string[] }>>([]);
@@ -272,6 +274,7 @@ export function KLineChart({
   const sideBtnActive = 'h-8 w-8 rounded-lg border border-blue-300/60 bg-blue-600/90 text-xs font-semibold text-white transition hover:bg-blue-500';
   const periods = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
   const MAIN_INDICATORS = useMemo(() => new Set(['MA', 'EMA', 'SMA', 'BOLL', 'SAR', 'BBI']), []);
+  const SUB_INDICATOR_WHITELIST = useMemo(() => new Set(['VOL', 'MACD', 'RSI', 'KDJ']), []);
   const INDICATOR_LABELS = useMemo<Record<string, string>>(
     () => ({
       MA: 'MA(移动平均线)',
@@ -287,7 +290,7 @@ export function KLineChart({
   const DEFAULT_INDICATOR_PARAMS = useMemo<Record<string, number[]>>(
     () => ({
       MA: [5, 10, 30, 60],
-      EMA: [6, 12, 20],
+      EMA: [6, 12, 20, 30, 60, 120],
       SMA: [12, 2],
       BOLL: [20, 2],
       SAR: [2, 2, 20],
@@ -302,6 +305,7 @@ export function KLineChart({
   const PARAM_LABELS = useMemo<Record<string, string[]>>(
     () => ({
       BOLL: ['周期', '标准差'],
+      EMA: ['EMA1', 'EMA2', 'EMA3', 'EMA4', 'EMA5', 'EMA6'],
       MACD: ['短期', '长期', '信号'],
       KDJ: ['周期', 'K平滑', 'D平滑'],
       RSI: ['周期1', '周期2', '周期3'],
@@ -310,8 +314,12 @@ export function KLineChart({
     [],
   );
   const supportedIndicators = useMemo(() => Array.from(new Set(getSupportedIndicators())), []);
+  const supportedOverlays = useMemo(() => new Set(getSupportedOverlays()), []);
   const mainIndicators = useMemo(() => supportedIndicators.filter((name) => MAIN_INDICATORS.has(name)), [supportedIndicators, MAIN_INDICATORS]);
-  const subIndicators = useMemo(() => supportedIndicators.filter((name) => !MAIN_INDICATORS.has(name)), [supportedIndicators, MAIN_INDICATORS]);
+  const subIndicators = useMemo(
+    () => supportedIndicators.filter((name) => !MAIN_INDICATORS.has(name) && SUB_INDICATOR_WHITELIST.has(name)),
+    [supportedIndicators, MAIN_INDICATORS, SUB_INDICATOR_WHITELIST],
+  );
   const legendPalette = useMemo(() => ['#f59e0b', '#3b82f6', '#ec4899', '#a78bfa', '#22d3ee', '#f97316'], []);
   const drawMenus = useMemo(
     () => [
@@ -347,8 +355,30 @@ export function KLineChart({
           { label: '三角形', overlay: 'triangle' },
         ],
       },
-    ],
-    [],
+      {
+        key: 'fibo',
+        icon: 'Φ',
+        title: '斐波那契',
+        items: [
+          { label: '斐波那契回撤', overlay: 'fibonacciLine' },
+          { label: '斐波那契扩展', overlay: 'fibonacciExtension' },
+          { label: '斐波那契扇形', overlay: 'fibonacciFanLine' },
+        ],
+      },
+      {
+        key: 'wave',
+        icon: '〰',
+        title: '波浪工具',
+        items: [
+          { label: '五浪标注', overlay: 'elliottWave' },
+          { label: '三浪标注', overlay: 'abcWave' },
+          { label: '波段折线', overlay: 'polyline' },
+        ],
+      },
+    ]
+      .map((menu) => ({ ...menu, items: menu.items.filter((item) => supportedOverlays.has(item.overlay)) }))
+      .filter((menu) => menu.items.length > 0),
+    [supportedOverlays],
   );
 
   const getActionMeta = (actionType: string) => {
@@ -598,7 +628,7 @@ export function KLineChart({
     rowsRef.current = rows.map((d, idx) => {
       const parsed = Date.parse(d.time);
       const timestamp = Number.isFinite(parsed) ? parsed : Date.now() + idx * 60_000;
-      return { timestamp, open: d.open, high: d.high, low: d.low, close: d.close };
+      return { timestamp, open: d.open, high: d.high, low: d.low, close: d.close, volume: Number(d.volume ?? 0) };
     });
     setFocusDataIndex((prev) => {
       if (typeof prev === 'number' && prev >= 0 && prev < rowsRef.current.length) return prev;
@@ -610,8 +640,9 @@ export function KLineChart({
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
 
-    const actionRows = Array.isArray(actions) ? actions : [];
-    actionRows.forEach((a) => {
+    if (showTradeOverlays) {
+      const actionRows = Array.isArray(actions) ? actions : [];
+      actionRows.forEach((a) => {
       const timestamp = typeof a.timestamp === 'number' ? a.timestamp : typeof a.timePointer === 'number' ? rowsRef.current[a.timePointer]?.timestamp : undefined;
       if (typeof timestamp !== 'number') return;
       const meta = getActionMeta(a.actionType);
@@ -648,11 +679,11 @@ export function KLineChart({
           },
         },
       });
-    });
+      });
 
-    const lastTimestamp = rowsRef.current[rowsRef.current.length - 1]?.timestamp;
-    if (typeof lastTimestamp === 'number') {
-      if (typeof stopLossPrice === 'number' && Number.isFinite(stopLossPrice)) {
+      const lastTimestamp = rowsRef.current[rowsRef.current.length - 1]?.timestamp;
+      if (typeof lastTimestamp === 'number') {
+        if (typeof stopLossPrice === 'number' && Number.isFinite(stopLossPrice)) {
         chart.createOverlay({
           name: 'horizontalStraightLine',
           groupId: 'risk-lines',
@@ -672,8 +703,8 @@ export function KLineChart({
             polygon: { color: '#ef4444', borderColor: '#ef4444' },
           },
         });
-      }
-      if (typeof takeProfitPrice === 'number' && Number.isFinite(takeProfitPrice)) {
+        }
+        if (typeof takeProfitPrice === 'number' && Number.isFinite(takeProfitPrice)) {
         chart.createOverlay({
           name: 'horizontalStraightLine',
           groupId: 'risk-lines',
@@ -693,10 +724,11 @@ export function KLineChart({
             polygon: { color: '#10b981', borderColor: '#10b981' },
           },
         });
+        }
       }
     }
     refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-  }, [data, actions, stopLossPrice, takeProfitPrice, highlightedActionId]);
+  }, [data, actions, stopLossPrice, takeProfitPrice, highlightedActionId, showTradeOverlays]);
 
   useEffect(() => {
     refreshIndicatorLegend(focusDataIndex);
@@ -805,16 +837,27 @@ export function KLineChart({
     setSettingsNotice(null);
   }, [showSettingsModal]);
 
-  const addDraw = (name: string) => {
+  useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
+    // 同步手动画线可见性，确保“眼睛”按钮有即时可见反馈
+    chart.overrideOverlay({ groupId: 'manual-draw', visible: showTradeOverlays });
+  }, [showTradeOverlays]);
+
+  const addDraw = (name: string) => {
+    if (drawLocked) return;
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (!supportedOverlays.has(name)) {
+      setParamToast('当前图表库不支持该画图工具');
+      return;
+    }
     const created = chart.createOverlay({ name, groupId: 'manual-draw' });
     if (created) {
       setActiveDrawTool(name);
       return;
     }
-    const fallback = chart.createOverlay({ name: 'straightLine', groupId: 'manual-draw' });
-    if (fallback) setActiveDrawTool('straightLine');
+    setParamToast('创建画图失败，请尝试其他工具');
   };
 
   const toggleIndicator = (name: string) => {
@@ -962,15 +1005,27 @@ export function KLineChart({
             </div>
           ))}
           <div className="my-1 border-t border-slate-700/70" />
-          <button className={`${sideBtn} m-1`} title="锁定(预留)">
+          <button
+            className={`${drawLocked ? sideBtnActive : sideBtn} m-1`}
+            title={drawLocked ? '已锁定画线' : '解锁后可画线'}
+            onClick={() => {
+              setDrawLocked((prev) => !prev);
+              setOpenDrawMenu(null);
+            }}
+          >
             🔒
           </button>
-          <button className={`${sideBtn} m-1`} title="显示/隐藏(预留)">
+          <button
+            className={`${showTradeOverlays ? sideBtnActive : sideBtn} m-1`}
+            title={showTradeOverlays ? '隐藏标注与画线' : '显示标注与画线'}
+            onClick={() => setShowTradeOverlays((prev) => !prev)}
+          >
             👁
           </button>
           <button
             className={`${sideBtn} m-1`}
             onClick={() => {
+              if (drawLocked) return;
               chartRef.current?.removeOverlay({ groupId: 'manual-draw' });
               setActiveDrawTool(null);
               setOpenDrawMenu(null);
@@ -1022,15 +1077,15 @@ export function KLineChart({
       {showIndicatorModal ? (
         <div className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-[1px]" onClick={() => setShowIndicatorModal(false)}>
           <div
-            className="mx-auto mt-20 w-[430px] max-w-[94vw] rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
+            className="mx-auto mt-20 w-[440px] max-w-[94vw] rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3.5">
               <div>
-                <h3 className="text-base font-semibold">指标设置</h3>
-                <p className="text-xs text-slate-400">选择主图与副图指标，并可调参数。</p>
+                <h3 className="text-[15px] font-semibold tracking-[0.01em] text-slate-100">指标设置</h3>
+                <p className="mt-0.5 text-[11px] text-slate-500">选择要显示的指标，并按需调整参数。</p>
               </div>
-              <Button variant="ghost" size="sm" className="!px-2 !py-1" onClick={() => setShowIndicatorModal(false)}>
+              <Button variant="ghost" size="sm" className="!px-2 !py-1.5 text-slate-400 hover:!text-slate-100" onClick={() => setShowIndicatorModal(false)}>
                 ✕
               </Button>
             </div>
@@ -1038,86 +1093,130 @@ export function KLineChart({
               {paramToast ? (
                 <div className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">{paramToast}</div>
               ) : null}
-              <div className="mb-1 text-xs font-semibold tracking-wide text-cyan-300">主图指标</div>
-              <div className="mb-2 text-[11px] text-slate-500">用于趋势与结构分析，叠加在主图K线上展示。</div>
-              <div className="space-y-1">
+              <section className="rounded-xl border border-slate-700/70 bg-slate-900/55 p-2.5">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="text-[12px] font-semibold tracking-[0.02em] text-cyan-300">主图指标</span>
+                <span className="rounded-full border border-cyan-400/35 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-200">主图叠加</span>
+              </div>
+              <div className="mb-2 text-[11px] text-slate-500">用于趋势与结构分析，叠加在主图 K 线上展示。</div>
+              <div className="space-y-1.5">
                 {mainIndicators.map((name) => (
-                  <div key={name} className="flex items-center justify-between rounded-lg px-2 py-2 hover:bg-slate-800/80">
+                  <div
+                    key={name}
+                    className={`flex items-center justify-between rounded-lg border px-2.5 py-2 transition ${
+                      selectedIndicators.includes(name) ? 'border-cyan-400/45 bg-cyan-500/10' : 'border-slate-700/70 bg-slate-900/35 hover:border-slate-500/80'
+                    }`}
+                  >
                     <div
                       className="flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
                       onClick={() => toggleIndicator(name)}
                     >
-                      <span className={selectedIndicators.includes(name) ? 'text-blue-400' : 'text-slate-300'}>{INDICATOR_LABELS[name] ?? name}</span>
+                      <span className={selectedIndicators.includes(name) ? 'text-[13px] font-semibold text-cyan-200' : 'text-[13px] font-medium text-slate-300'}>
+                        {INDICATOR_LABELS[name] ?? name}
+                      </span>
                       <Switch
                         checked={selectedIndicators.includes(name)}
                         onClick={(e) => e.stopPropagation()}
                         onChange={() => toggleIndicator(name)}
                       />
                     </div>
-                    <Button variant="ghost" size="sm" className="!p-1 text-slate-400 hover:text-slate-100" onClick={() => openParamEditor(name)} title="参数设置">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`!ml-2 !px-1.5 !py-1 text-[13px] ${selectedIndicators.includes(name) ? 'text-cyan-300 hover:!text-cyan-100' : 'text-slate-500 hover:!text-slate-200'}`}
+                      onClick={() => openParamEditor(name)}
+                      title="参数设置"
+                    >
                       ⚙
                     </Button>
                   </div>
                 ))}
               </div>
-              <div className="mb-1 mt-4 text-xs font-semibold tracking-wide text-cyan-300">副图指标</div>
-              <div className="mb-2 text-[11px] text-slate-500">用于动量和成交量观察，显示在副图区域。</div>
-              <div className="space-y-1">
+              </section>
+              <section className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/55 p-2.5">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="text-[12px] font-semibold tracking-[0.02em] text-cyan-300">副图指标</span>
+                <span className="rounded-full border border-indigo-400/35 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-indigo-200">副图振荡</span>
+              </div>
+              <div className="mb-2 text-[11px] text-slate-500">用于动量与成交量观察，显示在副图区域。</div>
+              <div className="space-y-1.5">
                 {subIndicators.map((name) => (
-                  <div key={name} className="flex items-center justify-between rounded-lg px-2 py-2 hover:bg-slate-800/80">
+                  <div
+                    key={name}
+                    className={`flex items-center justify-between rounded-lg border px-2.5 py-2 transition ${
+                      selectedIndicators.includes(name) ? 'border-cyan-400/45 bg-cyan-500/10' : 'border-slate-700/70 bg-slate-900/35 hover:border-slate-500/80'
+                    }`}
+                  >
                     <div
                       className="flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
                       onClick={() => toggleIndicator(name)}
                     >
-                      <span className={selectedIndicators.includes(name) ? 'text-blue-400' : 'text-slate-300'}>{INDICATOR_LABELS[name] ?? name}</span>
+                      <span className={selectedIndicators.includes(name) ? 'text-[13px] font-semibold text-cyan-200' : 'text-[13px] font-medium text-slate-300'}>
+                        {INDICATOR_LABELS[name] ?? name}
+                      </span>
                       <Switch
                         checked={selectedIndicators.includes(name)}
                         onClick={(e) => e.stopPropagation()}
                         onChange={() => toggleIndicator(name)}
                       />
                     </div>
-                    <Button variant="ghost" size="sm" className="!p-1 text-slate-400 hover:text-slate-100" onClick={() => openParamEditor(name)} title="参数设置">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`!ml-2 !px-1.5 !py-1 text-[13px] ${selectedIndicators.includes(name) ? 'text-cyan-300 hover:!text-cyan-100' : 'text-slate-500 hover:!text-slate-200'}`}
+                      onClick={() => openParamEditor(name)}
+                      title="参数设置"
+                    >
                       ⚙
                     </Button>
                   </div>
                 ))}
               </div>
+              </section>
             </div>
             {paramModal ? (
               <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-3" onClick={() => setParamModal(null)}>
-                <div className="w-full max-w-[340px] rounded-2xl border border-slate-700 bg-slate-900/95 p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="text-lg font-semibold text-slate-100">{paramModal.name} 参数设置</div>
-                    <Button variant="ghost" size="sm" className="!p-1 text-slate-400 hover:text-slate-100" onClick={() => setParamModal(null)}>
+                <div className="w-full max-w-[360px] rounded-2xl border border-slate-700 bg-slate-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3.5">
+                    <div>
+                      <div className="text-[15px] font-semibold tracking-[0.01em] text-slate-100">{paramModal.name} 参数设置</div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">调整后将立即作用于图表指标。</div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="!px-2 !py-1.5 text-slate-400 hover:!text-slate-100" onClick={() => setParamModal(null)}>
                       ✕
                     </Button>
                   </div>
-                  <div className="space-y-2">
-                    {paramModal.values.map((v, idx) => (
-                      <div key={`${paramModal.name}-${idx}`} className="grid grid-cols-[72px_1fr] items-center gap-2">
-                        <label className="text-sm text-slate-300">{PARAM_LABELS[paramModal.name]?.[idx] ?? `参数${idx + 1}`}</label>
-                        <Input
-                          className="rounded-lg bg-slate-800 py-1.5"
-                          value={v}
-                          onChange={(e) =>
-                            setParamModal((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    values: prev.values.map((item, i) => (i === idx ? e.target.value : item)),
-                                  }
-                                : prev,
-                            )
-                          }
-                        />
+                  <div className="px-4 py-3">
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/55 p-2.5">
+                      <div className="mb-2 text-[12px] font-semibold tracking-[0.02em] text-cyan-300">参数列表</div>
+                      <div className="space-y-2">
+                        {paramModal.values.map((v, idx) => (
+                          <div key={`${paramModal.name}-${idx}`} className="grid grid-cols-[78px_1fr] items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-900/35 px-2 py-2">
+                            <label className="text-[13px] font-medium text-slate-300">{PARAM_LABELS[paramModal.name]?.[idx] ?? `参数${idx + 1}`}</label>
+                            <Input
+                              className="h-8 rounded-lg bg-slate-800 px-2 text-[12px]"
+                              value={v}
+                              onChange={(e) =>
+                                setParamModal((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        values: prev.values.map((item, i) => (i === idx ? e.target.value : item)),
+                                      }
+                                    : prev,
+                                )
+                              }
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                  <div className="mt-4 flex items-center justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setParamModal(null)}>
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-700 px-4 py-3">
+                    <Button variant="ghost" size="sm" className="!px-3 !py-1.5 text-[12px]" onClick={() => setParamModal(null)}>
                       取消
                     </Button>
-                    <Button variant="primary" size="sm" onClick={saveParamEditor}>
+                    <Button variant="primary" size="sm" className="!px-3 !py-1.5 text-[12px]" onClick={saveParamEditor}>
                       保存
                     </Button>
                   </div>
@@ -1138,19 +1237,22 @@ export function KLineChart({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-700 px-5 py-3.5 sm:px-6 sm:py-4">
-              <h4 className="text-xl font-semibold tracking-[0.01em] sm:text-2xl">设置</h4>
-              <Button variant="ghost" size="sm" className="!px-2 !py-1 text-2xl leading-none text-slate-300" onClick={() => setShowSettingsModal(false)}>
+              <div>
+                <h4 className="text-[20px] font-semibold tracking-[0.01em] text-slate-100">设置</h4>
+                <p className="mt-0.5 text-[15px] text-slate-500">调整图表显示与交互偏好。</p>
+              </div>
+              <Button variant="ghost" size="sm" className="!px-2 !py-1.5 text-slate-400 hover:!text-slate-100" onClick={() => setShowSettingsModal(false)}>
                 ×
               </Button>
             </div>
             <div className="max-h-[calc(100vh-210px)] space-y-3 overflow-y-auto px-5 py-4 text-sm sm:px-6 sm:py-4">
               <section className="rounded-xl border border-slate-700/80 bg-slate-900/35 p-3">
-                <div className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-cyan-300">图表显示</div>
+                <div className="mb-2 text-[15px] font-semibold tracking-[0.02em] text-cyan-300">图表显示</div>
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-200">涨跌颜色</label>
+                <label className="mb-1.5 block text-[13px] font-medium text-slate-200">涨跌颜色</label>
                 <Select
-                  className="text-sm"
+                  className="text-[13px]"
                   value={chartSettings.riseFallMode}
                   onChange={(e) => setChartSettings((prev) => ({ ...prev, riseFallMode: e.target.value as RiseFallMode }))}
                 >
@@ -1159,9 +1261,9 @@ export function KLineChart({
                 </Select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-200">蜡烛图类型</label>
+                <label className="mb-1.5 block text-[13px] font-medium text-slate-200">蜡烛图类型</label>
                 <Select
-                  className="text-sm"
+                  className="text-[13px]"
                   value={chartSettings.candleType}
                   onChange={(e) => setChartSettings((prev) => ({ ...prev, candleType: e.target.value as CandleRenderType }))}
                 >
@@ -1176,7 +1278,7 @@ export function KLineChart({
                 onClick={() => setChartSettings((prev) => ({ ...prev, showLatestPrice: !prev.showLatestPrice }))}
               >
                 <div>
-                  <div className="text-sm">最新价显示</div>
+                  <div className="text-[13px] font-medium">最新价显示</div>
                 </div>
                 <Switch
                   checked={chartSettings.showLatestPrice}
@@ -1189,7 +1291,7 @@ export function KLineChart({
                 onClick={() => setChartSettings((prev) => ({ ...prev, showHighPrice: !prev.showHighPrice }))}
               >
                 <div>
-                  <div className="text-sm">最高价显示</div>
+                  <div className="text-[13px] font-medium">最高价显示</div>
                 </div>
                 <Switch
                   checked={chartSettings.showHighPrice}
@@ -1202,7 +1304,7 @@ export function KLineChart({
                 onClick={() => setChartSettings((prev) => ({ ...prev, showLowPrice: !prev.showLowPrice }))}
               >
                 <div>
-                  <div className="text-sm">最低价显示</div>
+                  <div className="text-[13px] font-medium">最低价显示</div>
                 </div>
                 <Switch
                   checked={chartSettings.showLowPrice}
@@ -1214,14 +1316,14 @@ export function KLineChart({
               </section>
 
               <section className="rounded-xl border border-slate-700/80 bg-slate-900/35 p-3">
-                <div className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-cyan-300">辅助工具</div>
+                <div className="mb-2 text-[15px] font-semibold tracking-[0.02em] text-cyan-300">辅助工具</div>
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <div
                 className="flex h-[46px] cursor-pointer items-center justify-between rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-2 text-left hover:border-slate-500"
                 onClick={() => setChartSettings((prev) => ({ ...prev, showIndicatorLatestValue: !prev.showIndicatorLatestValue }))}
               >
                 <div>
-                  <div className="text-sm">指标最新值显示</div>
+                  <div className="text-[13px] font-medium">指标最新值显示</div>
                 </div>
                 <Switch
                   checked={chartSettings.showIndicatorLatestValue}
@@ -1234,7 +1336,7 @@ export function KLineChart({
                 onClick={() => setChartSettings((prev) => ({ ...prev, reverseYAxis: !prev.reverseYAxis }))}
               >
                 <div>
-                  <div className="text-sm">倒置坐标</div>
+                  <div className="text-[13px] font-medium">倒置坐标</div>
                 </div>
                 <Switch
                   checked={chartSettings.reverseYAxis}
@@ -1247,30 +1349,13 @@ export function KLineChart({
                 onClick={() => setChartSettings((prev) => ({ ...prev, showGrid: !prev.showGrid }))}
               >
                 <div>
-                  <div className="text-sm">网格线显示</div>
+                  <div className="text-[13px] font-medium">网格线显示</div>
                 </div>
                 <Switch
                   checked={chartSettings.showGrid}
                   onClick={(e) => e.stopPropagation()}
                   onChange={() => setChartSettings((prev) => ({ ...prev, showGrid: !prev.showGrid }))}
                 />
-              </div>
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-slate-700/80 bg-slate-900/35 p-3">
-                <div className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-cyan-300">外观设置</div>
-                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-200">价格轴类型</label>
-                <Select
-                  className="text-sm"
-                  value={chartSettings.priceAxisType}
-                  onChange={(e) => setChartSettings((prev) => ({ ...prev, priceAxisType: e.target.value as PriceAxisType }))}
-                >
-                  <option value="linear">线性轴</option>
-                  <option value="log">对数轴</option>
-                </Select>
               </div>
                 </div>
               </section>

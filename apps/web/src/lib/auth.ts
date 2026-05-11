@@ -1,6 +1,7 @@
 export type AuthUser = {
   id: string;
   email: string;
+  nickname?: string | null;
   role?: 'USER' | 'ADMIN';
 };
 
@@ -20,7 +21,7 @@ export function getAuthUser(): AuthUser | null {
   try {
     const parsed = JSON.parse(raw) as Partial<AuthUser>;
     if (typeof parsed.id === 'string' && typeof parsed.email === 'string') {
-      return { id: parsed.id, email: parsed.email, role: parsed.role };
+      return { id: parsed.id, email: parsed.email, nickname: parsed.nickname, role: parsed.role };
     }
     return null;
   } catch {

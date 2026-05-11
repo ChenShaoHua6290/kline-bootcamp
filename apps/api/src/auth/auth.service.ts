@@ -20,6 +20,10 @@ export class AuthService {
     const prisma = this.prisma as any;
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already exists');
+    const nickname = (dto.nickname ?? '').trim();
+    if (!nickname) throw new BadRequestException('昵称不能为空');
+    if (nickname.length < 2 || nickname.length > 20) throw new BadRequestException('昵称长度需在2-20之间');
+    if (!/^[\u4e00-\u9fa5A-Za-z0-9_]+$/.test(nickname)) throw new BadRequestException('昵称仅支持中文、英文、数字和下划线');
     const code = dto.inviteCode?.trim();
     if (!code) throw new BadRequestException('邀请码不能为空');
     const invite = await prisma.inviteCode.findFirst({
@@ -40,7 +44,7 @@ export class AuthService {
       if (latestInvite.expiresAt && latestInvite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
       if (latestInvite.usedCount >= latestInvite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
 
-      const created = await tx.user.create({ data: { email: dto.email, password: hashed } });
+      const created = await tx.user.create({ data: { email: dto.email, password: hashed, nickname } });
       await tx.inviteCode.update({
         where: { id: latestInvite.id },
         data: { usedCount: { increment: 1 } },
@@ -56,7 +60,7 @@ export class AuthService {
     const rows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
       SELECT role FROM "User" WHERE id = ${user.id} LIMIT 1
     `;
-    return this.issueTokens(user.id, user.email, rows[0]?.role ?? 'USER');
+    return this.issueTokens(user.id, user.email, rows[0]?.role ?? 'USER', user.nickname ?? null);
   }
 
   async login(dto: AuthDto, meta?: { ip?: string; userAgent?: string }) {
@@ -78,7 +82,7 @@ export class AuthService {
       await this.securityLogService.logLoginFailed({ userId: user.id, ip: meta?.ip, userAgent: meta?.userAgent, detail: 'password mismatch' });
       throw new UnauthorizedException('Invalid credentials');
     }
-    return this.issueTokens(user.id, user.email, userExtra?.role ?? 'USER');
+    return this.issueTokens(user.id, user.email, userExtra?.role ?? 'USER', user.nickname ?? null);
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -92,12 +96,13 @@ export class AuthService {
         expiresAt: Date;
         revokedAt: Date | null;
         email: string;
+        nickname: string | null;
         role: string | null;
         isBanned: boolean | null;
       }>
     >`
       SELECT rt.id, rt."userId", rt."tokenHash", rt."expiresAt", rt."revokedAt",
-             u.email, u.role, u."isBanned"
+             u.email, u.nickname, u.role, u."isBanned"
       FROM "RefreshToken" rt
       JOIN "User" u ON u.id = rt."userId"
       WHERE rt.id = ${payload.jti as string}
@@ -113,7 +118,7 @@ export class AuthService {
     if (!matched) throw new UnauthorizedException('Refresh token 非法');
 
     await this.prisma.$executeRaw`UPDATE "RefreshToken" SET "revokedAt" = ${now} WHERE id = ${record.id}`;
-    return this.issueTokens(record.userId, record.email, record.role ?? 'USER');
+    return this.issueTokens(record.userId, record.email, record.role ?? 'USER', record.nickname ?? null);
   }
 
   async logout(dto: RefreshTokenDto) {
@@ -133,7 +138,13 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async issueTokens(sub: string, email: string, role: string) {
+  async me(userId: string) {
+    const user = await this.usersService.findPublicById(userId);
+    if (!user) throw new UnauthorizedException('Invalid token');
+    return user;
+  }
+
+  private async issueTokens(sub: string, email: string, role: string, nickname: string | null) {
     const now = new Date();
     const accessToken = this.jwtService.sign(
       { sub, email, role },
@@ -150,6 +161,6 @@ export class AuthService {
       INSERT INTO "RefreshToken" (id, "userId", "tokenHash", "expiresAt", "createdAt")
       VALUES (${jti}, ${sub}, ${refreshHash}, ${expiresAt}, ${now})
     `;
-    return { accessToken, refreshToken, user: { id: sub, email, role } };
+    return { accessToken, refreshToken, user: { id: sub, email, nickname, role } };
   }
 }

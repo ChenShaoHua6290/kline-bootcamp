@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Slider } from '@/components/ui/Slider';
 
 const markets = ['STOCK', 'FOREX', 'FUTURES', 'CRYPTO'];
-const timeframes = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
+const timeframes = ['15m', '1H', '4H', 'D'];
 const marketLabels: Record<string, string> = {
   STOCK: '股票',
   FOREX: '外汇',
@@ -68,13 +68,13 @@ export function TrainingConfigModal({
         </button>
 
         <div className="border-b border-slate-700/70 px-5 pb-3.5 pt-4.5 text-center sm:px-6 sm:pb-4 sm:pt-5">
-          <h2 className="mt-2 text-[clamp(0.95rem,1.45vw,1.35rem)] font-semibold leading-tight text-slate-100">开始训练</h2>
-          <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-400">选择市场、推进周期和训练长度</p>
+          <h2 className="mt-2 text-[clamp(1.05rem,1.6vw,1.45rem)] font-semibold leading-tight tracking-[0.01em] text-slate-100">开始训练</h2>
+          <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-slate-400">选择市场、推进周期和训练长度</p>
         </div>
 
         <div className="space-y-4 px-5 py-4 sm:px-6 sm:py-4">
           <section>
-            <div className="mb-2 text-[13px] font-semibold tracking-[0.06em] text-slate-400">市场</div>
+            <div className="mb-2 text-[12px] font-semibold tracking-[0.03em] text-cyan-300">市场</div>
             <div className="grid grid-cols-4 gap-2">
               {markets.map((m) => {
                 const active = form.market === m;
@@ -83,7 +83,7 @@ export function TrainingConfigModal({
                     key={m}
                     disabled={submitting}
                     onClick={() => setForm({ ...form, market: m })}
-                    className={`${optionBtnBase} h-9 px-2 text-[0.8rem] font-semibold tracking-[0.02em] ${
+                    className={`${optionBtnBase} h-9 px-2 text-[13px] font-semibold tracking-[0.01em] ${
                       active
                         ? 'border-cyan-200/80 bg-gradient-to-r from-cyan-500/75 to-sky-500/70 text-white shadow-[0_8px_24px_rgba(34,211,238,0.22),inset_0_0_0_1px_rgba(255,255,255,0.18)]'
                         : ''
@@ -97,7 +97,7 @@ export function TrainingConfigModal({
           </section>
 
           <section>
-            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold tracking-[0.06em] text-slate-400">
+            <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold tracking-[0.03em] text-cyan-300">
               <span>推进周期</span>
               <span className="group relative inline-flex">
                 <span
@@ -121,7 +121,7 @@ export function TrainingConfigModal({
                     key={tf}
                     disabled={submitting}
                     onClick={() => setForm({ ...form, drivingTimeframe: tf })}
-                    className={`${optionBtnBase} h-9 px-2 text-[0.8rem] font-semibold tracking-[0.02em] ${
+                    className={`${optionBtnBase} h-9 px-2 text-[13px] font-semibold tracking-[0.01em] ${
                       active ? 'border-cyan-200/80 bg-gradient-to-r from-cyan-500/75 to-sky-500/70 text-white shadow-[0_8px_24px_rgba(34,211,238,0.22),inset_0_0_0_1px_rgba(255,255,255,0.18)]' : ''
                     }`}
                   >
@@ -133,7 +133,7 @@ export function TrainingConfigModal({
           </section>
 
           <section>
-            <div className="mb-2 flex items-center justify-between text-[13px] font-semibold tracking-[0.06em] text-slate-400">
+            <div className="mb-2 flex items-center justify-between text-[12px] font-semibold tracking-[0.03em] text-cyan-300">
               <div className="flex items-center gap-2">
                 <span>训练K线数量</span>
                 <span className="group relative inline-flex">
@@ -150,7 +150,7 @@ export function TrainingConfigModal({
                   </span>
                 </span>
               </div>
-              <span className="text-cyan-300 text-[1rem] leading-none font-semibold">{form.trainingBars} 根</span>
+              <span className="text-cyan-200 text-[16px] leading-none font-semibold">{form.trainingBars} 根</span>
             </div>
             <Slider
               min={50}
@@ -159,9 +159,9 @@ export function TrainingConfigModal({
               value={form.trainingBars}
               disabled={submitting}
               onChange={(e) => setForm((prev) => ({ ...prev, trainingBars: Number(e.target.value) }))}
-              className="h-1.5 bg-slate-700/65 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_rgba(6,182,212,0.14)] [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3"
+              className="slider-compact h-1.5 bg-slate-700/65 [&::-webkit-slider-thumb]:!h-2 [&::-webkit-slider-thumb]:!w-2 [&::-webkit-slider-thumb]:!shadow-[0_0_0_2px_rgba(6,182,212,0.14)] [&::-moz-range-thumb]:!h-2 [&::-moz-range-thumb]:!w-2"
             />
-            <div className="mt-1.5 flex items-center justify-between text-[15px] text-slate-500">
+            <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium text-slate-500">
               <span>50</span>
               <span>300</span>
             </div>
@@ -174,20 +174,20 @@ export function TrainingConfigModal({
               type="button"
               disabled={submitting}
               onClick={onClose}
-              className="rounded-2xl border border-slate-500/70 bg-slate-800/55 py-2 text-[0.76rem] font-semibold text-slate-200 transition hover:border-slate-400/80 hover:bg-slate-700/70 active:border-cyan-300/70 active:bg-cyan-500/22 active:text-cyan-100 disabled:opacity-60"
+              className="rounded-2xl border border-slate-500/70 bg-slate-800/55 py-2 text-[12px] font-semibold text-slate-200 transition hover:border-slate-400/80 hover:bg-slate-700/70 active:border-cyan-300/70 active:bg-cyan-500/22 active:text-cyan-100 disabled:opacity-60"
             >
               取消
             </button>
             <button
               disabled={submitting}
               onClick={() => onSubmit(form)}
-              className="rounded-2xl bg-gradient-to-r from-[#13d9b6] to-[#22cde6] py-2 text-[0.76rem] font-semibold tracking-[0.03em] text-slate-950 transition hover:brightness-105 active:from-[#31e6c5] active:to-[#46ddf2] active:shadow-[0_0_0_2px_rgba(34,211,238,0.35),0_0_20px_rgba(34,211,238,0.25)] disabled:opacity-60"
+              className="rounded-2xl bg-gradient-to-r from-[#13d9b6] to-[#22cde6] py-2 text-[12px] font-semibold tracking-[0.02em] text-slate-950 transition hover:brightness-105 active:from-[#31e6c5] active:to-[#46ddf2] active:shadow-[0_0_0_2px_rgba(34,211,238,0.35),0_0_20px_rgba(34,211,238,0.25)] disabled:opacity-60"
             >
               {submitting ? '创建中...' : '开始训练'}
             </button>
           </div>
 
-          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/65 px-3 py-2 text-[12px] font-medium leading-4 text-slate-500 sm:px-4">
+          <div className="rounded-2xl border border-slate-700/80 bg-slate-900/65 px-3 py-2 text-[11px] font-medium leading-4 text-slate-500 sm:px-4">
             本功能用于K线训练与交易复盘学习，不构成投资建议。请根据自身风险承受能力理性训练。
           </div>
         </div>

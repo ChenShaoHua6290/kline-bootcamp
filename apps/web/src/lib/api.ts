@@ -18,7 +18,7 @@ async function refreshAccessToken(): Promise<string | null> {
         const resp = await axios.post(`${baseURL}/auth/refresh`, { refreshToken });
         const accessToken = resp?.data?.accessToken as string | undefined;
         const nextRefreshToken = resp?.data?.refreshToken as string | undefined;
-        const user = resp?.data?.user as { id: string; email: string; role?: 'USER' | 'ADMIN' } | undefined;
+        const user = resp?.data?.user as { id: string; email: string; nickname?: string | null; role?: 'USER' | 'ADMIN' } | undefined;
         if (!accessToken || !user) {
           clearAuthSession();
           return null;
@@ -74,7 +74,7 @@ api.interceptors.response.use(
           const refreshResp = await api.post('/auth/refresh', { refreshToken });
           const accessToken = refreshResp?.data?.accessToken as string | undefined;
           const nextRefreshToken = refreshResp?.data?.refreshToken as string | undefined;
-          const user = refreshResp?.data?.user as { id: string; email: string; role?: 'USER' | 'ADMIN' } | undefined;
+          const user = refreshResp?.data?.user as { id: string; email: string; nickname?: string | null; role?: 'USER' | 'ADMIN' } | undefined;
           if (accessToken && user) {
             setAuthSession(accessToken, user);
             if (nextRefreshToken) setRefreshToken(nextRefreshToken);

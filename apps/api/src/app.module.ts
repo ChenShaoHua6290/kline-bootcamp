@@ -10,6 +10,7 @@ import { MarketDataModule } from './market-data/market-data.module';
 import { ReplayModule } from './replay/replay.module';
 import { AccountModule } from './account/account.module';
 import { AdminModule } from './admin/admin.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AdminModule } from './admin/admin.module';
     ReplayModule,
     AccountModule,
     AdminModule,
+    DashboardModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

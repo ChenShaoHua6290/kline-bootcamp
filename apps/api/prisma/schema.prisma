@@ -61,6 +61,7 @@ enum AuditAction {
 model User {
   id            String                 @id @default(cuid())
   email         String                 @unique
+  nickname      String?
   password      String
   role          UserRole               @default(USER)
   isBanned      Boolean                @default(false)
@@ -230,6 +231,10 @@ model TrainingSession {
   lastActiveAt       DateTime          @default(now())
   createdAt          DateTime          @default(now())
   endedAt            DateTime?
+
+  @@index([userId, createdAt])
+  @@index([userId, endedAt])
+  @@index([userId, status])
 }
 
 model TrainingReview {

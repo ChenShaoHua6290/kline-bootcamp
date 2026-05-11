@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { FinishTrainingDto, SaveTrainingReviewDto, StartTrainingDto, TrainingActionDto } from './dto';
+import { FinishTrainingDto, HistoryQueryDto, SaveTrainingReviewDto, StartTrainingDto, TrainingActionDto } from './dto';
 import { TrainingService } from './training.service';
 
 @UseGuards(JwtAuthGuard)
@@ -50,8 +50,8 @@ export class TrainingController {
   }
 
   @Get('history')
-  history(@Req() req: { user: { sub: string } }) {
-    return this.trainingService.history(req.user.sub);
+  history(@Req() req: { user: { sub: string } }, @Query() query: HistoryQueryDto) {
+    return this.trainingService.history(req.user.sub, query);
   }
 
   @Get('profile')

@@ -19,35 +19,36 @@ export function TrainingInfoPanel({ session, viewTimeframe }: { session: Session
 
   return (
     <Card className="shrink-0 p-3">
-      <div className="mb-1.5 flex items-center justify-between">
-        <h3 className="text-xs font-semibold tracking-[0.01em] text-slate-100">训练信息</h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold tracking-[0.01em] text-slate-100">训练信息</h3>
         <Badge tone={session.status === 'ACTIVE' ? 'success' : session.status === 'LIQUIDATED' ? 'danger' : 'default'} className={statusColor}>
           {statusText}
         </Badge>
       </div>
-      <div className="space-y-1 text-[11px]">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between text-slate-300">
-          <span className="field-label normal-case tracking-normal">训练K线数量</span>
-          <span className="field-value">{session.totalBars} 根</span>
+          <span className="text-[10px] text-slate-400">训练K线数量</span>
+          <span className="text-[11px] font-semibold text-slate-100">{session.totalBars} 根</span>
         </div>
         <div className="flex items-center justify-between text-slate-300">
-          <span className="field-label normal-case tracking-normal">推进周期</span>
-          <span className="field-value">{session.drivingTimeframe}</span>
+          <span className="text-[10px] text-slate-400">推进周期</span>
+          <span className="text-[11px] font-semibold text-slate-100">{session.drivingTimeframe}</span>
         </div>
         <div className="flex items-center justify-between text-slate-300">
-          <span className="field-label normal-case tracking-normal">当前查看</span>
-          <span className="field-value">{viewTimeframe}</span>
+          <span className="text-[10px] text-slate-400">当前查看</span>
+          <span className="text-[11px] font-semibold text-slate-100">{viewTimeframe}</span>
         </div>
         <div className="flex items-center justify-between text-slate-300">
-          <span className="field-label normal-case tracking-normal">已推进</span>
-          <span className="field-value">
+          <span className="text-[10px] text-slate-400">已推进</span>
+          <span className="text-[11px] font-semibold text-cyan-200">
             {trainPointer} / {session.totalBars}
           </span>
         </div>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-700/70">
+      <div className="mt-2.5 mb-1 h-1.5 overflow-hidden rounded-full bg-slate-700/70">
         <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" style={{ width: `${progress}%` }} />
       </div>
+      <div className="text-right text-[10px] text-slate-400">进度 {progress.toFixed(0)}%</div>
     </Card>
   );
 }

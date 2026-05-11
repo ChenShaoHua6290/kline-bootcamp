@@ -1,4 +1,5 @@
-import { IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { MARKET_VALUES, type Market } from '../common/domain-enums';
 import { REAL_MARKET_TIMEFRAMES } from '../market-data/timeframes';
 
@@ -79,4 +80,45 @@ export class SaveTrainingReviewDto {
 export class FinishTrainingDto {
   @IsIn(['completed', 'terminated', 'liquidated'])
   reason!: 'completed' | 'terminated' | 'liquidated';
+}
+
+export class HistoryQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => Number(value ?? 1))
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value ?? 10))
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  pageSize?: number = 10;
+
+  @IsOptional()
+  @IsIn(MARKET_VALUES)
+  market?: Market;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'COMPLETED', 'TERMINATED', 'LIQUIDATED', 'ENDED'])
+  status?: 'ACTIVE' | 'COMPLETED' | 'TERMINATED' | 'LIQUIDATED' | 'ENDED';
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  isLiquidated?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasReview?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

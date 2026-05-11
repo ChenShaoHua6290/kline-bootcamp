@@ -27,3 +27,4 @@ data/
 *.zip
 *.sqlite
 *.db
+.vscode/
