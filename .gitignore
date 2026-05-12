@@ -22,7 +22,8 @@ node_modules/
 .env.*.local
 
 # local market data
-data/
+/data/
+storage/
 *.csv
 *.zip
 *.sqlite

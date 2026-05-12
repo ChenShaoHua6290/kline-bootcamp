@@ -1,0 +1,86 @@
+[
+  {
+    "market": "crypto",
+    "exchange": "binance",
+    "source": "binance_vision",
+    "symbol": "BTCUSDT",
+    "displayName": "BTC/USDT",
+    "rawTimeframe": "15m",
+    "baseTimeframe": "15m",
+    "timezone": "UTC",
+    "rawPath": "data/raw/crypto/binance/BTCUSDT/15m",
+    "enabled": true
+  },
+  {
+    "market": "crypto",
+    "exchange": "binance",
+    "source": "binance_vision",
+    "symbol": "ETHUSDT",
+    "displayName": "ETH/USDT",
+    "rawTimeframe": "15m",
+    "baseTimeframe": "15m",
+    "timezone": "UTC",
+    "rawPath": "data/raw/crypto/binance/ETHUSDT/15m",
+    "enabled": true
+  },
+  {
+    "market": "crypto",
+    "exchange": "binance",
+    "source": "binance_vision",
+    "symbol": "SOLUSDT",
+    "displayName": "SOL/USDT",
+    "rawTimeframe": "15m",
+    "baseTimeframe": "15m",
+    "timezone": "UTC",
+    "rawPath": "data/raw/crypto/binance/SOLUSDT/15m",
+    "enabled": true
+  },
+  {
+    "market": "forex",
+    "exchange": "histdata",
+    "source": "histdata",
+    "symbol": "EURUSD",
+    "displayName": "EUR/USD",
+    "rawTimeframe": "M1",
+    "baseTimeframe": "15m",
+    "timezone": "America/New_York",
+    "rawPath": "data/raw/forex/histdata/EURUSD/M1",
+    "enabled": false
+  },
+  {
+    "market": "gold",
+    "exchange": "histdata",
+    "source": "histdata",
+    "symbol": "XAUUSD",
+    "displayName": "XAU/USD",
+    "rawTimeframe": "M1",
+    "baseTimeframe": "15m",
+    "timezone": "America/New_York",
+    "rawPath": "data/raw/gold/histdata/XAUUSD/M1",
+    "enabled": false
+  },
+  {
+    "market": "stock",
+    "exchange": "nasdaq",
+    "source": "csv",
+    "symbol": "AAPL",
+    "displayName": "Apple",
+    "rawTimeframe": "D",
+    "baseTimeframe": "D",
+    "timezone": "America/New_York",
+    "rawPath": "data/raw/stock/csv/AAPL/D",
+    "enabled": false
+  },
+  {
+    "market": "futures",
+    "exchange": "cme",
+    "source": "csv",
+    "symbol": "ES_CONT",
+    "displayName": "E-mini S&P 500 Continuous",
+    "rawTimeframe": "15m",
+    "baseTimeframe": "15m",
+    "timezone": "America/Chicago",
+    "rawPath": "data/raw/futures/csv/ES_CONT/15m",
+    "enabled": false
+  }
+]

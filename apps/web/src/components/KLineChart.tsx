@@ -256,7 +256,7 @@ export function KLineChart({
   const [canPortal, setCanPortal] = useState(false);
   const [settingsModalScale, setSettingsModalScale] = useState(1);
   const [chartSettings, setChartSettings] = useState<ChartSettings>(DEFAULT_CHART_SETTINGS);
-  const [selectedIndicators, setSelectedIndicators] = useState<string[]>(['MA', 'MACD', 'VOL']);
+  const [selectedIndicators, setSelectedIndicators] = useState<string[]>(['EMA', 'MACD', 'VOL']);
   const [indicatorParams, setIndicatorParams] = useState<Record<string, number[]>>({});
   const [paramModal, setParamModal] = useState<{ name: string; values: string[] } | null>(null);
   const [paramToast, setParamToast] = useState('');
@@ -275,7 +275,7 @@ export function KLineChart({
   const sideBtn = 'h-8 w-8 rounded-lg border border-slate-600/70 bg-slate-800/80 text-xs text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
   const sideBtnActive = 'h-8 w-8 rounded-lg border border-blue-300/60 bg-blue-600/90 text-xs font-semibold text-white transition hover:bg-blue-500';
   const periods = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
-  const MAIN_INDICATORS = useMemo(() => new Set(['MA', 'EMA', 'SMA', 'BOLL', 'SAR', 'BBI']), []);
+  const MAIN_INDICATORS = useMemo(() => new Set(['MA', 'EMA', 'SMA', 'BOLL', 'BBI']), []);
   const SUB_INDICATOR_WHITELIST = useMemo(() => new Set(['VOL', 'MACD', 'RSI', 'KDJ']), []);
   const INDICATOR_LABELS = useMemo<Record<string, string>>(
     () => ({
@@ -283,7 +283,7 @@ export function KLineChart({
       EMA: 'EMA(指数平滑移动平均线)',
       SMA: 'SMA',
       BOLL: 'BOLL(布林线)',
-      SAR: 'SAR(停损点指标)',
+      // SAR: 'SAR(停损点指标)',
       BBI: 'BBI(多空指数)',
       VOL: 'VOL(成交量)',
     }),
@@ -292,10 +292,10 @@ export function KLineChart({
   const DEFAULT_INDICATOR_PARAMS = useMemo<Record<string, number[]>>(
     () => ({
       MA: [5, 10, 30, 60],
-      EMA: [6, 12, 20, 30, 60, 120],
+      EMA: [5, 10, 20, 60, 120],
       SMA: [12, 2],
       BOLL: [20, 2],
-      SAR: [2, 2, 20],
+      // SAR: [2, 2, 20],
       BBI: [3, 6, 12, 24],
       VOL: [5, 10, 20],
       MACD: [12, 26, 9],
@@ -307,11 +307,11 @@ export function KLineChart({
   const PARAM_LABELS = useMemo<Record<string, string[]>>(
     () => ({
       BOLL: ['周期', '标准差'],
-      EMA: ['EMA1', 'EMA2', 'EMA3', 'EMA4', 'EMA5', 'EMA6'],
+      EMA: ['EMA1', 'EMA2', 'EMA3', 'EMA4', 'EMA5'],
       MACD: ['短期', '长期', '信号'],
       KDJ: ['周期', 'K平滑', 'D平滑'],
       RSI: ['周期1', '周期2', '周期3'],
-      SAR: ['最小步长', '步长', '最大步长'],
+      // SAR: ['最小步长', '步长', '最大步长'],
     }),
     [],
   );
@@ -617,8 +617,9 @@ export function KLineChart({
     if (!chart || !chartReady) return;
     chart.removeIndicator();
     selectedIndicators.forEach((name) => {
-      const params = indicatorParams[name];
-      const value: string | IndicatorCreate = Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
+      const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
+      const value: string | IndicatorCreate =
+        Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
       if (MAIN_INDICATORS.has(name)) chart.createIndicator(value, true, { id: 'candle_pane' } as never);
       else chart.createIndicator(value, true);
     });
@@ -629,7 +630,7 @@ export function KLineChart({
     }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS]);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS]);
 
   useEffect(() => {
     const rows = Array.isArray(data) ? data : [];

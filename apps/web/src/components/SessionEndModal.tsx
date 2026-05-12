@@ -16,11 +16,13 @@ export function SessionEndModal({
   onClose,
   onRestart,
   onBackHome,
+  restarting = false,
 }: {
   session: Session;
   onClose: () => void;
   onRestart: () => void;
   onBackHome: () => void;
+  restarting?: boolean;
 }) {
   const [modalScale, setModalScale] = useState(1);
   const modalRef = useRef<HTMLDivElement | null>(null);
@@ -117,6 +119,7 @@ export function SessionEndModal({
               onClick={onBackHome}
               variant="default"
               className="w-full py-2.5 text-[clamp(14px,2.4vw,16px)]"
+              disabled={restarting}
             >
               返回首页
             </Button>
@@ -124,8 +127,9 @@ export function SessionEndModal({
               onClick={onRestart}
               variant="success"
               className="w-full py-2.5 text-[clamp(15px,2.6vw,17px)]"
+              disabled={restarting}
             >
-              开始新训练
+              {restarting ? '正在开始...' : '开始新训练'}
             </Button>
           </div>
         </div>

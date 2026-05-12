@@ -213,17 +213,18 @@ export default function TrainPage() {
     },
   });
 
-  const startNewWithCurrentBalance = () => {
-    if (!session) return;
+  const startNewWithCurrentBalance = (baseSession?: Session | null) => {
+    const source = baseSession ?? session;
+    if (!source) return;
     setNotice(null);
     setEndSummarySession(null);
     startMutation.mutate({
-      market: session.market,
-      drivingTimeframe: session.drivingTimeframe,
-      trainingBars: session.totalBars,
-      totalBars: 500 + session.totalBars,
+      market: source.market,
+      drivingTimeframe: source.drivingTimeframe,
+      trainingBars: source.totalBars,
+      totalBars: 500 + source.totalBars,
       initialVisibleBars: 500,
-      initialBalance: session.finalBalance,
+      initialBalance: source.finalBalance,
     });
   };
 
@@ -452,7 +453,8 @@ export default function TrainPage() {
         <SessionEndModal
           session={endSummarySession}
           onClose={() => setEndSummarySession(null)}
-          onRestart={startNewWithCurrentBalance}
+          onRestart={() => startNewWithCurrentBalance(endSummarySession)}
+          restarting={startMutation.isPending}
           onBackHome={() => {
             setEndSummarySession(null);
             clearClientTrainingState();

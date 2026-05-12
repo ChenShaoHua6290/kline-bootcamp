@@ -8,6 +8,7 @@ const items = [
   { href: '/admin', label: '概览' },
   { href: '/admin/invitations', label: '邀请码管理' },
   { href: '/admin/users', label: '用户管理' },
+  { href: '/admin/data-import', label: '历史K线导入' },
 ];
 
 export function AdminSidebar() {

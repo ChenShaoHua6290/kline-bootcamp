@@ -10,7 +10,7 @@ import {
   type PositionSide as PositionSideValue,
 } from '../common/domain-enums';
 import { MarketDataService, type Bar } from '../market-data/market-data.service';
-import { REAL_MARKET_TIMEFRAME_SET } from '../market-data/timeframes';
+import { getNextBucketStart, getTimeframeBucketStart, REAL_MARKET_TIMEFRAME_SET, timeframeRank } from '../market-data/timeframes';
 import { HistoryQueryDto, SaveTrainingReviewDto, StartTrainingDto, TrainingActionDto } from './dto';
 import { applyExecutionPrice, calcFloatingPnl, ensureSeries, FEE_RATE } from './training.engine';
 
@@ -33,9 +33,9 @@ const MAX_BARS_BY_TF: Record<string, number> = {
   '1H': 1500,
   '2H': 1500,
   '4H': 1500,
-  D: 1000,
-  W: 500,
-  M: 300,
+  D: 2000,
+  W: 1200,
+  M: 800,
 };
 
 @Injectable()
@@ -641,9 +641,15 @@ export class TrainingService {
       throw new BadRequestException('Invalid from/to range');
     }
     const currentTs = this.getBarTimestamp(meta.bars, session.pointer);
-    const safeTo = Math.min(toTs, currentTs);
+    const isLowerViewThanDriving = timeframeRank(timeframe) < timeframeRank(session.drivingTimeframe);
+    // When driving timeframe is higher (e.g. D) and user views lower timeframe (e.g. 1H/15m),
+    // expose the full child-window of current driving bar so clicking "next" visibly advances.
+    const drivingBucketStart = getTimeframeBucketStart(currentTs, session.drivingTimeframe);
+    const drivingBucketEnd = getNextBucketStart(drivingBucketStart, session.drivingTimeframe) - 1;
+    const visibleCapTs = isLowerViewThanDriving ? drivingBucketEnd : currentTs;
+    const safeTo = Math.min(toTs, visibleCapTs);
     if (safeTo <= fromTs) {
-      return { timeframe, from, to, currentTimePointer: new Date(currentTs).toISOString(), bars: [] };
+      return { timeframe, from, to, currentTimePointer: new Date(visibleCapTs).toISOString(), bars: [] };
     }
     const symbolId = await this.resolveSymbolId(session.market, session.symbol);
     const bars = await this.marketDataService.getBarsByTimeRangeForTraining({
@@ -653,12 +659,32 @@ export class TrainingService {
       drivingTimeframe: session.drivingTimeframe,
       fromTs,
       toTs: safeTo,
-      currentTimePointerTs: currentTs,
+      currentTimePointerTs: visibleCapTs,
     });
     if (bars.length === 0) {
       throw new NotFoundException(`No bars found for symbol=${session.symbol}, timeframe=${timeframe}`);
     }
-    const limited = this.limitBarsForTimeframe(timeframe, bars);
+    let mergedBars = bars;
+    const isHigherViewThanDriving = timeframeRank(timeframe) > timeframeRank(session.drivingTimeframe);
+    const targetVisibleBars = Math.max(1, Math.min(session.initialVisibleBars || 500, MAX_BARS_BY_TF[timeframe] ?? 1200));
+    if (isHigherViewThanDriving && mergedBars.length < targetVisibleBars) {
+      const firstTs = Date.parse(mergedBars[0]?.time ?? '');
+      if (Number.isFinite(firstTs)) {
+        const need = targetVisibleBars - mergedBars.length;
+        const older = await this.marketDataService.getBarsBefore(
+          session.market as never,
+          symbolId,
+          timeframe,
+          firstTs - 1,
+          need,
+        );
+        if (older.length > 0) {
+          mergedBars = [...older, ...mergedBars];
+        }
+      }
+    }
+
+    const limited = this.limitBarsForTimeframe(timeframe, mergedBars);
     const earliestTs = this.getEarliestTimestamp(meta.bars);
     const returnedFirstTs = limited.length > 0 ? Date.parse(limited[0].time) : safeTo;
     const hasMoreOlder = Number.isFinite(returnedFirstTs) ? returnedFirstTs > earliestTs : false;
@@ -666,7 +692,7 @@ export class TrainingService {
       timeframe,
       from: new Date(fromTs).toISOString(),
       to: new Date(safeTo).toISOString(),
-      currentTimePointer: new Date(currentTs).toISOString(),
+      currentTimePointer: new Date(visibleCapTs).toISOString(),
       bars: limited,
       hasMoreOlder,
     };
@@ -1084,7 +1110,9 @@ export class TrainingService {
     const visibleBars = meta.bars.slice(meta.contextStartIndex, pointerAbs + 1);
     const pointerVisible = Math.max(0, visibleBars.length - 1);
     const progressPointer = Math.max(0, pointerAbs - meta.trainStartIndex + 1);
-    const currentTimePointer = this.getBarTimestamp(meta.bars, pointerAbs);
+    const currentTimePointerRaw = this.getBarTimestamp(meta.bars, pointerAbs);
+    const currentBucketStart = getTimeframeBucketStart(currentTimePointerRaw, session.drivingTimeframe);
+    const currentTimePointer = getNextBucketStart(currentBucketStart, session.drivingTimeframe) - 1;
 
     const mappedActions = Array.isArray(session.actions)
       ? session.actions.map((a) => ({ ...a, timePointer: Math.max(0, Number(a.timePointer ?? 0) - meta.contextStartIndex) }))

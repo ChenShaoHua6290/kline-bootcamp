@@ -1,0 +1,26 @@
+[
+  {
+    "market": "crypto",
+    "exchange": "binance",
+    "symbol": "BTCUSDT",
+    "displayName": "BTC/USDT",
+    "interval": "15m",
+    "enabled": true
+  },
+  {
+    "market": "crypto",
+    "exchange": "binance",
+    "symbol": "ETHUSDT",
+    "displayName": "ETH/USDT",
+    "interval": "15m",
+    "enabled": true
+  },
+  {
+    "market": "crypto",
+    "exchange": "binance",
+    "symbol": "SOLUSDT",
+    "displayName": "SOL/USDT",
+    "interval": "15m",
+    "enabled": true
+  }
+]
