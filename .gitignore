@@ -12,13 +12,13 @@ dist/
 .next/
 build/
 node_modules/
-
-# logs
-*.log
+coverage/
+logs/
 
 # env
 .env
 .env.local
+.env.production
 .env.*.local
 
 # local market data
@@ -29,3 +29,4 @@ storage/
 *.sqlite
 *.db
 .vscode/
+.DS_Store

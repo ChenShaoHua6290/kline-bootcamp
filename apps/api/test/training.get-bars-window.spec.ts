@@ -14,6 +14,7 @@ function createServiceForBarsWindow() {
 
   const marketDataService = {
     getBarsByTimeRangeForTraining: vi.fn(),
+    getBarsBefore: vi.fn().mockResolvedValue([]),
   };
 
   const service = new TrainingService(prisma as never, marketDataService as never);

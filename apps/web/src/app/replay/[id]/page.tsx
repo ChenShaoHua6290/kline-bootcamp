@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -47,11 +47,16 @@ function aggregateBars(
 export default function ReplayPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [viewTimeframe, setViewTimeframe] = useState('1H');
+  const [viewTimeframe, setViewTimeframe] = useState('15m');
   const { data } = useQuery({
     queryKey: ['session', params.id],
     queryFn: async () => normalizeSession((await api.get(`/training/${params.id}`)).data),
   });
+  useEffect(() => {
+    if (!data?.drivingTimeframe) return;
+    if (!(data.drivingTimeframe in TIMEFRAME_TO_STEP)) return;
+    setViewTimeframe(data.drivingTimeframe);
+  }, [data?.drivingTimeframe]);
   const step = TIMEFRAME_TO_STEP[viewTimeframe] ?? 1;
   const sourceBars = data?.barsData ?? [];
   const sourceActions = data?.actions ?? [];
@@ -59,6 +64,11 @@ export default function ReplayPage() {
   const chartActions = useMemo(
     () =>
       sourceActions.map((a) => {
+        const rawBar =
+          typeof a.timePointer === 'number' && a.timePointer >= 0 && a.timePointer < sourceBars.length
+            ? sourceBars[a.timePointer]
+            : undefined;
+        const rawTs = rawBar ? Date.parse(rawBar.time) : NaN;
         const groupIndex = typeof a.timePointer === 'number' ? Math.floor(a.timePointer / step) : -1;
         const groupedBar = groupIndex >= 0 ? visibleBars[Math.min(groupIndex, visibleBars.length - 1)] : undefined;
         const parsed = groupedBar ? Date.parse(groupedBar.time) : NaN;
@@ -67,10 +77,10 @@ export default function ReplayPage() {
           actionType: a.actionType,
           timePointer: a.timePointer,
           price: a.price,
-          timestamp: Number.isFinite(parsed) ? parsed : undefined,
+          timestamp: Number.isFinite(rawTs) ? rawTs : Number.isFinite(parsed) ? parsed : undefined,
         };
       }),
-    [sourceActions, step, visibleBars],
+    [sourceActions, sourceBars, step, visibleBars],
   );
 
   if (!data) return <div className="p-5"><LoadingState message="复盘数据加载中..." /></div>;
@@ -84,6 +94,10 @@ export default function ReplayPage() {
         </div>
       </PageHeader>
       <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-sm text-slate-200">
+        <span>
+          标的: <span className="font-semibold text-slate-100">{data.symbolDisplayName?.trim() || data.symbol}</span>
+          {data.symbolDisplayName?.trim() ? <span className="ml-1 text-xs text-slate-400">({data.symbol})</span> : null}
+        </span>
         <span>
           市场: <span className="font-semibold text-slate-100">{formatMarketLabel(data.market)}</span>
         </span>

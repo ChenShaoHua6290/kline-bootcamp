@@ -19,6 +19,7 @@
     "dev:up:local": "bash scripts/dev-up-local.sh",
     "dev:up:lite": "bash scripts/dev-up-lite.sh",
     "data:download-binance": "tsx scripts/data/download-binance-data.ts",
+    "data:verify-binance-symbols": "tsx scripts/data/verify-binance-symbols.ts",
     "data:unzip": "tsx scripts/data/unzip-market-data.ts",
     "data:normalize": "tsx scripts/data/normalize-bars.ts",
     "data:normalize-all": "tsx scripts/data/normalize-bars.ts",
@@ -26,7 +27,9 @@
     "data:import-all": "tsx scripts/data/import-bars.ts",
     "data:aggregate": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run prisma:generate:pg && PATH=./node_modules/.bin:$PATH npm --prefix apps/api run aggregate:bars",
     "data:verify": "tsx scripts/data/verify-bars.ts",
-    "data:pipeline": "tsx scripts/data/run-pipeline.ts"
+    "data:pipeline": "tsx scripts/data/run-pipeline.ts",
+    "data:normalize-a-share": "tsx scripts/data/normalize-a-share-bars.ts",
+    "data:import-a-share": "tsx scripts/data/import-a-share-bars.ts"
   },
   "dependencies": {
     "axios": "^1.16.0",

@@ -18,6 +18,7 @@ import { PageDescription, PageTitle } from '@/components/ui/PageHeader';
 type HistoryItem = {
   id: string;
   symbol: string;
+  symbolDisplayName?: string | null;
   market: string;
   totalBars: number;
   initialBalance: number;
@@ -193,7 +194,10 @@ export default function HistoryPage() {
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 overflow-hidden">
-                          <span className="truncate text-base font-semibold text-slate-100">{formatSymbolLabel(item.symbol)}</span>
+                          <span className="truncate text-base font-semibold text-slate-100">
+                            {item.symbolDisplayName?.trim() || formatSymbolLabel(item.symbol)}
+                          </span>
+                          {item.symbolDisplayName?.trim() ? <span className="text-xs text-slate-400">{item.symbol}</span> : null}
                           <Badge>{formatMarketLabel(item.market)}</Badge>
                           <Badge tone="info">{item.totalBars}根</Badge>
                           <Badge tone={item.hasReview ? 'success' : 'default'}>{item.hasReview ? '已复盘' : '未复盘'}</Badge>
@@ -291,10 +295,10 @@ export default function HistoryPage() {
               <section className="rounded-xl border border-slate-700/70 bg-slate-900/45 p-4">
                 <h4 className="text-base font-semibold text-slate-100">买卖行为统计</h4>
                 <div className="mt-2 max-h-[34vh] space-y-2 overflow-y-auto pr-1">
-                  {session.actions.length === 0 ? (
+                  {session?.actions.length === 0 ? (
                     <EmptyState title="暂无操作记录" className="min-h-[96px]" />
                   ) : (
-                    session.actions.slice().reverse().map((action) => (
+                    (session?.actions ?? []).slice().reverse().map((action) => (
                       <div key={action.id} className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2">
                         <div className="flex items-center gap-2"><ActionTag actionType={action.actionType} /><span className="text-xs text-slate-400">{formatTime(action.createdAt)}</span></div>
                         <div className="text-xs font-semibold text-slate-100">¥{action.price.toFixed(2)}</div>

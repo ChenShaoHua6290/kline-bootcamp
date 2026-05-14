@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Queue, type JobsOptions } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { CreateDataImportJobDto, ListDataImportJobsDto } from './dto';
 
@@ -97,7 +98,7 @@ export class DataImportService implements OnModuleDestroy {
       data: {
         status: 'PENDING',
         errorMessage: null,
-        failedFiles: null,
+        failedFiles: Prisma.JsonNull,
         finishedAt: null,
       },
     });

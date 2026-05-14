@@ -45,14 +45,13 @@ export function TradePanel({
   const hasPosition = Boolean(session.position);
   const longOpen = session.position?.side === 'LONG';
   const shortOpen = session.position?.side === 'SHORT';
-  const isStockMarket = session.market === 'STOCK';
 
   const canBuy = !ended && !hasPosition && !busy;
-  const canAddLong = !isStockMarket && !ended && longOpen && !busy;
-  const canAddShort = !isStockMarket && !ended && shortOpen && !busy;
+  const canAddLong = !ended && longOpen && !busy;
+  const canAddShort = !ended && shortOpen && !busy;
   const canCloseLong = !ended && longOpen && !busy;
   const canCloseShort = !ended && shortOpen && !busy;
-  const canCloseAny = isStockMarket ? canCloseLong : !ended && hasPosition && !busy;
+  const canCloseAny = !ended && hasPosition && !busy;
   const canHold = !ended && !busy;
   const canEnd = !ended && !busy;
 
@@ -147,7 +146,7 @@ export function TradePanel({
             )
           }
         >
-          {isStockMarket ? '买涨' : hasPosition ? '加仓买涨' : '买涨'}
+          {hasPosition ? '加仓买涨' : '买涨'}
         </Button>
         <Button
           size="sm"
@@ -158,25 +157,21 @@ export function TradePanel({
         >
           部分平仓
         </Button>
-        {!isStockMarket ? (
-          <Button
-            size="sm"
-            disabled={!(canBuy || canAddShort)}
-            variant="warning"
-            className="h-8.5 !bg-amber-700/70 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
-            onClick={() =>
-              onAction(
-                hasPosition
-                  ? { actionType: 'ADD_SHORT', positionPercent, stopLossPrice, takeProfitPrice }
-                  : { action: 'BUY_SHORT', positionPercent, stopLossPrice, takeProfitPrice },
-              )
-            }
-          >
-            {hasPosition ? '加仓买跌' : '买跌'}
-          </Button>
-        ) : (
-          <div className="h-8.5 md:h-7" />
-        )}
+        <Button
+          size="sm"
+          disabled={!(canBuy || canAddShort)}
+          variant="warning"
+          className="h-8.5 !bg-amber-700/70 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
+          onClick={() =>
+            onAction(
+              hasPosition
+                ? { actionType: 'ADD_SHORT', positionPercent, stopLossPrice, takeProfitPrice }
+                : { action: 'BUY_SHORT', positionPercent, stopLossPrice, takeProfitPrice },
+            )
+          }
+        >
+          {hasPosition ? '加仓买跌' : '买跌'}
+        </Button>
         <Button
           size="sm"
           disabled={!canCloseAny}

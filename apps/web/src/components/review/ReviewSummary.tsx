@@ -11,7 +11,8 @@ export function ReviewSummary({ session }: { session: any }) {
       <div className="mb-2.5">
         <div className="text-[10px] tracking-[0.06em] text-slate-400">训练概览</div>
         <div className="mt-1 text-[13px] font-semibold text-slate-100">
-          {formatMarketLabel(session.market)} {formatSymbolLabel(session.symbol)}
+          {formatMarketLabel(session.market)} {session.symbolDisplayName?.trim() || formatSymbolLabel(session.symbol)}
+          {session.symbolDisplayName?.trim() ? <span className="ml-1 text-[11px] font-normal text-slate-400">({session.symbol})</span> : null}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">

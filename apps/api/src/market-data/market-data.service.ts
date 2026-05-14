@@ -18,6 +18,25 @@ export type WindowSeries = {
 export class MarketDataService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private hasEnoughVolatility(
+    rows: Array<{ open: number; high: number; low: number; close: number }>,
+    minRangeRatio: number,
+  ): boolean {
+    if (rows.length === 0) return false;
+    let minPrice = Number.POSITIVE_INFINITY;
+    let maxPrice = Number.NEGATIVE_INFINITY;
+    let closeSum = 0;
+    for (const row of rows) {
+      minPrice = Math.min(minPrice, row.low, row.open, row.close);
+      maxPrice = Math.max(maxPrice, row.high, row.open, row.close);
+      closeSum += row.close;
+    }
+    const avgClose = closeSum / rows.length;
+    if (!Number.isFinite(avgClose) || avgClose <= 0) return false;
+    const rangeRatio = (maxPrice - minPrice) / avgClose;
+    return Number.isFinite(rangeRatio) && rangeRatio >= minRangeRatio;
+  }
+
   async pickRandomWindowSeries(
     market: Market,
     timeframe: string,
@@ -30,15 +49,23 @@ export class MarketDataService {
       select: { symbolId: true, symbol: true },
       take: 2000,
     });
-    const symbols =
-      preferred.length > 0
-        ? preferred.map((row) => ({ id: row.symbolId, code: row.symbol }))
-        : await this.prisma.symbol.findMany({ where: { market }, select: { id: true, code: true } });
+    const allSymbols = await this.prisma.symbol.findMany({
+      where: { market, isActive: true },
+      select: { id: true, code: true },
+      take: 5000,
+    });
+    const preferredMap = new Map(preferred.map((row) => [row.symbolId, { id: row.symbolId, code: row.symbol }]));
+    const merged = [...preferredMap.values()];
+    for (const row of allSymbols) {
+      if (!preferredMap.has(row.id)) merged.push(row);
+    }
+    const symbols = merged;
     if (symbols.length === 0) {
       throw new Error(`No symbols configured for market=${market}`);
     }
 
     const needed = contextBars + trainBars + futureBars;
+    const minRangeRatio = 0.015;
     const shuffled = symbols
       .map((row) => ({ sortKey: Math.random(), ...row }))
       .sort((a, b) => a.sortKey - b.sortKey);
@@ -46,8 +73,21 @@ export class MarketDataService {
     for (const symbol of shuffled) {
       const allBars = await this.queryBarsByMarket(market, symbol.id, timeframe);
       if (allBars.length <= needed + 10) continue;
-      const start = Math.floor(Math.random() * (allBars.length - needed));
-      const sliced = allBars.slice(start, start + needed);
+      const maxStart = allBars.length - needed;
+      if (maxStart <= 0) continue;
+
+      let sliced: typeof allBars | null = null;
+      const attempts = Math.min(30, Math.max(8, Math.floor(maxStart / 50)));
+      for (let i = 0; i < attempts; i += 1) {
+        const start = Math.floor(Math.random() * maxStart);
+        const candidate = allBars.slice(start, start + needed);
+        if (this.hasEnoughVolatility(candidate, minRangeRatio)) {
+          sliced = candidate;
+          break;
+        }
+      }
+      if (!sliced) continue;
+
       const bars = sliced.map((b) => ({
         open: b.open,
         high: b.high,
@@ -189,37 +229,48 @@ export class MarketDataService {
     toTs?: number,
     take?: number,
   ): Promise<Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: string | Date }>> {
-    if (market === 'CRYPTO') {
-      const where = Prisma.sql`
-        "symbolId" = ${symbolId}
-        AND "timeframe" = ${timeframe}
-        ${fromTs != null ? Prisma.sql`AND "timestamp" >= ${new Date(fromTs)}` : Prisma.empty}
-        ${toTs != null ? Prisma.sql`AND "timestamp" <= ${new Date(toTs)}` : Prisma.empty}
-      `;
-      if (take && take > 0) {
-        const rowsDesc = await this.prisma.$queryRaw<
-          Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: Date | string }>
-        >(Prisma.sql`
-          SELECT "open","high","low","close","volume","timestamp"
-          FROM "bars_crypto"
-          WHERE ${where}
-          ORDER BY "timestamp" DESC
-          LIMIT ${take}
-        `);
-        return rowsDesc.reverse();
-      }
+    const table =
+      market === 'CRYPTO'
+        ? '"bars_crypto"'
+        : market === 'STOCK'
+          ? '"bars_stock"'
+          : market === 'FOREX'
+            ? '"bars_forex"'
+            : market === 'GOLD'
+              ? '"bars_gold"'
+              : market === 'FUTURES'
+                ? '"bars_futures"'
+                : null;
+    if (!table) throw new Error(`Market table routing not implemented for market=${market}`);
 
-      const rowsAsc = await this.prisma.$queryRaw<
+    const where = Prisma.sql`
+      "symbolId" = ${symbolId}
+      AND "timeframe" = ${timeframe}
+      ${fromTs != null ? Prisma.sql`AND "timestamp" >= ${new Date(fromTs)}` : Prisma.empty}
+      ${toTs != null ? Prisma.sql`AND "timestamp" <= ${new Date(toTs)}` : Prisma.empty}
+    `;
+
+    if (take && take > 0) {
+      const rowsDesc = await this.prisma.$queryRaw<
         Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: Date | string }>
       >(Prisma.sql`
         SELECT "open","high","low","close","volume","timestamp"
-        FROM "bars_crypto"
+        FROM ${Prisma.raw(table)}
         WHERE ${where}
-        ORDER BY "timestamp" ASC
+        ORDER BY "timestamp" DESC
+        LIMIT ${take}
       `);
-      return rowsAsc;
+      return rowsDesc.reverse();
     }
 
-    throw new Error(`Market table routing not implemented for market=${market}`);
+    const rowsAsc = await this.prisma.$queryRaw<
+      Array<{ open: number; high: number; low: number; close: number; volume: number | null; timestamp: Date | string }>
+    >(Prisma.sql`
+      SELECT "open","high","low","close","volume","timestamp"
+      FROM ${Prisma.raw(table)}
+      WHERE ${where}
+      ORDER BY "timestamp" ASC
+    `);
+    return rowsAsc;
   }
 }

@@ -45,7 +45,7 @@ export class TrainingService {
   async start(userId: string, dto: StartTrainingDto) {
     const fixedInitialVisibleBars = 500;
     const trainingBarsRaw = dto.trainingBars ?? dto.totalBars;
-    const trainingBars = Math.max(50, Math.min(300, Math.floor(trainingBarsRaw)));
+    const trainingBars = Math.max(50, Math.min(500, Math.floor(trainingBarsRaw)));
     const latestSession = await this.prisma.trainingSession.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -254,6 +254,19 @@ export class TrainingService {
       }),
     ]);
 
+    const pairs = Array.from(new Set(rows.map((s) => `${s.market}__${s.symbol}`)));
+    const symbolDisplayMap = new Map<string, string>();
+    if (pairs.length > 0) {
+      const ors = rows.map((s) => ({ market: s.market as never, code: s.symbol }));
+      const symbols = await this.prisma.symbol.findMany({
+        where: { OR: ors },
+        select: { market: true, code: true, displayName: true },
+      });
+      for (const sym of symbols) {
+        if (sym.displayName) symbolDisplayMap.set(`${sym.market}__${sym.code}`, sym.displayName);
+      }
+    }
+
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
       items: rows.map((s) => ({
@@ -274,6 +287,7 @@ export class TrainingService {
         createdAt: s.createdAt,
         endedAt: s.endedAt,
         hasReview: Boolean(s.review?.id),
+        symbolDisplayName: symbolDisplayMap.get(`${s.market}__${s.symbol}`) ?? null,
       })),
       pagination: {
         page,
@@ -543,7 +557,15 @@ export class TrainingService {
       include: { position: true, actions: true, snapshots: true },
     });
     if (!session) throw new NotFoundException('Session not found');
-    return this.toClientSession(session);
+    const mapped = this.toClientSession(session);
+    const symbolMeta = await this.prisma.symbol.findFirst({
+      where: { market: session.market, code: session.symbol },
+      select: { displayName: true },
+    });
+    return {
+      ...mapped,
+      symbolDisplayName: symbolMeta?.displayName ?? null,
+    };
   }
 
   async getReviewDetail(userId: string, sessionId: string) {
@@ -557,6 +579,10 @@ export class TrainingService {
     if (!session) throw new NotFoundException('Session not found');
 
     const mapped = this.toClientSession(session);
+    const symbolMeta = await this.prisma.symbol.findFirst({
+      where: { market: session.market, code: session.symbol },
+      select: { displayName: true },
+    });
     const trades = this.buildTrades(session.actions);
     const stats = this.buildBehaviorStats(session, trades);
     let review: { id: string; content: string; problemTags: unknown; createdAt: Date; updatedAt: Date } | undefined;
@@ -569,7 +595,10 @@ export class TrainingService {
       review = undefined;
     }
     return {
-      session: mapped,
+      session: {
+        ...mapped,
+        symbolDisplayName: symbolMeta?.displayName ?? null,
+      },
       actions: mapped.actions,
       snapshots: mapped.snapshots ?? [],
       trades,
@@ -710,9 +739,6 @@ export class TrainingService {
     const position = await this.prisma.position.findUnique({ where: { sessionId } });
 
     const normalizedAction = this.normalizeIncomingAction(dto);
-    if (session.market === 'STOCK' && (normalizedAction === 'OPEN_SHORT' || normalizedAction === 'ADD_SHORT')) {
-      throw new BadRequestException('Stock market only supports long positions');
-    }
     if (normalizedAction === 'OPEN_LONG' || normalizedAction === 'OPEN_SHORT' || normalizedAction === 'ADD_LONG' || normalizedAction === 'ADD_SHORT') {
       const wantsLong = normalizedAction === 'OPEN_LONG' || normalizedAction === 'ADD_LONG';
       const side: PositionSideValue = wantsLong ? PositionSide.LONG : PositionSide.SHORT;

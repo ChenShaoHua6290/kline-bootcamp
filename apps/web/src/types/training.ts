@@ -2,6 +2,7 @@ export type Session = {
   id: string;
   market: string;
   symbol: string;
+  symbolDisplayName?: string | null;
   drivingTimeframe: string;
   totalBars: number;
   initialVisibleBars: number;

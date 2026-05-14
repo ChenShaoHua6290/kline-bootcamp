@@ -18,7 +18,7 @@ export class StartTrainingDto {
   @IsOptional()
   @IsInt()
   @Min(50)
-  @Max(300)
+  @Max(500)
   trainingBars?: number;
 
   @IsOptional()

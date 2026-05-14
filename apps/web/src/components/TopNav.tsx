@@ -57,7 +57,7 @@ export function TopNav({
     <div className="app-nav flex flex-wrap items-center justify-between gap-2 sm:gap-2">
       <h1 className="app-title flex items-center gap-2">
         <span className="rounded-md border border-cyan-300/35 bg-cyan-500/10 px-1.5 py-0.5 text-xs font-bold tracking-[0.08em] text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.28)] sm:text-[20px]">
-          只做一种模式K线训练系统
+          只做一种模式
         </span>
       </h1>
       <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
@@ -71,22 +71,23 @@ export function TopNav({
               <div className="truncate text-[10px] text-slate-400">{user.email}</div>
             </button>
             {menuOpen ? (
-              <Panel className="absolute right-0 z-[140] mt-2 w-[190px] p-3 shadow-2xl backdrop-blur">
-                <div className="text-xs text-slate-400">爆仓次数: <span className="font-semibold text-rose-300">{liquidationCount}</span></div>
+              <Panel className="absolute right-0 z-[140] mt-2 w-[190px] p-3 text-center shadow-2xl backdrop-blur">
                 <div className="mt-1 text-[13px] text-slate-300">
                   重置次数: <span className="font-semibold text-cyan-300">{totalResetCount}</span>
                 </div>
-                <Button
-                  variant="primary"
-                  className="mt-3 h-8 w-full !text-[13px] !font-medium"
-                  onClick={() => {
-                    onRequestReset?.();
-                    setMenuOpen(false);
-                  }}
-                  disabled={resetBalanceBusy}
-                >
-                  {resetBalanceBusy ? '重置中...' : '重置金额'}
-                </Button>
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    variant="primary"
+                    className="h-8 !text-[13px] !font-medium"
+                    onClick={() => {
+                      onRequestReset?.();
+                      setMenuOpen(false);
+                    }}
+                    disabled={resetBalanceBusy}
+                  >
+                    {resetBalanceBusy ? '重置中...' : '重置金额'}
+                  </Button>
+                </div>
               </Panel>
             ) : null}
           </div>

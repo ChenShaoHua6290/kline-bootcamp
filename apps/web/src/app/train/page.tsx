@@ -45,7 +45,6 @@ function translateErrorMessage(raw: string) {
     ['No bars found for symbol=', '所选周期暂无数据，请先执行聚合或切换周期'],
     ['Unsupported timeframe:', '不支持的周期，请重新选择'],
     ['Active training session already exists', '当前已有进行中的训练，请先继续或结束当前训练'],
-    ['Stock market only supports long positions', '股票市场仅支持做多与平多，不支持做空'],
   ];
   const hit = dict.find(([en]) => text.includes(en));
   if (hit) return hit[1];

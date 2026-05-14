@@ -29,22 +29,58 @@ const TIMEFRAME_TO_STEP: Record<string, number> = {
   W: 96 * 7,
 };
 
+const TIMEFRAME_TO_MS: Record<string, number> = {
+  '15m': 15 * 60_000,
+  '30m': 30 * 60_000,
+  '1H': 60 * 60_000,
+  '2H': 2 * 60 * 60_000,
+  '4H': 4 * 60 * 60_000,
+};
+
+function getBucketStart(ts: number, timeframe: string): number {
+  const ms = TIMEFRAME_TO_MS[timeframe];
+  if (ms) return Math.floor(ts / ms) * ms;
+
+  const d = new Date(ts);
+  if (timeframe === 'D') {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
+  }
+  if (timeframe === 'W') {
+    const day = d.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + mondayOffset, 0, 0, 0, 0);
+  }
+  return ts;
+}
+
 function aggregateBars(
   bars: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }>,
-  step: number,
+  timeframe: string,
 ) {
-  if (step <= 1) return bars;
+  if (timeframe === '15m') return bars;
+  const sorted = bars
+    .map((b) => ({ ...b, ts: Date.parse(b.time) }))
+    .filter((b) => Number.isFinite(b.ts))
+    .sort((a, b) => a.ts - b.ts);
+  const groups = new Map<number, typeof sorted>();
+  for (const row of sorted) {
+    const key = getBucketStart(row.ts, timeframe);
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
   const out: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> = [];
-  for (let i = 0; i < bars.length; i += step) {
-    const chunk = bars.slice(i, i + step);
-    if (chunk.length === 0) continue;
+  const keys = Array.from(groups.keys()).sort((a, b) => a - b);
+  for (const k of keys) {
+    const list = (groups.get(k) ?? []).sort((a, b) => a.ts - b.ts);
+    if (list.length === 0) continue;
     out.push({
-      open: chunk[0].open,
-      high: Math.max(...chunk.map((x) => x.high)),
-      low: Math.min(...chunk.map((x) => x.low)),
-      close: chunk[chunk.length - 1].close,
-      time: chunk[chunk.length - 1].time,
-      volume: chunk.reduce((sum, x) => sum + Number(x.volume ?? 0), 0),
+      open: list[0].open,
+      high: Math.max(...list.map((x) => x.high)),
+      low: Math.min(...list.map((x) => x.low)),
+      close: list[list.length - 1].close,
+      time: new Date(k).toISOString(),
+      volume: list.reduce((sum, x) => sum + Number(x.volume ?? 0), 0),
     });
   }
   return out;
@@ -71,6 +107,23 @@ export default function HistoryReviewPage() {
     },
   });
 
+  const sessionForBars = reviewQuery.data?.session;
+  const barsWindowQuery = useQuery({
+    queryKey: ['training-review-bars', params.sessionId, viewTimeframe, sessionForBars?.contextStartTime, sessionForBars?.currentTimePointer],
+    enabled: Boolean(sessionForBars),
+    queryFn: async () => {
+      if (!sessionForBars) return { bars: [] as Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> };
+      const from = sessionForBars.contextStartTime ?? sessionForBars.barsData?.[0]?.time;
+      const to = sessionForBars.currentTimePointer ?? sessionForBars.barsData?.[sessionForBars.pointer]?.time;
+      if (!from || !to) return { bars: [] as Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> };
+      return (
+        await api.get(`/training/${params.sessionId}/bars`, {
+          params: { timeframe: viewTimeframe, from, to },
+        })
+      ).data as { bars: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> };
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (payload: { content: string; problemTags: string[] }) =>
       (await api.post(`/training/${params.sessionId}/review`, payload)).data,
@@ -91,17 +144,28 @@ export default function HistoryReviewPage() {
   const step = TIMEFRAME_TO_STEP[viewTimeframe] ?? 1;
   const sourceBars = session?.barsData ?? [];
   const sourceActions = session?.actions ?? [];
-  const visibleBars = aggregateBars(sourceBars, step);
+  const fetchedBars = Array.isArray(barsWindowQuery.data?.bars) ? barsWindowQuery.data?.bars : [];
+  const visibleBars = fetchedBars.length > 0 ? fetchedBars : aggregateBars(sourceBars, viewTimeframe);
   const chartActions = sourceActions.map((a: any) => {
-    const groupIndex = typeof a.timePointer === 'number' ? Math.floor(a.timePointer / step) : -1;
-    const groupedBar = groupIndex >= 0 ? visibleBars[Math.min(groupIndex, visibleBars.length - 1)] : undefined;
-    const parsed = groupedBar ? Date.parse(groupedBar.time) : NaN;
+    const rawBar =
+      typeof a.timePointer === 'number' && a.timePointer >= 0 && a.timePointer < sourceBars.length
+        ? sourceBars[a.timePointer]
+        : undefined;
+    const rawTs = rawBar ? Date.parse(rawBar.time) : NaN;
+    let nearestTs = NaN;
+    if (Number.isFinite(rawTs) && visibleBars.length > 0) {
+      nearestTs = Date.parse(visibleBars[0].time);
+      for (let i = 1; i < visibleBars.length; i += 1) {
+        const ts = Date.parse(visibleBars[i].time);
+        if (Math.abs(ts - rawTs) <= Math.abs(nearestTs - rawTs)) nearestTs = ts;
+      }
+    }
     return {
       id: a.id,
       actionType: a.actionType,
       timePointer: a.timePointer,
       price: a.price,
-      timestamp: Number.isFinite(parsed) ? parsed : undefined,
+      timestamp: Number.isFinite(nearestTs) ? nearestTs : undefined,
       positionPercent: a.positionPercent ?? null,
       pnl: a.pnl ?? null,
       closeReason: a.reason ?? null,

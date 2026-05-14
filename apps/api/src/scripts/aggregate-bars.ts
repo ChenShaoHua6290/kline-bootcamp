@@ -6,27 +6,41 @@ async function main() {
   const service = new BarAggregationService(prisma as never);
   const startAt = Date.now();
   try {
-    const symbols = await prisma.symbol.findMany({
-      where: { market: 'CRYPTO' },
-      select: { id: true, code: true },
-    });
-    if (symbols.length === 0) throw new Error('No CRYPTO symbols found. Run import first.');
+    const requested = (process.env.AGGREGATE_MARKETS ?? '')
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter(Boolean) as Array<'CRYPTO' | 'FOREX' | 'GOLD' | 'FUTURES' | 'STOCK'>;
+    const markets: Array<'CRYPTO' | 'FOREX' | 'GOLD' | 'FUTURES' | 'STOCK'> =
+      requested.length > 0 ? requested : ['CRYPTO', 'FOREX', 'GOLD', 'FUTURES', 'STOCK'];
 
-    for (const s of symbols) {
-      const result = await service.aggregateCryptoFrom15m(s.id);
-      console.log(
-        JSON.stringify(
-          {
-            market: 'CRYPTO',
-            symbol: s.code,
-            inserted: result.inserted,
-            deduped: result.deduped,
-            timeframes: result.timeframes,
-          },
-          null,
-          2,
-        ),
+    for (const market of markets) {
+      const symbolFilter = new Set(
+        (process.env.AGGREGATE_SYMBOLS ?? '')
+          .split(',')
+          .map((x) => x.trim().toUpperCase())
+          .filter(Boolean),
       );
+      const symbols = await prisma.symbol.findMany({
+        where: { market },
+        select: { id: true, code: true },
+      });
+      for (const s of symbols) {
+        if (symbolFilter.size > 0 && !symbolFilter.has(s.code.toUpperCase())) continue;
+        const result = await service.aggregateMarketFrom15m(market, s.id);
+        console.log(
+          JSON.stringify(
+            {
+              market,
+              symbol: s.code,
+              inserted: result.inserted,
+              deduped: result.deduped,
+              timeframes: result.timeframes,
+            },
+            null,
+            2,
+          ),
+        );
+      }
     }
   } finally {
     await prisma.$disconnect();
@@ -38,4 +52,3 @@ main().catch((err) => {
   console.error('[aggregate] failed:', err);
   process.exit(1);
 });
-

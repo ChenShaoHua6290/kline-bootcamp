@@ -120,6 +120,7 @@ async function main() {
   const files = (await walkCsvFiles(NORMALIZED_ROOT)).map(toImportFile);
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
+  let shouldRefreshStats = true;
 
   const summary: Array<{
     market: string;
@@ -130,6 +131,51 @@ async function main() {
     skippedCount: number;
     duration: number;
   }> = [];
+
+  async function refreshSymbolStats() {
+    await client.query(`
+      WITH all_bars AS (
+        SELECT 'CRYPTO'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
+        FROM bars_crypto b GROUP BY b."symbolId", b.timeframe
+        UNION ALL
+        SELECT 'FOREX'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
+        FROM bars_forex b GROUP BY b."symbolId", b.timeframe
+        UNION ALL
+        SELECT 'GOLD'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
+        FROM bars_gold b GROUP BY b."symbolId", b.timeframe
+        UNION ALL
+        SELECT 'STOCK'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
+        FROM bars_stock b GROUP BY b."symbolId", b.timeframe
+        UNION ALL
+        SELECT 'FUTURES'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
+        FROM bars_futures b GROUP BY b."symbolId", b.timeframe
+      )
+      INSERT INTO "SymbolDataStats" ("id","symbolId","market","exchange","symbol","timeframe","barCount","startTime","endTime","isTrainable","updatedAt")
+      SELECT
+        CONCAT('sds_', a."symbolId", '_', a.timeframe),
+        a."symbolId",
+        a.market,
+        s.exchange,
+        s.code,
+        a.timeframe,
+        a.bar_count,
+        a.start_time,
+        a.end_time,
+        (a.bar_count >= 500),
+        NOW()
+      FROM all_bars a
+      JOIN "Symbol" s ON s.id = a."symbolId"
+      ON CONFLICT ("symbolId","timeframe") DO UPDATE
+      SET "barCount"=EXCLUDED."barCount",
+          "startTime"=EXCLUDED."startTime",
+          "endTime"=EXCLUDED."endTime",
+          "isTrainable"=EXCLUDED."isTrainable",
+          "exchange"=EXCLUDED."exchange",
+          "symbol"=EXCLUDED."symbol",
+          "market"=EXCLUDED."market",
+          "updatedAt"=NOW()
+    `);
+  }
 
   try {
     for (const file of files) {
@@ -143,8 +189,8 @@ async function main() {
       await client.query('BEGIN');
 
       await client.query(
-        `INSERT INTO "Symbol" ("id", "market", "code", "createdAt")
-         VALUES (md5(random()::text || clock_timestamp()::text), $1::"Market", $2, NOW())
+        `INSERT INTO "Symbol" ("id", "market", "code", "isActive", "createdAt", "updatedAt")
+         VALUES (md5(random()::text || clock_timestamp()::text), $1::"Market", $2, TRUE, NOW(), NOW())
          ON CONFLICT ("market", "code") DO NOTHING`,
         [marketEnum, file.symbol],
       );
@@ -217,9 +263,13 @@ async function main() {
       });
     }
   } catch (err) {
+    shouldRefreshStats = false;
     await client.query('ROLLBACK');
     throw err;
   } finally {
+    if (shouldRefreshStats) {
+      await refreshSymbolStats();
+    }
     await client.end();
   }
 

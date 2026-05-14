@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Market, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { REAL_MARKET_TIMEFRAME_SET } from './timeframes';
 
@@ -20,31 +20,101 @@ export class BarAggregationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async aggregateCryptoFrom15m(symbolId: string, timeframes: string[] = [...TARGET_TIMEFRAMES]) {
-    const source = await this.prisma.$queryRaw<Array<{ timestamp: Date; open: number; high: number; low: number; close: number; volume: number | null }>>(
-      Prisma.sql`SELECT "timestamp","open","high","low","close","volume" FROM "bars_crypto" WHERE "symbolId"=${symbolId} AND "timeframe"='15m' ORDER BY "timestamp" ASC`,
+    return this.aggregateMarketFrom15m('CRYPTO', symbolId, timeframes);
+  }
+
+  async aggregateMarketFrom15m(market: Market, symbolId: string, timeframes: string[] = [...TARGET_TIMEFRAMES]) {
+    const table = marketToBarsTable(market);
+    const hasBase = await this.prisma.$queryRaw<Array<{ one: number }>>(
+      Prisma.sql`SELECT 1 AS one FROM ${Prisma.raw(table)} WHERE "symbolId"=${symbolId} AND "timeframe"='15m' LIMIT 1`,
     );
-    if (source.length === 0) return { inserted: 0, deduped: 0, timeframes };
+    if (hasBase.length === 0) return { inserted: 0, deduped: 0, timeframes };
 
     let inserted = 0;
     let deduped = 0;
     for (const timeframe of timeframes) {
-      const rows = aggregateRowsFrom15m(source, timeframe);
-      if (rows.length === 0) continue;
-      let insertedThisTf = 0;
-      for (const r of rows) {
-        const result = await this.prisma.$executeRaw(
-          Prisma.sql`INSERT INTO "bars_crypto" ("id","symbolId","timeframe","timestamp","open","high","low","close","volume","source","createdAt")
-                     VALUES (${`bc_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`}, ${symbolId}, ${r.timeframe}, ${r.timestamp}, ${r.open}, ${r.high}, ${r.low}, ${r.close}, ${r.volume}, 'AGGREGATED_15M', NOW())
-                     ON CONFLICT ("symbolId","timeframe","timestamp") DO NOTHING`,
-        );
-        insertedThisTf += Number(result ?? 0);
-      }
+      const tfMs = TF_MS[timeframe as keyof typeof TF_MS];
+      if (!tfMs) throw new Error(`Unsupported target timeframe: ${timeframe}`);
+      const counts = await this.prisma.$queryRaw<Array<{ inserted: string; candidates: string }>>(
+        Prisma.sql`
+          WITH src AS (
+            SELECT
+              "timestamp",
+              "open",
+              "high",
+              "low",
+              "close",
+              COALESCE("volume", 0) AS "volume",
+              floor((extract(epoch from "timestamp") * 1000) / ${tfMs})::bigint * ${tfMs} AS bucket_ms
+            FROM ${Prisma.raw(table)}
+            WHERE "symbolId" = ${symbolId}
+              AND "timeframe" = '15m'
+          ),
+          ranked AS (
+            SELECT
+              bucket_ms,
+              "timestamp",
+              "open",
+              "high",
+              "low",
+              "close",
+              "volume",
+              row_number() OVER (PARTITION BY bucket_ms ORDER BY "timestamp" ASC) AS rn_asc,
+              row_number() OVER (PARTITION BY bucket_ms ORDER BY "timestamp" DESC) AS rn_desc
+            FROM src
+          ),
+          agg AS (
+            SELECT
+              bucket_ms,
+              max(CASE WHEN rn_asc = 1 THEN "open" END) AS "open",
+              max("high") AS "high",
+              min("low") AS "low",
+              max(CASE WHEN rn_desc = 1 THEN "close" END) AS "close",
+              sum("volume") AS "volume"
+            FROM ranked
+            GROUP BY bucket_ms
+          ),
+          ins AS (
+            INSERT INTO ${Prisma.raw(table)} ("id","symbolId","timeframe","timestamp","open","high","low","close","volume","source","createdAt")
+            SELECT
+              md5(random()::text || clock_timestamp()::text || row_number() OVER ()::text),
+              ${symbolId},
+              ${timeframe},
+              to_timestamp(bucket_ms::double precision / 1000.0),
+              "open",
+              "high",
+              "low",
+              "close",
+              "volume",
+              'AGGREGATED_15M',
+              NOW()
+            FROM agg
+            ON CONFLICT ("symbolId","timeframe","timestamp") DO NOTHING
+            RETURNING 1
+          )
+          SELECT
+            (SELECT COUNT(*)::text FROM ins) AS inserted,
+            (SELECT COUNT(*)::text FROM agg) AS candidates
+        `,
+      );
+
+      const insertedThisTf = Number(counts[0]?.inserted ?? '0');
+      const candidatesThisTf = Number(counts[0]?.candidates ?? '0');
       inserted += insertedThisTf;
-      deduped += rows.length - insertedThisTf;
+      deduped += Math.max(0, candidatesThisTf - insertedThisTf);
     }
     return { inserted, deduped, timeframes };
   }
 
+}
+
+function marketToBarsTable(market: Market): string {
+  if (market === 'CRYPTO') return '"bars_crypto"';
+  if (market === 'FOREX') return '"bars_forex"';
+  if (market === 'GOLD') return '"bars_gold"';
+  if (market === 'FUTURES') return '"bars_futures"';
+  if (market === 'STOCK') return '"bars_stock"';
+  throw new Error(`Unsupported market: ${market}`);
 }
 
 export function aggregateRowsFrom15m(

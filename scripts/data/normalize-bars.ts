@@ -67,15 +67,13 @@ async function loadConfig(): Promise<MarketSymbolConfig[]> {
 
 function getInputDirs(cfg: MarketSymbolConfig): string[] {
   const rawDir = path.join(ROOT, cfg.rawPath);
+  const unzippedPath = cfg.rawPath.replace(/^data\/raw\//, 'data/unzipped/');
+  const unzippedDir = path.join(ROOT, unzippedPath);
   const dirs: string[] = [];
 
-  if (cfg.source === 'binance_vision') {
-    const unzippedPath = cfg.rawPath.replace(/^data\/raw\//, 'data/unzipped/');
-    dirs.push(path.join(ROOT, unzippedPath));
-    dirs.push(rawDir);
-  } else {
-    dirs.push(rawDir);
-  }
+  // Prefer unzipped folder first so zip->unzip workflow works for all sources (including HistData).
+  dirs.push(unzippedDir);
+  dirs.push(rawDir);
 
   return Array.from(new Set(dirs));
 }

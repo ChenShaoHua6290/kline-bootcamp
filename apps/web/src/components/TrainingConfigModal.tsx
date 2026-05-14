@@ -21,7 +21,7 @@ export function TrainingConfigModal({
   onSubmit: (v: { market: string; drivingTimeframe: string; trainingBars: number }) => void;
   submitting?: boolean;
 }) {
-  const [form, setForm] = useState({ market: 'CRYPTO', drivingTimeframe: '1H', trainingBars: 100 });
+  const [form, setForm] = useState({ market: 'CRYPTO', drivingTimeframe: '1H', trainingBars: 150 });
   const [modalScale, setModalScale] = useState(1);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -154,7 +154,7 @@ export function TrainingConfigModal({
             </div>
             <Slider
               min={50}
-              max={300}
+              max={500}
               step={10}
               value={form.trainingBars}
               disabled={submitting}
@@ -163,7 +163,7 @@ export function TrainingConfigModal({
             />
             <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium text-slate-500">
               <span>50</span>
-              <span>300</span>
+              <span>500</span>
             </div>
           </section>
         </div>
