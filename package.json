@@ -27,9 +27,11 @@
     "data:import-all": "tsx scripts/data/import-bars.ts",
     "data:aggregate": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run prisma:generate:pg && PATH=./node_modules/.bin:$PATH npm --prefix apps/api run aggregate:bars",
     "data:verify": "tsx scripts/data/verify-bars.ts",
+    "data:audit-bars": "tsx scripts/data/audit-bars-integrity.ts",
     "data:pipeline": "tsx scripts/data/run-pipeline.ts",
     "data:normalize-a-share": "tsx scripts/data/normalize-a-share-bars.ts",
-    "data:import-a-share": "tsx scripts/data/import-a-share-bars.ts"
+    "data:import-a-share": "tsx scripts/data/import-a-share-bars.ts",
+    "data:audit-indexes": "tsx scripts/data/audit-bars-indexes.ts"
   },
   "dependencies": {
     "axios": "^1.16.0",
