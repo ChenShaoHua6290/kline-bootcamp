@@ -80,6 +80,7 @@ export default function TrainPage() {
   const [hasMoreOlderBars, setHasMoreOlderBars] = useState(false);
   const [loadingOlderBars, setLoadingOlderBars] = useState(false);
   const barsCacheRef = useRef<Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>>({});
+  const barsRequestKeyRef = useRef<string | null>(null);
   const pendingLeaveActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const { session, setSession, clearTrainingState, viewTimeframe, setViewTimeframe } = useTrainingStore();
   const router = useRouter();
@@ -308,21 +309,27 @@ export default function TrainPage() {
       setBarsFromTime(null);
       setHasMoreOlderBars(false);
       barsCacheRef.current = {};
+      barsRequestKeyRef.current = null;
       return;
     }
     const from = barsFromTime ?? session.contextStartTime ?? session.barsData?.[0]?.time;
     const to = session.currentTimePointer ?? session.barsData?.[session.pointer]?.time;
     if (!from || !to) return;
-    const cacheKey = `${session.id}|${viewTimeframe}|${from}|${to}`;
+    const requestKey = `${session.id}|${viewTimeframe}|${from}|${to}`;
+    barsRequestKeyRef.current = requestKey;
+    const cacheKey = requestKey;
     const cached = barsCacheRef.current[cacheKey];
     if (cached) {
-      setTimeframeBars(cached);
-      setLoadingOlderBars(false);
+      if (barsRequestKeyRef.current === requestKey) {
+        setTimeframeBars(cached);
+        setLoadingOlderBars(false);
+      }
       return;
     }
     api
       .get(`/training/${session.id}/bars`, { params: { timeframe: viewTimeframe, from, to } })
       .then((res) => {
+        if (barsRequestKeyRef.current !== requestKey) return;
         const rows = Array.isArray(res.data?.bars) ? res.data.bars : [];
         barsCacheRef.current[cacheKey] = rows;
         setTimeframeBars(rows);
@@ -330,6 +337,7 @@ export default function TrainPage() {
         setLoadingOlderBars(false);
       })
       .catch(() => {
+        if (barsRequestKeyRef.current !== requestKey) return;
         setTimeframeBars([]);
         setHasMoreOlderBars(false);
         setLoadingOlderBars(false);
