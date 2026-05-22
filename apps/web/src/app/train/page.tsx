@@ -45,6 +45,8 @@ function translateErrorMessage(raw: string) {
     ['No bars found for symbol=', '所选周期暂无数据，请先执行聚合或切换周期'],
     ['Unsupported timeframe:', '不支持的周期，请重新选择'],
     ['Active training session already exists', '当前已有进行中的训练，请先继续或结束当前训练'],
+    ['ThrottlerException: Too Many Requests', '操作过于频繁，请稍后继续'],
+    ['Too Many Requests', '操作过于频繁，请稍后继续'],
   ];
   const hit = dict.find(([en]) => text.includes(en));
   if (hit) return hit[1];
@@ -76,11 +78,21 @@ export default function TrainPage() {
   const [startConflictSessionId, setStartConflictSessionId] = useState<string | null>(null);
   const [endSummarySession, setEndSummarySession] = useState<Session | null>(null);
   const [timeframeBars, setTimeframeBars] = useState<Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>([]);
+  const [timeframeBarsTf, setTimeframeBarsTf] = useState<string | null>(null);
+  const [timeframeBarsMap, setTimeframeBarsMap] = useState<
+    Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>
+  >({});
+  const [stableVisibleBars, setStableVisibleBars] = useState<
+    Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>
+  >([]);
   const [barsFromTime, setBarsFromTime] = useState<string | null>(null);
   const [hasMoreOlderBars, setHasMoreOlderBars] = useState(false);
   const [loadingOlderBars, setLoadingOlderBars] = useState(false);
-  const barsCacheRef = useRef<Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>>({});
   const barsRequestKeyRef = useRef<string | null>(null);
+  const actionInFlightRef = useRef(false);
+  const latestPointerRef = useRef(0);
+  const holdBatchActiveRef = useRef(false);
+  const sessionRef = useRef<Session | null>(null);
   const pendingLeaveActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const { session, setSession, clearTrainingState, viewTimeframe, setViewTimeframe } = useTrainingStore();
   const router = useRouter();
@@ -130,6 +142,11 @@ export default function TrainPage() {
     if (params.get('start') === '1') setShowConfig(true);
   }, []);
 
+  useEffect(() => {
+    latestPointerRef.current = typeof session?.pointer === 'number' ? session.pointer : 0;
+    sessionRef.current = session ?? null;
+  }, [session]);
+
   const startMutation = useMutation({
     mutationFn: async (payload: any) => (await api.post('/training/start', payload)).data,
     onMutate: () => {
@@ -153,9 +170,15 @@ export default function TrainPage() {
 
   const actionMutation = useMutation({
     mutationFn: async (payload: any) => (await api.post(`/training/${session?.id}/action`, payload)).data,
-    onMutate: () => setNotice(null),
+    onMutate: () => {
+      actionInFlightRef.current = true;
+      setNotice(null);
+    },
     onSuccess: (data) => {
       const normalized = normalizeSession(data);
+      if (typeof normalized?.pointer === 'number' && normalized.pointer < latestPointerRef.current) {
+        return;
+      }
       setSession(normalized);
       profileStatsQuery.refetch();
     },
@@ -166,6 +189,10 @@ export default function TrainPage() {
         message: normalizeErrorMessage(msg, '操作失败，请重试'),
         tone: 'warning',
       });
+    },
+    onSettled: () => {
+      actionInFlightRef.current = false;
+      holdBatchActiveRef.current = false;
     },
   });
 
@@ -213,27 +240,11 @@ export default function TrainPage() {
     },
   });
 
-  const startNewWithCurrentBalance = (baseSession?: Session | null) => {
-    const source = baseSession ?? session;
-    if (!source) return;
-    setNotice(null);
-    setEndSummarySession(null);
-    startMutation.mutate({
-      market: source.market,
-      drivingTimeframe: source.drivingTimeframe,
-      trainingBars: source.totalBars,
-      totalBars: 500 + source.totalBars,
-      initialVisibleBars: 500,
-      initialBalance: source.finalBalance,
-    });
-  };
-
   const clearClientTrainingState = () => {
     clearTrainingState();
     setTimeframeBars([]);
     setBarsFromTime(null);
     setHasMoreOlderBars(false);
-    barsCacheRef.current = {};
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('activeSessionId');
       window.sessionStorage.removeItem('activeSessionId');
@@ -267,19 +278,28 @@ export default function TrainPage() {
     takeProfitPrice?: number;
   }) => {
     if (!session) return;
+    const isHold = payload.action === 'HOLD' || payload.actionType === 'HOLD';
+    if (actionInFlightRef.current) {
+      return;
+    }
+    if (holdBatchActiveRef.current) {
+      return;
+    }
     const normalizePositive = (value?: number) =>
       typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
     const safePayload = {
       ...payload,
       stopLossPrice: normalizePositive(payload.stopLossPrice),
       takeProfitPrice: normalizePositive(payload.takeProfitPrice),
+      expectedPointer: session.pointer,
     };
     // 到达最后一根后，观望与“结束训练”行为保持一致。
     const trainPointer = typeof session.trainPointer === 'number' ? session.trainPointer : session.pointer;
-    if ((safePayload.action === 'HOLD' || safePayload.actionType === 'HOLD') && trainPointer >= session.totalBars) {
+    if (isHold && trainPointer >= session.totalBars) {
       endMutation.mutate();
       return;
     }
+    holdBatchActiveRef.current = true;
     actionMutation.mutate(safePayload);
   };
 
@@ -306,9 +326,11 @@ export default function TrainPage() {
   useEffect(() => {
     if (!session) {
       setTimeframeBars([]);
+      setTimeframeBarsTf(null);
+      setTimeframeBarsMap({});
+      setStableVisibleBars([]);
       setBarsFromTime(null);
       setHasMoreOlderBars(false);
-      barsCacheRef.current = {};
       barsRequestKeyRef.current = null;
       return;
     }
@@ -317,28 +339,21 @@ export default function TrainPage() {
     if (!from || !to) return;
     const requestKey = `${session.id}|${viewTimeframe}|${from}|${to}`;
     barsRequestKeyRef.current = requestKey;
-    const cacheKey = requestKey;
-    const cached = barsCacheRef.current[cacheKey];
-    if (cached) {
-      if (barsRequestKeyRef.current === requestKey) {
-        setTimeframeBars(cached);
-        setLoadingOlderBars(false);
-      }
-      return;
-    }
     api
       .get(`/training/${session.id}/bars`, { params: { timeframe: viewTimeframe, from, to } })
       .then((res) => {
         if (barsRequestKeyRef.current !== requestKey) return;
         const rows = Array.isArray(res.data?.bars) ? res.data.bars : [];
-        barsCacheRef.current[cacheKey] = rows;
         setTimeframeBars(rows);
+        setTimeframeBarsTf(viewTimeframe);
+        setTimeframeBarsMap((prev) => ({ ...prev, [viewTimeframe]: rows }));
         setHasMoreOlderBars(Boolean(res.data?.hasMoreOlder));
         setLoadingOlderBars(false);
       })
       .catch(() => {
         if (barsRequestKeyRef.current !== requestKey) return;
         setTimeframeBars([]);
+        setTimeframeBarsTf(viewTimeframe);
         setHasMoreOlderBars(false);
         setLoadingOlderBars(false);
       });
@@ -347,6 +362,24 @@ export default function TrainPage() {
   useEffect(() => {
     setBarsFromTime(null);
   }, [session?.id, viewTimeframe]);
+
+  // Keep local timeframeBars aligned with the currently selected timeframe only.
+  // This prevents one-frame "old timeframe bars" flashes when switching periods.
+  useEffect(() => {
+    if (!session) {
+      setTimeframeBars([]);
+      setTimeframeBarsTf(null);
+      return;
+    }
+    const cached = timeframeBarsMap[viewTimeframe];
+    if (Array.isArray(cached)) {
+      setTimeframeBars(cached);
+      setTimeframeBarsTf(viewTimeframe);
+      return;
+    }
+    setTimeframeBars([]);
+    setTimeframeBarsTf(viewTimeframe);
+  }, [session?.id, viewTimeframe, timeframeBarsMap]);
 
   const loadOlderBars = () => {
     if (!session || loadingOlderBars) return;
@@ -398,13 +431,24 @@ export default function TrainPage() {
 
   const visibleBars = useMemo(() => {
     if (!session) return [];
-    return timeframeBars.length > 0 ? timeframeBars : session.barsData;
-  }, [session, timeframeBars]);
+    if (timeframeBarsTf === viewTimeframe && timeframeBars.length > 0) return timeframeBars;
+    const cached = timeframeBarsMap[viewTimeframe];
+    if (Array.isArray(cached) && cached.length > 0) return cached;
+    const baseTf = String(session.drivingTimeframe || session.viewTimeframe || '1H').toUpperCase();
+    if (viewTimeframe.toUpperCase() === baseTf) return session.barsData;
+    return [];
+  }, [session, timeframeBars, timeframeBarsMap, viewTimeframe]);
+  useEffect(() => {
+    if (visibleBars.length > 0) {
+      setStableVisibleBars(visibleBars);
+      return;
+    }
+    if (!session) setStableVisibleBars([]);
+  }, [visibleBars, session]);
   const hasTrainingActions = useMemo(() => {
     if (!session) return false;
     return session.actions.length > 0;
   }, [session]);
-
   if (!ready) {
     return <main className="app-shell p-6"><LoadingState message="正在检查登录状态..." /></main>;
   }
@@ -460,7 +504,11 @@ export default function TrainPage() {
         <SessionEndModal
           session={endSummarySession}
           onClose={() => setEndSummarySession(null)}
-          onRestart={() => startNewWithCurrentBalance(endSummarySession)}
+          onRestart={() => {
+            setNotice(null);
+            setEndSummarySession(null);
+            setShowConfig(true);
+          }}
           restarting={startMutation.isPending}
           onBackHome={() => {
             setEndSummarySession(null);
@@ -549,13 +597,15 @@ export default function TrainPage() {
           {session ? (
             <div className="relative h-full w-full min-h-0">
               <KLineChart
-                data={visibleBars}
+                data={stableVisibleBars}
                 actions={chartActions}
                 timeframe={viewTimeframe}
                 onTimeframeChange={setViewTimeframe}
                 fitContainerHeight
                 showTradeLegend={false}
                 showActionSummary={false}
+                hideTimeAxisLabels
+                hideHeaderTime
                 stopLossPrice={session.position?.stopLossPrice}
                 takeProfitPrice={session.position?.takeProfitPrice}
                 hasMoreOlder={hasMoreOlderBars}
@@ -584,7 +634,7 @@ export default function TrainPage() {
               <div className="shrink-0 xl:max-h-[58vh] xl:overflow-y-auto">
                 <TradePanel
                   session={session}
-                  busy={actionMutation.isPending || startMutation.isPending || endMutation.isPending}
+                  busy={actionMutation.isPending || startMutation.isPending || endMutation.isPending || holdBatchActiveRef.current}
                   onAction={handleTradeAction}
                   onEnd={() => setConfirmEndOpen(true)}
                 />

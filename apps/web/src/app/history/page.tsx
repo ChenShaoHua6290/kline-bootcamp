@@ -31,7 +31,7 @@ type HistoryItem = {
   hasReview?: boolean;
 };
 
-type StatusFilter = 'CLOSED' | 'ALL' | 'ACTIVE' | 'LIQUIDATED' | 'COMPLETED' | 'TERMINATED';
+type StatusFilter = 'CLOSED' | 'ALL' | 'ACTIVE' | 'LIQUIDATED';
 type HistoryResponse = {
   items: HistoryItem[];
   pagination: {
@@ -127,8 +127,6 @@ export default function HistoryPage() {
       if (statusFilter === 'ALL') return true;
       if (statusFilter === 'LIQUIDATED') return item.isLiquidated;
       if (statusFilter === 'ACTIVE') return item.status === 'ACTIVE';
-      if (statusFilter === 'COMPLETED') return isCompletedLike(item.status) && !item.isLiquidated;
-      if (statusFilter === 'TERMINATED') return item.status === 'TERMINATED';
       return item.status !== 'ACTIVE';
     });
     return filtered;
@@ -161,8 +159,6 @@ export default function HistoryPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="ml-1 text-xs text-slate-400">状态:</span>
                 <Button size="sm" variant={statusFilter === 'CLOSED' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('CLOSED'); setPage(1); }}>已结束</Button>
-                <Button size="sm" variant={statusFilter === 'COMPLETED' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('COMPLETED'); setPage(1); }}>已完成</Button>
-                <Button size="sm" variant={statusFilter === 'TERMINATED' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('TERMINATED'); setPage(1); }}>已终止</Button>
                 <Button size="sm" variant={statusFilter === 'ACTIVE' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('ACTIVE'); setPage(1); }}>进行中</Button>
                 <Button size="sm" variant={statusFilter === 'LIQUIDATED' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('LIQUIDATED'); setPage(1); }}>已爆仓</Button>
                 <Button size="sm" variant={statusFilter === 'ALL' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('ALL'); setPage(1); }}>全部</Button>

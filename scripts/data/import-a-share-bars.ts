@@ -181,9 +181,6 @@ async function refreshSymbolStats(client: Client): Promise<void> {
       SELECT 'CRYPTO'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
       FROM bars_crypto b GROUP BY b."symbolId", b.timeframe
       UNION ALL
-      SELECT 'FOREX'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
-      FROM bars_forex b GROUP BY b."symbolId", b.timeframe
-      UNION ALL
       SELECT 'GOLD'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
       FROM bars_gold b GROUP BY b."symbolId", b.timeframe
       UNION ALL

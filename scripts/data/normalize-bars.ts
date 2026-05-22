@@ -11,7 +11,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(customParseFormat);
 
-type Market = 'crypto' | 'forex' | 'gold' | 'stock' | 'futures';
+type Market = 'crypto' | 'gold' | 'stock' | 'futures';
 
 type MarketSymbolConfig = {
   market: Market;
@@ -38,6 +38,7 @@ type NormalizedBar = {
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, 'config', 'market-symbols.json');
 const NORMALIZED_ROOT = path.join(ROOT, 'data', 'normalized');
+const FUTURES_FLAT_FILE_RE = /^([A-Za-z0-9]+)\.([A-Za-z]+)-(\d+)(min|m)\.csv$/i;
 
 async function walkFiles(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -264,7 +265,7 @@ async function normalizeFile(filePath: string, cfg: MarketSymbolConfig): Promise
 
   const { rows: parsedRows, skipped: parseSkipped } = await parseOneFile(filePath, cfg);
   const transformedRows =
-    (cfg.market === 'forex' || cfg.market === 'gold') && cfg.rawTimeframe.toUpperCase() === 'M1' && cfg.baseTimeframe === '15m'
+    cfg.market === 'gold' && cfg.rawTimeframe.toUpperCase() === 'M1' && cfg.baseTimeframe === '15m'
       ? aggregateM1To15m(parsedRows)
       : parsedRows.slice().sort((a, b) => a.timestampMs - b.timestampMs);
 
@@ -280,8 +281,18 @@ async function normalizeFile(filePath: string, cfg: MarketSymbolConfig): Promise
   return { outputFile: outFile, valid: transformedRows.length, skipped: parseSkipped + Math.max(0, parsedRows.length - transformedRows.length) };
 }
 
+function parseFuturesFlatFileName(fileName: string): { symbol: string; exchange: string; baseTimeframe: string } | null {
+  const m = FUTURES_FLAT_FILE_RE.exec(fileName);
+  if (!m) return null;
+  const symbol = m[1].toUpperCase();
+  const exchange = m[2].toLowerCase();
+  const minutes = Number(m[3]);
+  if (!Number.isFinite(minutes) || minutes <= 0) return null;
+  const baseTimeframe = `${minutes}m`;
+  return { symbol, exchange, baseTimeframe };
+}
+
 async function main() {
-  const configs = await loadConfig();
   const report: Array<{
     market: string;
     symbol: string;
@@ -292,6 +303,45 @@ async function main() {
     skipped: number;
   }> = [];
 
+  const futuresFlatDir = (process.env.DATA_IMPORT_FUTURES_FLAT_DIR ?? '').trim();
+  if (futuresFlatDir) {
+    const absDir = path.isAbsolute(futuresFlatDir) ? futuresFlatDir : path.join(ROOT, futuresFlatDir);
+    const files = await walkFiles(absDir);
+    const symbolFilter = new Set(
+      (process.env.DATA_IMPORT_SYMBOLS ?? '')
+        .split(',')
+        .map((x) => x.trim().toUpperCase())
+        .filter(Boolean),
+    );
+    for (const file of files) {
+      const parsed = parseFuturesFlatFileName(path.basename(file));
+      if (!parsed) continue;
+      if (symbolFilter.size > 0 && !symbolFilter.has(parsed.symbol)) continue;
+      const cfg: MarketSymbolConfig = {
+        market: 'futures',
+        exchange: parsed.exchange,
+        source: 'csv',
+        symbol: parsed.symbol,
+        displayName: parsed.symbol,
+        rawTimeframe: parsed.baseTimeframe,
+        baseTimeframe: parsed.baseTimeframe,
+        timezone: 'Asia/Shanghai',
+        rawPath: absDir,
+        enabled: true,
+      };
+      const one = await normalizeFile(file, cfg);
+      report.push({
+        market: cfg.market,
+        symbol: cfg.symbol,
+        baseTimeframe: cfg.baseTimeframe,
+        inputFile: file,
+        outputFile: one.outputFile,
+        valid: one.valid,
+        skipped: one.skipped,
+      });
+    }
+  } else {
+    const configs = await loadConfig();
   for (const cfg of configs) {
     const inputDirs = getInputDirs(cfg);
     for (const dir of inputDirs) {
@@ -310,6 +360,7 @@ async function main() {
       }
       if (files.length > 0) break;
     }
+  }
   }
 
   console.log(

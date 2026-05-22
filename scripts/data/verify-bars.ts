@@ -4,7 +4,6 @@ type MarketRow = { market: string; table_name: string };
 
 const MARKET_TABLES: MarketRow[] = [
   { market: 'crypto', table_name: 'bars_crypto' },
-  { market: 'forex', table_name: 'bars_forex' },
   { market: 'gold', table_name: 'bars_gold' },
   { market: 'stock', table_name: 'bars_stock' },
   { market: 'futures', table_name: 'bars_futures' },

@@ -9,9 +9,9 @@ async function main() {
     const requested = (process.env.AGGREGATE_MARKETS ?? '')
       .split(',')
       .map((x) => x.trim().toUpperCase())
-      .filter(Boolean) as Array<'CRYPTO' | 'FOREX' | 'GOLD' | 'FUTURES' | 'STOCK'>;
-    const markets: Array<'CRYPTO' | 'FOREX' | 'GOLD' | 'FUTURES' | 'STOCK'> =
-      requested.length > 0 ? requested : ['CRYPTO', 'FOREX', 'GOLD', 'FUTURES', 'STOCK'];
+      .filter(Boolean) as Array<'CRYPTO' | 'GOLD' | 'FUTURES' | 'STOCK'>;
+    const markets: Array<'CRYPTO' | 'GOLD' | 'FUTURES' | 'STOCK'> =
+      requested.length > 0 ? requested : ['CRYPTO', 'GOLD', 'FUTURES', 'STOCK'];
 
     for (const market of markets) {
       const symbolFilter = new Set(

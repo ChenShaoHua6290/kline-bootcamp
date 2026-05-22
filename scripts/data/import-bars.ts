@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { Client } from 'pg';
 import { from as copyFrom } from 'pg-copy-streams';
 
-type Market = 'crypto' | 'forex' | 'gold' | 'stock' | 'futures';
+type Market = 'crypto' | 'gold' | 'stock' | 'futures';
 
 type MarketSymbolConfig = {
   market: Market;
@@ -32,14 +32,12 @@ const NORMALIZED_ROOT = path.join(ROOT, 'data', 'normalized');
 const CONFIG_PATH = path.join(ROOT, 'config', 'market-symbols.json');
 const MARKET_ENUM: Record<Market, string> = {
   crypto: 'CRYPTO',
-  forex: 'FOREX',
   gold: 'GOLD',
   stock: 'STOCK',
   futures: 'FUTURES',
 };
 const MARKET_TABLE: Record<Market, string> = {
   crypto: 'bars_crypto',
-  forex: 'bars_forex',
   gold: 'bars_gold',
   stock: 'bars_stock',
   futures: 'bars_futures',
@@ -138,9 +136,6 @@ async function main() {
         SELECT 'CRYPTO'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
         FROM bars_crypto b GROUP BY b."symbolId", b.timeframe
         UNION ALL
-        SELECT 'FOREX'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
-        FROM bars_forex b GROUP BY b."symbolId", b.timeframe
-        UNION ALL
         SELECT 'GOLD'::"Market" AS market, b."symbolId", b.timeframe, COUNT(*)::int AS bar_count, MIN(b.timestamp) AS start_time, MAX(b.timestamp) AS end_time
         FROM bars_gold b GROUP BY b."symbolId", b.timeframe
         UNION ALL
@@ -179,7 +174,22 @@ async function main() {
 
   try {
     for (const file of files) {
-      const cfg = configMap.get(`${file.market}:${file.symbol}`);
+      const cfg =
+        configMap.get(`${file.market}:${file.symbol}`) ??
+        (file.market === 'futures'
+          ? ({
+              market: 'futures',
+              exchange: 'auto',
+              source: 'csv',
+              symbol: file.symbol,
+              displayName: file.symbol,
+              rawTimeframe: file.timeframe,
+              baseTimeframe: file.timeframe,
+              timezone: 'Asia/Shanghai',
+              rawPath: '',
+              enabled: true,
+            } as MarketSymbolConfig)
+          : null);
       if (!cfg) continue;
 
       const start = Date.now();

@@ -2,11 +2,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Client } from 'pg';
 
-type MarketTable = { market: 'CRYPTO' | 'FOREX' | 'GOLD' | 'STOCK' | 'FUTURES'; table: string };
+type MarketTable = { market: 'CRYPTO' | 'GOLD' | 'STOCK' | 'FUTURES'; table: string };
 
 const MARKET_TABLES: MarketTable[] = [
   { market: 'CRYPTO', table: 'bars_crypto' },
-  { market: 'FOREX', table: 'bars_forex' },
   { market: 'GOLD', table: 'bars_gold' },
   { market: 'STOCK', table: 'bars_stock' },
   { market: 'FUTURES', table: 'bars_futures' },

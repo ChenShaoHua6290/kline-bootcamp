@@ -110,7 +110,6 @@ export class BarAggregationService {
 
 function marketToBarsTable(market: Market): string {
   if (market === 'CRYPTO') return '"bars_crypto"';
-  if (market === 'FOREX') return '"bars_forex"';
   if (market === 'GOLD') return '"bars_gold"';
   if (market === 'FUTURES') return '"bars_futures"';
   if (market === 'STOCK') return '"bars_stock"';

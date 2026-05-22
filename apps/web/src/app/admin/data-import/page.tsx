@@ -111,7 +111,6 @@ export default function AdminDataImportPage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <Select value={form.market} onChange={(e) => setForm((f) => ({ ...f, market: e.target.value }))}>
             <option value="crypto">crypto</option>
-            <option value="forex">forex</option>
             <option value="gold">gold</option>
             <option value="stock">stock</option>
             <option value="futures">futures</option>

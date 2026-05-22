@@ -1,6 +1,5 @@
 export const Market = {
   STOCK: 'STOCK',
-  FOREX: 'FOREX',
   FUTURES: 'FUTURES',
   GOLD: 'GOLD',
   CRYPTO: 'CRYPTO',

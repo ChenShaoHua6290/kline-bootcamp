@@ -2,11 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Slider } from '@/components/ui/Slider';
 
-const markets = ['STOCK', 'FOREX', 'FUTURES', 'CRYPTO'];
-const timeframes = ['15m', '1H', '4H', 'D'];
+const markets = ['STOCK', 'FUTURES', 'CRYPTO'];
+const timeframes = ['15m', '30m', '1H', '4H', 'D'];
 const marketLabels: Record<string, string> = {
   STOCK: '股票',
-  FOREX: '外汇',
   FUTURES: '期货',
   GOLD: '黄金',
   CRYPTO: '加密',
@@ -75,7 +74,7 @@ export function TrainingConfigModal({
         <div className="space-y-4 px-5 py-4 sm:px-6 sm:py-4">
           <section>
             <div className="mb-2 text-[12px] font-semibold tracking-[0.03em] text-cyan-300">市场</div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {markets.map((m) => {
                 const active = form.market === m;
                 return (
@@ -113,7 +112,7 @@ export function TrainingConfigModal({
                 </span>
               </span>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {timeframes.map((tf) => {
                 const active = form.drivingTimeframe === tf;
                 return (

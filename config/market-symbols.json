@@ -864,18 +864,6 @@
     "enabled": true
   },
   {
-    "market": "forex",
-    "exchange": "histdata",
-    "source": "histdata",
-    "symbol": "EURUSD",
-    "displayName": "EUR/USD",
-    "rawTimeframe": "M1",
-    "baseTimeframe": "15m",
-    "timezone": "America/New_York",
-    "rawPath": "data/raw/forex/histdata/EURUSD/M1",
-    "enabled": false
-  },
-  {
     "market": "gold",
     "exchange": "histdata",
     "source": "histdata",

@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
-const MARKETS = ['crypto', 'forex', 'stock', 'futures', 'gold'] as const;
+const MARKETS = ['crypto', 'stock', 'futures', 'gold'] as const;
 const SOURCES = ['binance', 'csv', 'histdata', 'yahoo_csv', 'generic_csv'] as const;
 
 export class CreateDataImportJobDto {

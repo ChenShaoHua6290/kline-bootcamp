@@ -63,6 +63,12 @@ export class TrainingActionDto {
   @IsNumber()
   @Min(0.000001)
   takeProfitPrice?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(0)
+  expectedPointer?: number;
 }
 
 export class SaveTrainingReviewDto {

@@ -46,7 +46,7 @@ const DEFAULT_CHART_SETTINGS: ChartSettings = {
   priceAxisType: 'linear',
 };
 
-function buildChartStyles(settings: ChartSettings) {
+function buildChartStyles(settings: ChartSettings, hideTimeAxisLabels = false) {
   const isRedUp = settings.riseFallMode === 'red-up';
   const upColor = isRedUp ? '#ef4444' : '#22c55e';
   const downColor = isRedUp ? '#22c55e' : '#f43f5e';
@@ -60,6 +60,8 @@ function buildChartStyles(settings: ChartSettings) {
     'up-stroke': 'candle_up_stroke',
     'down-stroke': 'candle_down_stroke',
   };
+
+  const showLatestPriceMark = settings.showLatestPrice;
 
   return {
     grid: {
@@ -84,13 +86,13 @@ function buildChartStyles(settings: ChartSettings) {
         high: { show: settings.showHighPrice, color: '#94a3b8' },
         low: { show: settings.showLowPrice, color: '#94a3b8' },
         last: {
-          show: settings.showLatestPrice,
+          show: showLatestPriceMark,
           upColor,
           downColor,
           noChangeColor: '#94a3b8',
-          line: { show: settings.showLatestPrice, size: 1, style: 'dashed', dashedValue: [4, 4] },
+          line: { show: showLatestPriceMark, size: 1, style: 'dashed', dashedValue: [4, 4] },
           text: {
-            show: settings.showLatestPrice,
+            show: showLatestPriceMark,
             color: '#ffffff',
             size: 12,
             family: 'ui-sans-serif',
@@ -121,8 +123,8 @@ function buildChartStyles(settings: ChartSettings) {
         { color: '#a78bfa', size: 1.2, smooth: true, style: 'solid' },
       ],
       tooltip: {
-        showRule: 'none',
-        showType: 'rect',
+        showRule: settings.showIndicatorLatestValue ? 'always' : 'none',
+        showType: 'standard',
         title: { color: '#e2e8f0', size: 12, family: 'ui-sans-serif', weight: '500' },
         legend: { color: '#cbd5e1', size: 12, family: 'ui-sans-serif', weight: '500' },
       },
@@ -130,7 +132,7 @@ function buildChartStyles(settings: ChartSettings) {
     xAxis: {
       axisLine: { show: true, color: '#334155', size: 1 },
       tickLine: { show: true, color: '#334155', size: 1, length: 3 },
-      tickText: { show: true, color: '#94a3b8', size: 12, family: 'ui-sans-serif', weight: '500' },
+      tickText: { show: !hideTimeAxisLabels, color: '#94a3b8', size: 12, family: 'ui-sans-serif', weight: '500' },
     },
     yAxis: {
       axisLine: { show: true, color: '#334155', size: 1 },
@@ -161,7 +163,7 @@ function buildChartStyles(settings: ChartSettings) {
       vertical: {
         line: { show: true, style: 'dashed', color: 'rgba(148,163,184,0.35)', size: 1, dashedValue: [3, 3] },
         text: {
-          show: true,
+          show: !hideTimeAxisLabels,
           color: '#ffffff',
           size: 12,
           family: 'ui-sans-serif',
@@ -227,6 +229,8 @@ export function KLineChart({
   disableScrollZoom = false,
   showTradeLegend = true,
   showActionSummary = true,
+  hideTimeAxisLabels = false,
+  hideHeaderTime = false,
 }: {
   data: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>;
   actions?: Action[];
@@ -243,11 +247,14 @@ export function KLineChart({
   disableScrollZoom?: boolean;
   showTradeLegend?: boolean;
   showActionSummary?: boolean;
+  hideTimeAxisLabels?: boolean;
+  hideHeaderTime?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const chartPaneRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
   const rowsRef = useRef<KLineData[]>([]);
+  const chartRowsRef = useRef<KLineData[]>([]);
   const drawToolbarRef = useRef<HTMLDivElement | null>(null);
   const settingsModalRef = useRef<HTMLDivElement | null>(null);
   const [chartReady, setChartReady] = useState(false);
@@ -267,9 +274,19 @@ export function KLineChart({
   const [showTradeOverlays, setShowTradeOverlays] = useState(true);
   const [openDrawMenu, setOpenDrawMenu] = useState<string | null>(null);
   const [focusDataIndex, setFocusDataIndex] = useState<number | null>(null);
-  const [mainIndicatorLegend, setMainIndicatorLegend] = useState<Array<{ name: string; values: string[] }>>([]);
+  const [, setMainIndicatorLegend] = useState<Array<{ name: string; values: string[] }>>([]);
   const [focusedAction, setFocusedAction] = useState<Action | null>(null);
   const leftEdgeLockRef = useRef(false);
+  const userInteractedRef = useRef(false);
+  const viewportInitRef = useRef(false);
+  const prevViewTimeframeRef = useRef<string | null>(null);
+  const viewportSyncRafRef = useRef<number | null>(null);
+  const viewportGuardPendingRef = useRef(false);
+  const TRAINING_RIGHT_WHITESPACE_BARS = 0;
+  const DEFAULT_VISIBLE_BARS = 120;
+  const PRICE_PADDING_RATIO = 0.15;
+  const MIN_PRICE_RANGE_RATIO = 0.003;
+  const TRAINING_PRICE_WINDOW_BARS = 50;
   const toolBtn = 'rounded-lg border border-slate-600/70 bg-slate-800/80 px-2.5 py-1 text-[12px] font-medium text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
   const activeToolBtn = 'rounded-lg border border-blue-300/60 bg-blue-600/90 px-2.5 py-1 text-[12px] font-semibold text-white shadow shadow-blue-900/50 transition hover:bg-blue-500';
   const sideBtn = 'h-8 w-8 rounded-lg border border-slate-600/70 bg-slate-800/80 text-xs text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
@@ -322,7 +339,6 @@ export function KLineChart({
     () => supportedIndicators.filter((name) => !MAIN_INDICATORS.has(name) && SUB_INDICATOR_WHITELIST.has(name)),
     [supportedIndicators, MAIN_INDICATORS, SUB_INDICATOR_WHITELIST],
   );
-  const legendPalette = useMemo(() => ['#f59e0b', '#3b82f6', '#ec4899', '#a78bfa', '#22d3ee', '#f97316'], []);
   const drawMenus = useMemo(
     () => [
       {
@@ -419,6 +435,53 @@ export function KLineChart({
     return value.toFixed(2);
   };
 
+  const decimalPlaces = (value: number) => {
+    if (!Number.isFinite(value)) return 0;
+    const s = value.toString().toLowerCase();
+    if (s.includes('e-')) {
+      const exp = Number(s.split('e-')[1]);
+      return Number.isFinite(exp) ? exp : 0;
+    }
+    const dot = s.indexOf('.');
+    return dot >= 0 ? s.length - dot - 1 : 0;
+  };
+
+  const getTimeframeMs = (tf: string) => {
+    const map: Record<string, number> = {
+      '15m': 15 * 60_000,
+      '30m': 30 * 60_000,
+      '1H': 60 * 60_000,
+      '2H': 2 * 60 * 60_000,
+      '4H': 4 * 60 * 60_000,
+      D: 24 * 60 * 60_000,
+      W: 7 * 24 * 60 * 60_000,
+      M: 30 * 24 * 60 * 60_000,
+    };
+    return map[tf] ?? 60 * 60_000;
+  };
+
+  const appendRightWhitespaceBars = (visibleRows: KLineData[], timeframeMs: number): KLineData[] => {
+    if (visibleRows.length === 0) return [];
+    const result: KLineData[] = [...visibleRows];
+    const last = visibleRows[visibleRows.length - 1];
+    const lastTs = Number(last?.timestamp);
+    const lastClose = Number(last?.close);
+    if (!Number.isFinite(lastTs)) return result;
+    if (!Number.isFinite(lastClose)) return result;
+    for (let i = 1; i <= TRAINING_RIGHT_WHITESPACE_BARS; i += 1) {
+      result.push({
+        timestamp: lastTs + timeframeMs * i,
+        open: lastClose,
+        high: lastClose,
+        low: lastClose,
+        close: lastClose,
+        volume: 0,
+        __spacer: true,
+      } as KLineData);
+    }
+    return result;
+  };
+
   const formatTime = (timestamp?: number) => {
     if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return '--';
     return new Date(timestamp).toLocaleString('zh-CN', {
@@ -428,6 +491,50 @@ export function KLineChart({
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+    });
+  };
+
+  const syncTrainingViewport = (
+    chart: Chart,
+    visibleRows: KLineData[],
+    _mode: 'init' | 'switch' | 'advance',
+    force = false,
+  ) => {
+    if (visibleRows.length === 0) return;
+    if (!force && userInteractedRef.current) return;
+    const anyChart = chart as unknown as {
+      setVisibleRange?: (range: { from: number; to: number }) => void;
+    };
+    const latestVisibleIndex = visibleRows.length - 1;
+    const from = Math.max(0, latestVisibleIndex - DEFAULT_VISIBLE_BARS + 1);
+    const to = latestVisibleIndex + TRAINING_RIGHT_WHITESPACE_BARS;
+    if (typeof anyChart.setVisibleRange === 'function') {
+      anyChart.setVisibleRange({ from, to });
+    }
+  };
+
+  const syncTrainingViewportWithFallback = (
+    chart: Chart,
+    visibleRows: KLineData[],
+    mode: 'init' | 'switch' | 'advance',
+    force = false,
+    withVisibilityGuard = false,
+  ) => {
+    syncTrainingViewport(chart, visibleRows, mode, force);
+    if (withVisibilityGuard) {
+      viewportGuardPendingRef.current = true;
+    }
+    if (viewportSyncRafRef.current != null) {
+      cancelAnimationFrame(viewportSyncRafRef.current);
+      viewportSyncRafRef.current = null;
+    }
+    const shouldReleaseGuard = viewportGuardPendingRef.current;
+    viewportSyncRafRef.current = requestAnimationFrame(() => {
+      viewportSyncRafRef.current = null;
+      syncTrainingViewport(chart, visibleRows, mode, force);
+      if (shouldReleaseGuard) {
+        viewportGuardPendingRef.current = false;
+      }
     });
   };
 
@@ -511,15 +618,109 @@ export function KLineChart({
 
     chart.setDataLoader({
       getBars: ({ callback }) => {
-        callback(rowsRef.current, false);
+        callback(chartRowsRef.current, false);
       },
     });
     chart.setSymbol({ ticker: 'TRAIN', pricePrecision: 2, volumePrecision: 2 });
     chart.setPeriod({ type: 'minute', span: 1 });
     chart.setScrollEnabled(!disableScrollZoom);
     chart.setZoomEnabled(!disableScrollZoom);
-    chart.resetData();
+
+    // Main pane y-axis: autoscale by current visible candles only (with padding),
+    // so small local fluctuations stay readable and are not flattened by global history.
+    const axisCapableChart = chart as unknown as {
+      overrideYAxis?: (axis: {
+        paneId?: string;
+        id?: string;
+        createRange?: (params: {
+          defaultRange: {
+            from: number;
+            to: number;
+            realFrom: number;
+            realTo: number;
+            range: number;
+            realRange: number;
+            displayFrom: number;
+            displayTo: number;
+            displayRange: number;
+          };
+        }) => {
+          from: number;
+          to: number;
+          realFrom: number;
+          realTo: number;
+          range: number;
+          realRange: number;
+          displayFrom: number;
+          displayTo: number;
+          displayRange: number;
+        };
+      }) => void;
+      getVisibleRange?: () => { from?: number; to?: number; realFrom?: number; realTo?: number };
+    };
+    axisCapableChart.overrideYAxis?.({
+      paneId: 'candle_pane',
+      id: 'candle_pane',
+      createRange: ({ defaultRange }) => {
+        const vr = axisCapableChart.getVisibleRange?.();
+        const fromIdxRaw = typeof vr?.realFrom === 'number' ? vr.realFrom : vr?.from;
+        const toIdxRaw = typeof vr?.realTo === 'number' ? vr.realTo : vr?.to;
+        if (!Number.isFinite(fromIdxRaw) || !Number.isFinite(toIdxRaw) || rowsRef.current.length === 0) return defaultRange;
+        const fromIdx = Math.max(0, Math.floor(fromIdxRaw as number));
+        const toIdx = Math.max(fromIdx, Math.min(rowsRef.current.length - 1, Math.ceil(toIdxRaw as number)));
+        const trainingToIdx = rowsRef.current.length - 1;
+        const trainingFromIdx = Math.max(0, trainingToIdx - TRAINING_PRICE_WINDOW_BARS);
+        const effectiveFromIdx = hideTimeAxisLabels ? trainingFromIdx : fromIdx;
+        const effectiveToIdx = hideTimeAxisLabels ? trainingToIdx : toIdx;
+        const lows: number[] = [];
+        const highs: number[] = [];
+        let maxDecimals = 0;
+        for (let i = effectiveFromIdx; i <= effectiveToIdx; i += 1) {
+          const row = rowsRef.current[i];
+          if (!row) continue;
+          if (Number.isFinite(row.low)) lows.push(row.low);
+          if (Number.isFinite(row.high)) highs.push(row.high);
+          if (Number.isFinite(row.close)) maxDecimals = Math.max(maxDecimals, decimalPlaces(row.close));
+        }
+        if (lows.length === 0 || highs.length === 0) return defaultRange;
+        lows.sort((a, b) => a - b);
+        highs.sort((a, b) => a - b);
+        const trim = lows.length >= 20 ? Math.min(10, Math.floor(lows.length * 0.25)) : 0;
+        const low = lows[Math.min(lows.length - 1, trim)];
+        const high = highs[Math.max(0, highs.length - 1 - trim)];
+        if (!Number.isFinite(low) || !Number.isFinite(high)) return defaultRange;
+        const mid = (high + low) / 2;
+        const rawRange = Math.max(0, high - low);
+        const minRangeByPrice = Math.max(5e-8, Math.abs(mid) * MIN_PRICE_RANGE_RATIO);
+        const tick = Math.pow(10, -Math.min(10, maxDecimals));
+        const minRangeByTick = Math.max(5e-8, tick * 220);
+        const finalRange = Math.max(rawRange, minRangeByPrice, minRangeByTick);
+        const pad = finalRange * PRICE_PADDING_RATIO;
+        const minValue = mid - finalRange / 2 - pad;
+        const maxValue = mid + finalRange / 2 + pad;
+        if (!Number.isFinite(minValue) || !Number.isFinite(maxValue) || maxValue <= minValue) return defaultRange;
+        return {
+          ...defaultRange,
+          from: minValue,
+          to: maxValue,
+          realFrom: minValue,
+          realTo: maxValue,
+          range: maxValue - minValue,
+          realRange: maxValue - minValue,
+          displayFrom: minValue,
+          displayTo: maxValue,
+          displayRange: maxValue - minValue,
+        };
+      },
+    });
+    const initChartWithApply = chart as unknown as { applyNewData?: (rows: KLineData[], more?: boolean) => void };
+    if (typeof initChartWithApply.applyNewData === 'function') {
+      initChartWithApply.applyNewData(chartRowsRef.current, false);
+    } else {
+      chart.resetData();
+    }
     const maybeTriggerLoadOlder = () => {
+      userInteractedRef.current = true;
       if (!hasMoreOlder || loadingOlder || leftEdgeLockRef.current) return;
       const anyChart = chart as unknown as {
         getVisibleRange?: () => { from?: number; realFrom?: number };
@@ -601,7 +802,7 @@ export function KLineChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady) return;
-    chart.setStyles(buildChartStyles(chartSettings) as never);
+    chart.setStyles(buildChartStyles(chartSettings, hideTimeAxisLabels) as never);
     chart.setPaneOptions({
       id: 'candle_pane',
       axis: {
@@ -610,7 +811,7 @@ export function KLineChart({
       },
     });
     chart.resize();
-  }, [chartReady, chartSettings]);
+  }, [chartReady, chartSettings, hideTimeAxisLabels]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -620,8 +821,11 @@ export function KLineChart({
       const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
       const value: string | IndicatorCreate =
         Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
-      if (MAIN_INDICATORS.has(name)) chart.createIndicator(value, true, { id: 'candle_pane' } as never);
-      else chart.createIndicator(value, true);
+      if (MAIN_INDICATORS.has(name)) {
+        chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
+      } else {
+        chart.createIndicator(value, { isStack: true });
+      }
     });
     const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
     const want = Array.from(new Set(selectedIndicators));
@@ -632,20 +836,39 @@ export function KLineChart({
     refreshIndicatorLegend(focusDataIndex);
   }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const prevRows = rowsRef.current;
+    const isTrainingMode = hideTimeAxisLabels;
     const rows = Array.isArray(data) ? data : [];
     rowsRef.current = rows.map((d, idx) => {
       const parsed = Date.parse(d.time);
       const timestamp = Number.isFinite(parsed) ? parsed : Date.now() + idx * 60_000;
       return { timestamp, open: d.open, high: d.high, low: d.low, close: d.close, volume: Number(d.volume ?? 0) };
     });
+    chartRowsRef.current = hideTimeAxisLabels ? appendRightWhitespaceBars(rowsRef.current, getTimeframeMs(timeframe)) : rowsRef.current;
     setFocusDataIndex((prev) => {
       if (typeof prev === 'number' && prev >= 0 && prev < rowsRef.current.length) return prev;
       return rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null;
     });
     const chart = chartRef.current;
     if (!chart) return;
-    chart.resetData();
+    const currentLastTs = rowsRef.current[rowsRef.current.length - 1]?.timestamp ?? null;
+    const prevLastTs = prevRows[prevRows.length - 1]?.timestamp ?? null;
+    const currentFirstTs = rowsRef.current[0]?.timestamp ?? null;
+    const prevFirstTs = prevRows[0]?.timestamp ?? null;
+    const timeframeChanged = prevViewTimeframeRef.current !== timeframe;
+    const rowsShapeChanged =
+      rowsRef.current.length !== prevRows.length || currentFirstTs !== prevFirstTs || currentLastTs !== prevLastTs;
+    if (timeframeChanged && !rowsShapeChanged) {
+      return;
+    }
+    const shouldInitViewport = !viewportInitRef.current || timeframeChanged;
+    const chartWithApply = chart as unknown as { applyNewData?: (rows: KLineData[], more?: boolean) => void };
+    if (typeof chartWithApply.applyNewData === 'function') {
+      chartWithApply.applyNewData(chartRowsRef.current, false);
+    } else {
+      chart.resetData();
+    }
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
     chart.removeOverlay({ groupId: 'partial-candle-hint' });
@@ -727,7 +950,7 @@ export function KLineChart({
       const lastTimestamp = rowsRef.current[rowsRef.current.length - 1]?.timestamp;
       const lastInput = rows[rows.length - 1];
       if (typeof lastTimestamp === 'number') {
-        if (lastInput?.isPartial) {
+        if (!hideTimeAxisLabels && lastInput?.isPartial) {
           chart.createOverlay({
             name: 'horizontalStraightLine',
             groupId: 'partial-candle-hint',
@@ -800,12 +1023,30 @@ export function KLineChart({
         }
       }
     }
+    if (isTrainingMode && shouldInitViewport) {
+      syncTrainingViewportWithFallback(chart, rowsRef.current, timeframeChanged ? 'switch' : 'init', true, true);
+      viewportInitRef.current = true;
+      userInteractedRef.current = false;
+    } else if (isTrainingMode && currentLastTs != null && prevLastTs != null && currentLastTs !== prevLastTs) {
+      syncTrainingViewportWithFallback(chart, rowsRef.current, 'advance');
+    }
+    prevViewTimeframeRef.current = timeframe;
     refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-  }, [data, actions, stopLossPrice, takeProfitPrice, highlightedActionId, showTradeOverlays]);
+  }, [data, actions, stopLossPrice, takeProfitPrice, highlightedActionId, showTradeOverlays, hideTimeAxisLabels, timeframe]);
 
   useEffect(() => {
     refreshIndicatorLegend(focusDataIndex);
   }, [focusDataIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (viewportSyncRafRef.current != null) {
+        cancelAnimationFrame(viewportSyncRafRef.current);
+        viewportSyncRafRef.current = null;
+      }
+      viewportGuardPendingRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!Array.isArray(actions) || actions.length === 0) {
@@ -843,6 +1084,7 @@ export function KLineChart({
   }, [focusDataIndex, actions]);
 
   useEffect(() => {
+    if (hideTimeAxisLabels) return;
     if (typeof focusedTimestamp !== 'number' || !Number.isFinite(focusedTimestamp)) return;
     if (rowsRef.current.length === 0) return;
     let nearestIndex = 0;
@@ -859,7 +1101,7 @@ export function KLineChart({
     if (!chart) return;
     if (typeof chart.scrollToTimestamp === 'function') chart.scrollToTimestamp(rowsRef.current[nearestIndex].timestamp);
     else if (typeof chart.scrollToDataIndex === 'function') chart.scrollToDataIndex(nearestIndex);
-  }, [focusedTimestamp]);
+  }, [focusedTimestamp, hideTimeAxisLabels]);
 
   useEffect(() => {
     const onDocMouseDown = (e: MouseEvent) => {
@@ -1076,7 +1318,7 @@ export function KLineChart({
         <div ref={chartPaneRef} className="flex min-h-0 flex-1 flex-col gap-1">
           <div className="rounded-xl border border-slate-700/50 bg-slate-950/70 px-3 py-1.5 text-[12px] text-slate-200">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-slate-400">时间: {formatTime(focusTimestamp)}</span>
+              {!hideHeaderTime ? <span className="text-slate-400">时间: {formatTime(focusTimestamp)}</span> : null}
               <span>开: {priceInfo.open}</span>
               <span>高: {priceInfo.high}</span>
               <span>低: {priceInfo.low}</span>
@@ -1085,23 +1327,7 @@ export function KLineChart({
                 涨跌: {priceInfo.change} ({priceInfo.changePct})
               </span>
             </div>
-            {chartSettings.showIndicatorLatestValue && mainIndicatorLegend.length > 0 ? (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                {mainIndicatorLegend.map((item) => (
-                  <span key={item.name} className="text-slate-300">
-                    {item.name}
-                    {item.values.length > 0 ? ':' : ': --'}{' '}
-                    {item.values.length > 0
-                      ? item.values.map((v, idx) => (
-                          <span key={`${item.name}-${v}`} style={{ color: legendPalette[idx % legendPalette.length] }} className="mr-2">
-                            {v}
-                          </span>
-                        ))
-                      : null}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            
           </div>
           <div
             ref={ref}

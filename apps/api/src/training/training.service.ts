@@ -40,6 +40,8 @@ const MAX_BARS_BY_TF: Record<string, number> = {
 
 @Injectable()
 export class TrainingService {
+  private readonly recentActionGuard = new Map<string, { at: number; pointer: number; action: string }>();
+
   constructor(private readonly prisma: PrismaService, private readonly marketDataService: MarketDataService) {}
 
   async start(userId: string, dto: StartTrainingDto) {
@@ -111,10 +113,22 @@ export class TrainingService {
   }
 
   async next(userId: string, sessionId: string) {
-    return this.handleAction(userId, sessionId, { action: 'HOLD' });
+    return this.action(userId, sessionId, { action: 'HOLD' });
   }
 
   async action(userId: string, sessionId: string, dto: TrainingActionDto) {
+    const normalizedAction = this.normalizeIncomingAction(dto);
+    const current = await this.ensureOwnership(userId, sessionId);
+    if (typeof dto.expectedPointer === 'number' && Number.isFinite(dto.expectedPointer) && current.pointer !== dto.expectedPointer) {
+      return this.getById(userId, sessionId);
+    }
+    const guardKey = `${userId}:${sessionId}`;
+    const now = Date.now();
+    const prev = this.recentActionGuard.get(guardKey);
+    if (prev && now - prev.at <= 300 && prev.pointer === current.pointer && prev.action === normalizedAction) {
+      return this.getById(userId, sessionId);
+    }
+    this.recentActionGuard.set(guardKey, { at: now, pointer: current.pointer, action: normalizedAction });
     return this.handleAction(userId, sessionId, dto);
   }
 

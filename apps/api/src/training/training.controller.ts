@@ -16,13 +16,13 @@ export class TrainingController {
   }
 
   @Post(':id/next')
-  @Throttle({ default: { limit: 240, ttl: 60_000 } })
+  @Throttle({ default: { limit: 1200, ttl: 60_000 } })
   next(@Req() req: { user: { sub: string } }, @Param('id') id: string) {
     return this.trainingService.next(req.user.sub, id);
   }
 
   @Post(':id/action')
-  @Throttle({ default: { limit: 240, ttl: 60_000 } })
+  @Throttle({ default: { limit: 1200, ttl: 60_000 } })
   action(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: TrainingActionDto) {
     return this.trainingService.action(req.user.sub, id, dto);
   }
