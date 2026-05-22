@@ -20,9 +20,24 @@ model User {
   redemptions   InviteCodeRedemption[]
   createdInviteCodes InviteCode[]
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   adminLogs     AdminAuditLog[]        @relation("AdminActorLogs")
   securityLogs  SecurityLog[]
   reviews       TrainingReview[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Symbol {

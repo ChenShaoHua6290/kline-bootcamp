@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -12,6 +13,7 @@ import { PageDescription, PageTitle } from '@/components/ui/PageHeader';
 import { ContactTeacherModal } from '@/components/contact/ContactTeacherModal';
 import { Toast } from '@/components/ui/Toast';
 import { resolveAdminWechatId, resolveAdminWechatQr } from '@/lib/contact';
+import { PASSWORD_STRENGTH_HINT } from '@/lib/password';
 
 type Mode = 'login' | 'register';
 
@@ -198,16 +200,17 @@ export default function AuthPage() {
           </label>
 
           <label className="block text-[12px]">
-            <span className="field-label mb-1 block">密码（至少 6 位）</span>
+            <span className="field-label mb-1 block">{mode === 'register' ? '密码（至少 8 位，字母+数字）' : '密码'}</span>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={mode === 'register' ? 8 : 1}
               placeholder="******"
             />
           </label>
+          {mode === 'register' ? <p className="text-[11px] text-slate-400">{PASSWORD_STRENGTH_HINT}</p> : null}
 
             <label className={`block text-[12px] transition-opacity ${mode === 'register' ? 'opacity-100' : 'pointer-events-none select-none opacity-0'}`}>
               <span className="field-label mb-1 block">邀请码（必填）</span>
@@ -243,6 +246,13 @@ export default function AuthPage() {
           >
             {mutation.isPending ? '提交中...' : mode === 'login' ? '登录' : '注册并登录'}
           </Button>
+          {mode === 'login' ? (
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-[12px] text-cyan-300 hover:text-cyan-200">
+                忘记密码？
+              </Link>
+            </div>
+          ) : null}
 
           <div className="pt-2 text-center">
             <button

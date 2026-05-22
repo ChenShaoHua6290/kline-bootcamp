@@ -16,6 +16,15 @@ if [ ! -f "$ENV_FILE" ]; then
 DATABASE_URL="file:./dev.db"
 SQLITE_URL="file:./dev.db"
 JWT_SECRET="dev-secret"
+JWT_REFRESH_SECRET="dev-refresh-secret"
+JWT_ACCESS_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+APP_URL="http://localhost:3000"
+SMTP_HOST="smtp.exmail.qq.com"
+SMTP_PORT="465"
+SMTP_USER="zhizuoyizhongmoshi@1mode.cn"
+SMTP_PASS="4buDKESR8KiiuuBj"
+SMTP_FROM="zhizuoyizhongmoshi@1mode.cn"
 EOT
   echo "[INFO] 已创建 $ENV_FILE (Lite 模式)"
 fi

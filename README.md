@@ -73,6 +73,15 @@ npm install --legacy-peer-deps
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/kline"
 REDIS_URL="redis://localhost:6379"
 JWT_SECRET="dev-secret"
+JWT_REFRESH_SECRET="dev-refresh-secret"
+JWT_ACCESS_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+APP_URL="http://localhost:3000"
+SMTP_HOST=""
+SMTP_PORT=""
+SMTP_USER=""
+SMTP_PASS=""
+SMTP_FROM=""
 ```
 
 3. Prisma（按环境选择）

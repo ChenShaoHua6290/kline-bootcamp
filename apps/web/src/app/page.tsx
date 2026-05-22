@@ -117,6 +117,7 @@ export default function HomePage() {
       <TopNav
         onStart={() => router.push('/train?start=1')}
         onHistory={() => router.push('/history')}
+        onSettings={() => router.push('/settings')}
         onAdmin={() => router.push('/admin')}
         user={user}
         liquidationCount={profileStatsQuery.data?.liquidationCount ?? 0}

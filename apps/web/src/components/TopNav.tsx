@@ -10,6 +10,7 @@ import { Panel } from '@/components/ui/Panel';
 export function TopNav({
   onStart,
   onHistory,
+  onSettings,
   onAdmin,
   onLogout,
   user,
@@ -20,6 +21,7 @@ export function TopNav({
 }: {
   onStart: () => void;
   onHistory?: () => void;
+  onSettings?: () => void;
   onAdmin?: () => void;
   onLogout?: () => void | Promise<void>;
   user: AuthUser | null;
@@ -101,6 +103,9 @@ export function TopNav({
             ) : null}
             <Button variant="ghost" size="sm" className="h-8 sm:px-3 sm:text-[15px]" onClick={onHistory}>
               历史记录
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 sm:px-3 sm:text-[15px]" onClick={onSettings}>
+              修改密码
             </Button>
             <Button variant="primary" size="sm" className="h-8 sm:px-3 sm:text-[15px ]" onClick={onStart}>
               开始训练

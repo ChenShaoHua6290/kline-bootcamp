@@ -1,11 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
+import { EmailService } from '../common/email.service';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
 import { UsersService } from '../users/users.service';
-import { AuthDto, RefreshTokenDto } from './dto';
+import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RefreshTokenDto, RegisterDto, ResetPasswordDto } from './dto';
+import { isPasswordStrong, passwordStrengthMessage } from './password-policy';
 
 @Injectable()
 export class AuthService {
@@ -14,18 +16,22 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly securityLogService: SecurityLogService,
+    private readonly emailService: EmailService,
   ) {}
 
-  async register(dto: AuthDto) {
+  async register(dto: RegisterDto) {
     const prisma = this.prisma as any;
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already exists');
+    if (!isPasswordStrong(dto.password)) throw new BadRequestException(passwordStrengthMessage());
+
     const nickname = (dto.nickname ?? '').trim();
     if (!nickname) throw new BadRequestException('昵称不能为空');
     if (nickname.length < 2 || nickname.length > 20) throw new BadRequestException('昵称长度需在2-20之间');
     if (!/^[\u4e00-\u9fa5A-Za-z0-9_]+$/.test(nickname)) throw new BadRequestException('昵称仅支持中文、英文、数字和下划线');
     const code = dto.inviteCode?.trim();
     if (!code) throw new BadRequestException('邀请码不能为空');
+
     const invite = await prisma.inviteCode.findFirst({
       where: { code, deletedAt: null },
       select: { id: true, isActive: true, maxUses: true, usedCount: true, expiresAt: true },
@@ -34,6 +40,7 @@ export class AuthService {
     if (!invite.isActive) throw new BadRequestException('邀请码已失效');
     if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
     if (invite.usedCount >= invite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
+
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await prisma.$transaction(async (tx: any) => {
       const latestInvite = await tx.inviteCode.findUnique({
@@ -45,44 +52,141 @@ export class AuthService {
       if (latestInvite.usedCount >= latestInvite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
 
       const created = await tx.user.create({ data: { email: dto.email, password: hashed, nickname } });
-      await tx.inviteCode.update({
-        where: { id: latestInvite.id },
-        data: { usedCount: { increment: 1 } },
-      });
-      await tx.inviteCodeRedemption.create({
-        data: {
-          inviteCodeId: latestInvite.id,
-          userId: created.id,
-        },
-      });
+      await tx.inviteCode.update({ where: { id: latestInvite.id }, data: { usedCount: { increment: 1 } } });
+      await tx.inviteCodeRedemption.create({ data: { inviteCodeId: latestInvite.id, userId: created.id } });
       return created;
     });
+
     const rows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
       SELECT role FROM "User" WHERE id = ${user.id} LIMIT 1
     `;
     return this.issueTokens(user.id, user.email, rows[0]?.role ?? 'USER', user.nickname ?? null);
   }
 
-  async login(dto: AuthDto, meta?: { ip?: string; userAgent?: string }) {
+  async login(dto: LoginDto, meta?: { ip?: string; userAgent?: string }) {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user) {
       await this.securityLogService.logLoginFailed({ ip: meta?.ip, userAgent: meta?.userAgent, detail: `email=${dto.email}` });
       throw new UnauthorizedException('Invalid credentials');
     }
+
     const userRows = await this.prisma.$queryRaw<Array<{ id: string; role: string | null; isBanned: boolean | null }>>`
-      SELECT id, role, "isBanned"
-      FROM "User"
-      WHERE id = ${user.id}
-      LIMIT 1
+      SELECT id, role, "isBanned" FROM "User" WHERE id = ${user.id} LIMIT 1
     `;
     const userExtra = userRows[0];
     if (userExtra?.isBanned) throw new ForbiddenException('账号已被封禁，请联系管理员');
+
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) {
       await this.securityLogService.logLoginFailed({ userId: user.id, ip: meta?.ip, userAgent: meta?.userAgent, detail: 'password mismatch' });
       throw new UnauthorizedException('Invalid credentials');
     }
     return this.issueTokens(user.id, user.email, userExtra?.role ?? 'USER', user.nickname ?? null);
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const generic = { message: '如果该邮箱已注册，我们已发送重置密码邮件' };
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) return generic;
+
+    const oneMinuteAgo = new Date(Date.now() - 60_000);
+    const recentRows = await this.prisma.$queryRaw<Array<{ c: number | string }>>`
+      SELECT COUNT(1) as c
+      FROM "password_reset_tokens"
+      WHERE "userId" = ${user.id}
+        AND "createdAt" > ${oneMinuteAgo}
+    `;
+    const recentCount = Number(recentRows[0]?.c ?? 0);
+    if (recentCount > 0) return generic;
+
+    await this.prisma.$executeRaw`
+      DELETE FROM "password_reset_tokens"
+      WHERE "userId" = ${user.id}
+    `;
+    const plainToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(plainToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await this.prisma.$executeRaw`
+      INSERT INTO "password_reset_tokens" (id, "userId", "tokenHash", "expiresAt", "createdAt")
+      VALUES (${`prt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`}, ${user.id}, ${tokenHash}, ${expiresAt}, ${new Date()})
+    `;
+
+    const baseUrl = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(plainToken)}`;
+    await this.emailService.sendPasswordResetEmail({ to: user.email, resetLink });
+    return generic;
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) throw new BadRequestException('两次密码不一致');
+    if (!isPasswordStrong(dto.newPassword)) throw new BadRequestException(passwordStrengthMessage());
+
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+    const now = new Date();
+    const rows = await this.prisma.$queryRaw<
+      Array<{ id: string; userId: string; userPassword: string }>
+    >`
+      SELECT prt.id, prt."userId", u.password as "userPassword"
+      FROM "password_reset_tokens" prt
+      JOIN "User" u ON u.id = prt."userId"
+      WHERE prt."tokenHash" = ${tokenHash}
+        AND prt."usedAt" IS NULL
+        AND prt."expiresAt" > ${now}
+      LIMIT 1
+    `;
+    const record = rows[0];
+    if (!record) throw new BadRequestException('链接已过期或无效');
+
+    const sameAsOld = await bcrypt.compare(dto.newPassword, record.userPassword);
+    if (sameAsOld) throw new BadRequestException('新密码不能与旧密码相同');
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE "User"
+        SET password = ${passwordHash}
+        WHERE id = ${record.userId}
+      `;
+      await tx.$executeRaw`
+        UPDATE "password_reset_tokens"
+        SET "usedAt" = ${now}
+        WHERE id = ${record.id}
+      `;
+      await tx.$executeRaw`
+        UPDATE "RefreshToken"
+        SET "revokedAt" = ${now}
+        WHERE "userId" = ${record.userId}
+          AND "revokedAt" IS NULL
+      `;
+    });
+
+    return { message: '密码已重置，请重新登录' };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) throw new BadRequestException('两次密码不一致');
+    if (!isPasswordStrong(dto.newPassword)) throw new BadRequestException(passwordStrengthMessage());
+
+    const user = await this.usersService.findPublicById(userId);
+    if (!user) throw new UnauthorizedException('Invalid token');
+    const userWithPassword = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!userWithPassword) throw new UnauthorizedException('Invalid token');
+
+    const currentValid = await bcrypt.compare(dto.currentPassword, userWithPassword.password);
+    if (!currentValid) throw new BadRequestException('当前密码错误');
+
+    const sameAsOld = await bcrypt.compare(dto.newPassword, userWithPassword.password);
+    if (sameAsOld) throw new BadRequestException('新密码不能与旧密码相同');
+
+    const now = new Date();
+    const nextHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { password: nextHash } });
+      await tx.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+    });
+
+    return { message: '密码修改成功，请重新登录' };
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -163,4 +267,5 @@ export class AuthService {
     `;
     return { accessToken, refreshToken, user: { id: sub, email, nickname, role } };
   }
+
 }
