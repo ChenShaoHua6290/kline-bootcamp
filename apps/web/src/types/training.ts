@@ -4,6 +4,7 @@ export type Session = {
   symbol: string;
   symbolDisplayName?: string | null;
   drivingTimeframe: string;
+  viewTimeframe?: string;
   totalBars: number;
   initialVisibleBars: number;
   initialBalance: number;
