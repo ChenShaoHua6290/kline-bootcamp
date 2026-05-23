@@ -765,6 +765,22 @@ docker compose --env-file .env.production -f docker-compose.prod.yml run --rm \
 
 # 10. 启动应用
 
+## 10.0 部署前一致性检查（强烈建议）
+
+执行位置：服务器（项目根目录）。
+
+```bash
+cd /opt/kline-training/kline-bootcamp
+npm run preflight:prod
+```
+
+作用：提前拦截以下常见问题，避免到 `up -d` 才失败：
+
+- `package.json` 与 `package-lock.json` 不一致导致 `npm ci` 失败
+- API / Web TypeScript 编译失败
+- `next build` 生产构建失败
+- `docker-compose.prod.yml` 配置或镜像构建失败
+
 ## 10.1 构建镜像
 
 执行位置：服务器。

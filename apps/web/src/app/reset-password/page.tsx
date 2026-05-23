@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -11,6 +11,14 @@ import { Card, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<ResetPasswordSkeleton />}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get('token') ?? '', [searchParams]);
   const [newPassword, setNewPassword] = useState('');
@@ -74,6 +82,19 @@ export default function ResetPasswordPage() {
           <Link className="text-sm text-cyan-300 hover:text-cyan-200" href="/auth">
             返回登录
           </Link>
+        </CardBody>
+      </Card>
+    </main>
+  );
+}
+
+function ResetPasswordSkeleton() {
+  return (
+    <main className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md">
+        <CardBody className="space-y-3 p-5">
+          <h1 className="text-lg font-semibold text-slate-100">重置密码</h1>
+          <p className="text-sm text-slate-400">页面加载中...</p>
         </CardBody>
       </Card>
     </main>
