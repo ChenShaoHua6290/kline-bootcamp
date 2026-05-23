@@ -9,7 +9,7 @@ ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
 RUN npm ci --legacy-peer-deps
-RUN npm --prefix apps/web ci --legacy-peer-deps
+RUN npm --prefix apps/web install --legacy-peer-deps
 
 COPY . .
 RUN npm --prefix apps/web run build
