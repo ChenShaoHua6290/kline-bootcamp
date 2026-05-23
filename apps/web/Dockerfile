@@ -22,7 +22,6 @@ ENV WEB_PORT=3000
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
 RUN npm ci --omit=dev --legacy-peer-deps
-RUN npm --prefix apps/web ci --omit=dev --legacy-peer-deps
 
 COPY --from=builder /app/apps/web/.next ./apps/web/.next
 COPY --from=builder /app/apps/web/public ./apps/web/public
