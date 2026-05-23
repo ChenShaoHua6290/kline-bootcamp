@@ -809,7 +809,7 @@ export function KLineChart({
         name: chartSettings.priceAxisType === 'log' ? 'logarithm' : 'normal',
         reverse: chartSettings.reverseYAxis,
       },
-    });
+    } as never);
     chart.resize();
   }, [chartReady, chartSettings, hideTimeAxisLabels]);
 
