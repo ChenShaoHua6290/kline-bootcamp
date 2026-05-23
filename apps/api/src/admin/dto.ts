@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 function sanitizeText(value: unknown) {
   if (typeof value !== 'string') return value;
@@ -23,6 +23,24 @@ export class CreateInviteCodeDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsIn(['TRIAL', 'PAID', 'INTERNAL'])
+  type?: 'TRIAL' | 'PAID' | 'INTERNAL';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  trialDays?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dailyTrainingLimit?: number;
+
+  @IsOptional()
+  @IsIn(['NONE', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
+  paidPlan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 }
 
 export class UpdateInviteCodeDto {
@@ -38,6 +56,20 @@ export class UpdateInviteCodeDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  trialDays?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dailyTrainingLimit?: number;
+
+  @IsOptional()
+  @IsIn(['NONE', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
+  paidPlan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 }
 
 export class BanUserDto {
@@ -47,3 +79,45 @@ export class BanUserDto {
   reason!: string;
 }
 
+export class UpdateUserAccessDto {
+  @IsOptional()
+  @IsIn(['TRIAL', 'PAID', 'INTERNAL'])
+  accessType?: 'TRIAL' | 'PAID' | 'INTERNAL';
+
+  @IsOptional()
+  @IsIn(['NONE', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
+  plan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+
+  @IsOptional()
+  @IsDateString()
+  accessExpiresAt?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  disabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  extendMonths?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dailyTrainingLimit?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  remark?: string;
+}
+
+export class AdminResetUserPasswordDto {
+  @IsString()
+  @MaxLength(128)
+  newPassword!: string;
+
+  @IsString()
+  @MaxLength(128)
+  confirmPassword!: string;
+}

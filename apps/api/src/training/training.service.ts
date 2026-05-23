@@ -45,6 +45,7 @@ export class TrainingService {
   constructor(private readonly prisma: PrismaService, private readonly marketDataService: MarketDataService) {}
 
   async start(userId: string, dto: StartTrainingDto) {
+    await this.canUserTrain(userId);
     const fixedInitialVisibleBars = 500;
     const trainingBarsRaw = dto.trainingBars ?? dto.totalBars;
     const trainingBars = Math.max(50, Math.min(500, Math.floor(trainingBarsRaw)));
@@ -107,6 +108,7 @@ export class TrainingService {
         liquidatedAt: null,
       },
     });
+    await this.increaseDailyTrainingUsage(userId);
 
     await this.snapshot(session.id, session.pointer, initialBalance, 0);
     return this.getById(userId, session.id);
@@ -364,6 +366,71 @@ export class TrainingService {
     return { session, stats };
   }
 
+  private async canUserTrain(userId: string) {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        isBanned: boolean | null;
+        accessType: string | null;
+        accessStatus: string | null;
+        accessExpiresAt: Date | null;
+        dailyTrainingLimit: number | null;
+        isTrainingUnlimited: boolean | null;
+      }>
+    >`
+      SELECT id, "isBanned", "accessType", "accessStatus", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited"
+      FROM "User"
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+    const user = rows[0];
+    if (!user) throw new NotFoundException('用户不存在');
+    if (user.isBanned) throw new BadRequestException('账号已被禁用');
+    if ((user.accessStatus ?? 'ACTIVE') === 'DISABLED') throw new BadRequestException('权限已被禁用');
+    const accessType = (user.accessType ?? 'INTERNAL').toUpperCase();
+    if (accessType !== 'INTERNAL') {
+      if (!user.accessExpiresAt || user.accessExpiresAt.getTime() <= Date.now()) {
+        await this.prisma.$executeRaw`
+          UPDATE "User"
+          SET "accessStatus" = CAST(${'EXPIRED'} AS "AccessStatus")
+          WHERE id = ${userId}
+        `;
+        throw new BadRequestException(
+          accessType === 'TRIAL'
+            ? '试用期已结束。为保障服务器算力与整体服务稳定，请联系管理员升级正式版本后继续训练。'
+            : '权限已过期，请续费后继续训练',
+        );
+      }
+    }
+    if (accessType === 'TRIAL' && !user.isTrainingUnlimited) {
+      const todayUtc = new Date();
+      todayUtc.setUTCHours(0, 0, 0, 0);
+      const usageRows = await this.prisma.$queryRaw<Array<{ trainingCount: number | string }>>`
+        SELECT "trainingCount"
+        FROM "UserTrainingDailyUsage"
+        WHERE "userId" = ${userId} AND "usageDate" = ${todayUtc}
+        LIMIT 1
+      `;
+      const limit = Number(user.dailyTrainingLimit ?? 5);
+      const used = Number(usageRows[0]?.trainingCount ?? 0);
+      if (used >= limit) {
+        throw new BadRequestException('今日试用训练次数已用完。为保障服务稳定与友好体验，请明日再试或联系管理员升级正式版本。');
+      }
+    }
+  }
+
+  private async increaseDailyTrainingUsage(userId: string) {
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    const id = `uuse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await this.prisma.$executeRaw`
+      INSERT INTO "UserTrainingDailyUsage" (id, "userId", "usageDate", "trainingCount", "createdAt", "updatedAt")
+      VALUES (${id}, ${userId}, ${todayUtc}, 1, ${new Date()}, ${new Date()})
+      ON CONFLICT ("userId", "usageDate")
+      DO UPDATE SET "trainingCount" = "UserTrainingDailyUsage"."trainingCount" + 1, "updatedAt" = ${new Date()}
+    `;
+  }
+
   async profileStats(userId: string) {
     const resetAggregate = await this.prisma.trainingSession.aggregate({
       where: { userId },
@@ -378,11 +445,46 @@ export class TrainingService {
       select: { finalBalance: true, initialBalance: true, isLiquidated: true },
     });
     const accountBalance = latestSession ? (latestSession.finalBalance ?? latestSession.initialBalance) : 10000;
+    const userRows = await this.prisma.$queryRaw<
+      Array<{
+        accessType: string | null;
+        accessStatus: string | null;
+        accessExpiresAt: Date | null;
+        dailyTrainingLimit: number | null;
+        isTrainingUnlimited: boolean | null;
+        currentPlan: string | null;
+      }>
+    >`
+      SELECT "accessType", "accessStatus", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "currentPlan"
+      FROM "User"
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+    const u = userRows[0];
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    const usageRows = await this.prisma.$queryRaw<Array<{ trainingCount: number | string }>>`
+      SELECT "trainingCount" FROM "UserTrainingDailyUsage"
+      WHERE "userId" = ${userId} AND "usageDate" = ${todayUtc}
+      LIMIT 1
+    `;
+    const usedToday = Number(usageRows[0]?.trainingCount ?? 0);
+    const limit = u?.dailyTrainingLimit ?? null;
     return {
       liquidationCount,
       totalResetCount: resetAggregate._sum.resetCount ?? 0,
       accountBalance,
       needResetAfterLiquidation: Boolean(latestSession && (latestSession.isLiquidated || accountBalance <= 0)),
+      access: {
+        accessType: u?.accessType ?? 'INTERNAL',
+        accessStatus: u?.accessStatus ?? 'ACTIVE',
+        accessExpiresAt: u?.accessExpiresAt?.toISOString() ?? null,
+        dailyTrainingLimit: limit,
+        todayTrainingCount: usedToday,
+        todayRemainingTrainingCount: limit == null ? null : Math.max(0, limit - usedToday),
+        isTrainingUnlimited: Boolean(u?.isTrainingUnlimited ?? true),
+        currentPlan: u?.currentPlan ?? 'NONE',
+      },
     };
   }
 

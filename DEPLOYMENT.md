@@ -558,9 +558,9 @@ docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}"
 执行位置：本地电脑。
 
 ```bash
-docker exec -t <本地postgres容器名> pg_dump \
-  -U <数据库用户名> \
-  -d <数据库名> \
+docker exec -t kline-postgres pg_dump \
+  -U kline_user \
+  -d kline \
   -Fc \
   -f /tmp/kline_prod.dump
 ```
@@ -568,7 +568,7 @@ docker exec -t <本地postgres容器名> pg_dump \
 把文件复制到本地：
 
 ```bash
-docker cp <本地postgres容器名>:/tmp/kline_prod.dump ./kline_prod.dump
+docker cp kline-postgres:/tmp/kline_prod.dump ./kline_prod.dump
 ```
 
 ### 方案 B：本机 PostgreSQL（非 Docker）
@@ -619,7 +619,7 @@ scp ./kline_prod.dump root@<你的服务器IP>:/opt/kline-training/backups/
 执行位置：本地电脑。
 
 ```bash
-rsync -avzP ./kline_prod.dump root@<你的服务器IP>:/opt/kline-training/backups/
+rsync -avzP ./kline_prod.dump ubuntu@:/opt/kline-training/backups/
 ```
 
 ## 7.3 服务器检查文件
@@ -660,14 +660,14 @@ docker compose --env-file .env.production -f docker-compose.prod.yml ps
 进入 PostgreSQL：
 
 ```bash
-docker exec -it <生产postgres容器名> psql -U <数据库用户名> -d postgres
+docker exec -it kline-postgres psql -U postgres -d postgres
 ```
 
 删除并重建：
 
 ```sql
-DROP DATABASE IF EXISTS <数据库名>;
-CREATE DATABASE <数据库名>;
+DROP DATABASE IF EXISTS kline;
+CREATE DATABASE kline;
 \q
 ```
 
@@ -676,9 +676,9 @@ CREATE DATABASE <数据库名>;
 执行位置：服务器。
 
 ```bash
-docker exec -i <生产postgres容器名> pg_restore \
-  -U <数据库用户名> \
-  -d <数据库名> \
+docker exec -i kline-postgres pg_restore \
+  -U postgres \
+  -d please_change_me \
   --clean --if-exists --no-owner --no-privileges \
   < /opt/kline-training/backups/kline_prod.dump
 ```
@@ -764,22 +764,6 @@ docker compose --env-file .env.production -f docker-compose.prod.yml run --rm \
 ---
 
 # 10. 启动应用
-
-## 10.0 部署前一致性检查（强烈建议）
-
-执行位置：服务器（项目根目录）。
-
-```bash
-cd /opt/kline-training/kline-bootcamp
-npm run preflight:prod
-```
-
-作用：提前拦截以下常见问题，避免到 `up -d` 才失败：
-
-- `package.json` 与 `package-lock.json` 不一致导致 `npm ci` 失败
-- API / Web TypeScript 编译失败
-- `next build` 生产构建失败
-- `docker-compose.prod.yml` 配置或镜像构建失败
 
 ## 10.1 构建镜像
 

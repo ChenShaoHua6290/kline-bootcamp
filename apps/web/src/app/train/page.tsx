@@ -64,6 +64,16 @@ type ProfileStats = {
   totalResetCount: number;
   accountBalance: number;
   needResetAfterLiquidation: boolean;
+  access?: {
+    accessType: 'TRIAL' | 'PAID' | 'INTERNAL';
+    accessStatus: 'ACTIVE' | 'EXPIRED' | 'DISABLED';
+    accessExpiresAt: string | null;
+    dailyTrainingLimit: number | null;
+    todayTrainingCount: number;
+    todayRemainingTrainingCount: number | null;
+    isTrainingUnlimited: boolean;
+    currentPlan: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+  };
 };
 
 export default function TrainPage() {
@@ -483,6 +493,8 @@ export default function TrainPage() {
         totalResetCount={profileStatsQuery.data?.totalResetCount ?? 0}
         onRequestReset={resetBalanceFromMenu}
         resetBalanceBusy={resetAccountMutation.isPending}
+        accessInfo={profileStatsQuery.data?.access ?? null}
+        needResetAfterLiquidation={profileStatsQuery.data?.needResetAfterLiquidation ?? false}
       />
       {showConfig && (
         <TrainingConfigModal

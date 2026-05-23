@@ -11,6 +11,7 @@ export function Button({
   variant = 'default',
   size = 'md',
   disabled,
+  type = 'button',
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
   const normalizedVariant = variant === 'secondary' ? 'default' : variant === 'outline' ? 'ghost' : variant;
@@ -35,6 +36,7 @@ export function Button({
         className,
       )}
       disabled={disabled}
+      type={type}
       {...props}
     />
   );

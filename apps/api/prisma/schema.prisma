@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["debian-openssl-3.0.x"]
+  binaryTargets = ["darwin", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -18,8 +18,20 @@ model User {
   banReason          String?
   createdAt          DateTime               @default(now())
   nickname           String?
+  accessType         AccessType              @default(INTERNAL)
+  accessStartAt      DateTime?
+  accessExpiresAt    DateTime?
+  dailyTrainingLimit Int?
+  isTrainingUnlimited Boolean               @default(true)
+  accessStatus       AccessStatus            @default(ACTIVE)
+  currentPlan        AccessPlan              @default(NONE)
+  accessInviteCodeId String?
   adminLogs          AdminAuditLog[]        @relation("AdminActorLogs")
   createdInviteCodes InviteCode[]
+  accessSourceInviteCode InviteCode?        @relation("UserAccessSourceInviteCode", fields: [accessInviteCodeId], references: [id])
+  trainingDailyUsage UserTrainingDailyUsage[]
+  accessChangeLogs   UserAccessChangeLog[]   @relation("AccessTargetUserLogs")
+  operatedAccessChangeLogs UserAccessChangeLog[] @relation("AccessOperatorUserLogs")
   redemptions        InviteCodeRedemption[]
   refreshTokens      RefreshToken[]
   passwordResetTokens PasswordResetToken[]
@@ -276,6 +288,11 @@ model AccountSnapshot {
 model InviteCode {
   id          String                 @id @default(cuid())
   code        String                 @unique
+  type        InviteCodeType         @default(INTERNAL)
+  trialDays   Int?
+  dailyTrainingLimit Int?
+  paidPlan    AccessPlan             @default(NONE)
+  durationMonths Int?
   isActive    Boolean                @default(true)
   maxUses     Int
   usedCount   Int                    @default(0)
@@ -285,7 +302,43 @@ model InviteCode {
   deletedAt   DateTime?
   createdAt   DateTime               @default(now())
   creator     User?                  @relation(fields: [createdBy], references: [id])
+  accessUsers User[]                 @relation("UserAccessSourceInviteCode")
   redemptions InviteCodeRedemption[]
+}
+
+model UserTrainingDailyUsage {
+  id            String   @id @default(cuid())
+  userId        String
+  usageDate     DateTime
+  trainingCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, usageDate])
+  @@index([usageDate])
+}
+
+model UserAccessChangeLog {
+  id             String       @id @default(cuid())
+  userId         String
+  operatorUserId String
+  action         String
+  oldAccessType  AccessType?
+  newAccessType  AccessType?
+  oldAccessPlan  AccessPlan?
+  newAccessPlan  AccessPlan?
+  oldExpiresAt   DateTime?
+  newExpiresAt   DateTime?
+  oldAccessStatus AccessStatus?
+  newAccessStatus AccessStatus?
+  remark         String?
+  createdAt      DateTime     @default(now())
+  user           User         @relation("AccessTargetUserLogs", fields: [userId], references: [id])
+  operator       User         @relation("AccessOperatorUserLogs", fields: [operatorUserId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([operatorUserId, createdAt])
 }
 
 model InviteCodeRedemption {
@@ -450,4 +503,29 @@ enum DataImportJobStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum InviteCodeType {
+  TRIAL
+  PAID
+  INTERNAL
+}
+
+enum AccessType {
+  TRIAL
+  PAID
+  INTERNAL
+}
+
+enum AccessStatus {
+  ACTIVE
+  EXPIRED
+  DISABLED
+}
+
+enum AccessPlan {
+  NONE
+  MONTHLY
+  QUARTERLY
+  YEARLY
 }

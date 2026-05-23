@@ -16,12 +16,24 @@ model User {
   bannedAt      DateTime?
   banReason     String?
   createdAt     DateTime               @default(now())
+  accessType    String                 @default("INTERNAL")
+  accessStartAt DateTime?
+  accessExpiresAt DateTime?
+  dailyTrainingLimit Int?
+  isTrainingUnlimited Boolean          @default(true)
+  accessStatus  String                 @default("ACTIVE")
+  currentPlan   String                 @default("NONE")
+  accessInviteCodeId String?
   sessions      TrainingSession[]
   redemptions   InviteCodeRedemption[]
   createdInviteCodes InviteCode[]
   refreshTokens RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   adminLogs     AdminAuditLog[]        @relation("AdminActorLogs")
+  accessSourceInviteCode InviteCode?   @relation("UserAccessSourceInviteCode", fields: [accessInviteCodeId], references: [id])
+  trainingDailyUsage UserTrainingDailyUsage[]
+  accessChangeLogs UserAccessChangeLog[] @relation("AccessTargetUserLogs")
+  operatedAccessChangeLogs UserAccessChangeLog[] @relation("AccessOperatorUserLogs")
   securityLogs  SecurityLog[]
   reviews       TrainingReview[]
 }
@@ -266,6 +278,11 @@ model AccountSnapshot {
 model InviteCode {
   id          String                 @id @default(cuid())
   code        String                 @unique
+  type        String                 @default("INTERNAL")
+  trialDays   Int?
+  dailyTrainingLimit Int?
+  paidPlan    String                 @default("NONE")
+  durationMonths Int?
   isActive    Boolean                @default(true)
   maxUses     Int
   usedCount   Int                    @default(0)
@@ -275,7 +292,43 @@ model InviteCode {
   deletedAt   DateTime?
   createdAt   DateTime               @default(now())
   redemptions InviteCodeRedemption[]
+  accessUsers User[]                 @relation("UserAccessSourceInviteCode")
   creator     User?                  @relation(fields: [createdBy], references: [id])
+}
+
+model UserTrainingDailyUsage {
+  id            String   @id @default(cuid())
+  userId        String
+  usageDate     DateTime
+  trainingCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, usageDate])
+  @@index([usageDate])
+}
+
+model UserAccessChangeLog {
+  id              String   @id @default(cuid())
+  userId          String
+  operatorUserId  String
+  action          String
+  oldAccessType   String?
+  newAccessType   String?
+  oldAccessPlan   String?
+  newAccessPlan   String?
+  oldExpiresAt    DateTime?
+  newExpiresAt    DateTime?
+  oldAccessStatus String?
+  newAccessStatus String?
+  remark          String?
+  createdAt       DateTime @default(now())
+  user            User     @relation("AccessTargetUserLogs", fields: [userId], references: [id])
+  operator        User     @relation("AccessOperatorUserLogs", fields: [operatorUserId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([operatorUserId, createdAt])
 }
 
 model InviteCodeRedemption {

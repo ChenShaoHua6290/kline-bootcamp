@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
-import { BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto } from './dto';
+import { isPasswordStrong, passwordStrengthMessage } from '../auth/password-policy';
+import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
 
 @Injectable()
 export class AdminService {
@@ -42,6 +44,11 @@ export class AdminService {
       Array<{
         id: string;
         code: string;
+        type: string;
+        trialDays: number | null;
+        dailyTrainingLimit: number | null;
+        paidPlan: string | null;
+        durationMonths: number | null;
         maxUses: number;
         usedCount: number;
         isActive: boolean;
@@ -50,7 +57,7 @@ export class AdminService {
         updatedAt: Date;
       }>
     >`
-      SELECT id, code, "maxUses", "usedCount", "isActive", "expiresAt", "createdAt", "updatedAt"
+      SELECT id, code, type, "trialDays", "dailyTrainingLimit", "paidPlan", "durationMonths", "maxUses", "usedCount", "isActive", "expiresAt", "createdAt", "updatedAt"
       FROM "InviteCode"
       WHERE "deletedAt" IS NULL
       ORDER BY "createdAt" DESC
@@ -74,6 +81,11 @@ export class AdminService {
     const row = existing[0];
     const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
     const isActive = dto.isActive ?? true;
+    const inviteType = dto.type ?? 'INTERNAL';
+    const trialDays = inviteType === 'TRIAL' ? dto.trialDays ?? 7 : null;
+    const dailyTrainingLimit = inviteType === 'TRIAL' ? dto.dailyTrainingLimit ?? 5 : null;
+    const paidPlan = inviteType === 'PAID' ? dto.paidPlan ?? 'MONTHLY' : 'NONE';
+    const durationMonths = paidPlan === 'MONTHLY' ? 1 : paidPlan === 'QUARTERLY' ? 3 : paidPlan === 'YEARLY' ? 12 : null;
 
     if (row && !row.deletedAt) throw new BadRequestException('邀请码已存在');
 
@@ -85,6 +97,11 @@ export class AdminService {
             "usedCount" = 0,
             "isActive" = ${isActive},
             "expiresAt" = ${expiresAt},
+            type = CAST(${inviteType} AS "InviteCodeType"),
+            "trialDays" = ${trialDays},
+            "dailyTrainingLimit" = ${dailyTrainingLimit},
+            "paidPlan" = CAST(${paidPlan} AS "AccessPlan"),
+            "durationMonths" = ${durationMonths},
             "createdBy" = ${adminId},
             "updatedAt" = ${new Date()}
         WHERE id = ${row.id}
@@ -107,6 +124,15 @@ export class AdminService {
       VALUES (
         ${id}, ${code}, ${dto.maxUses}, 0, ${isActive}, ${expiresAt}, ${adminId}, ${new Date()}, ${new Date()}
       )
+    `;
+    await this.prisma.$executeRaw`
+      UPDATE "InviteCode"
+      SET type = CAST(${inviteType} AS "InviteCodeType"),
+          "trialDays" = ${trialDays},
+          "dailyTrainingLimit" = ${dailyTrainingLimit},
+          "paidPlan" = CAST(${paidPlan} AS "AccessPlan"),
+          "durationMonths" = ${durationMonths}
+      WHERE id = ${id}
     `;
     await this.securityLogService.logAdminAction({
       adminUserId: adminId,
@@ -132,6 +158,22 @@ export class AdminService {
     }
     if (dto.expiresAt !== undefined) {
       await this.prisma.$executeRaw`UPDATE "InviteCode" SET "expiresAt" = ${new Date(dto.expiresAt)}, "updatedAt" = ${new Date()} WHERE id = ${id}`;
+    }
+    if (dto.trialDays !== undefined) {
+      await this.prisma.$executeRaw`UPDATE "InviteCode" SET "trialDays" = ${dto.trialDays}, "updatedAt" = ${new Date()} WHERE id = ${id}`;
+    }
+    if (dto.dailyTrainingLimit !== undefined) {
+      await this.prisma.$executeRaw`UPDATE "InviteCode" SET "dailyTrainingLimit" = ${dto.dailyTrainingLimit}, "updatedAt" = ${new Date()} WHERE id = ${id}`;
+    }
+    if (dto.paidPlan !== undefined) {
+      const durationMonths = dto.paidPlan === 'MONTHLY' ? 1 : dto.paidPlan === 'QUARTERLY' ? 3 : dto.paidPlan === 'YEARLY' ? 12 : null;
+      await this.prisma.$executeRaw`
+        UPDATE "InviteCode"
+        SET "paidPlan" = CAST(${dto.paidPlan} AS "AccessPlan"),
+            "durationMonths" = ${durationMonths},
+            "updatedAt" = ${new Date()}
+        WHERE id = ${id}
+      `;
     }
 
     await this.securityLogService.logAdminAction({
@@ -173,13 +215,20 @@ export class AdminService {
             email: string;
             nickname: string | null;
             role: string | null;
+            accessType: string | null;
+            accessStatus: string | null;
+            accessStartAt: Date | null;
+            accessExpiresAt: Date | null;
+            dailyTrainingLimit: number | null;
+            isTrainingUnlimited: boolean | null;
+            currentPlan: string | null;
             isBanned: boolean | null;
             bannedAt: Date | null;
             banReason: string | null;
             createdAt: Date;
           }>
         >`
-          SELECT id, email, nickname, role, "isBanned", "bannedAt", "banReason", "createdAt"
+          SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
           WHERE email LIKE ${kw} OR nickname LIKE ${kw}
           ORDER BY "createdAt" DESC
@@ -190,13 +239,20 @@ export class AdminService {
             email: string;
             nickname: string | null;
             role: string | null;
+            accessType: string | null;
+            accessStatus: string | null;
+            accessStartAt: Date | null;
+            accessExpiresAt: Date | null;
+            dailyTrainingLimit: number | null;
+            isTrainingUnlimited: boolean | null;
+            currentPlan: string | null;
             isBanned: boolean | null;
             bannedAt: Date | null;
             banReason: string | null;
             createdAt: Date;
           }>
         >`
-          SELECT id, email, nickname, role, "isBanned", "bannedAt", "banReason", "createdAt"
+          SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
           ORDER BY "createdAt" DESC
         `;
@@ -213,6 +269,13 @@ export class AdminService {
           WHERE "userId" = ${u.id} AND "isLiquidated" = TRUE
         `,
       ]);
+      const usageRows = await this.prisma.$queryRaw<Array<{ c: number | string }>>`
+        SELECT "trainingCount" as c
+        FROM "UserTrainingDailyUsage"
+        WHERE "userId" = ${u.id}
+          AND "usageDate" = ${new Date(new Date().setUTCHours(0, 0, 0, 0))}
+        LIMIT 1
+      `;
       out.push({
         id: u.id,
         email: u.email,
@@ -222,6 +285,14 @@ export class AdminService {
         bannedAt: u.bannedAt?.toISOString() ?? null,
         banReason: u.banReason,
         createdAt: u.createdAt.toISOString(),
+        accessType: u.accessType ?? 'INTERNAL',
+        accessStatus: u.accessStatus ?? 'ACTIVE',
+        accessStartAt: u.accessStartAt?.toISOString() ?? null,
+        accessExpiresAt: u.accessExpiresAt?.toISOString() ?? null,
+        dailyTrainingLimit: u.dailyTrainingLimit,
+        isTrainingUnlimited: Boolean(u.isTrainingUnlimited ?? true),
+        currentPlan: u.currentPlan ?? 'NONE',
+        todayTrainingCount: Number(usageRows[0]?.c ?? 0),
         trainingCount: Number(trainingRows[0]?.c ?? 0),
         liquidationCount: Number(liqRows[0]?.c ?? 0),
       });
@@ -276,5 +347,142 @@ export class AdminService {
       targetUserId: userId,
     });
     return { ok: true };
+  }
+
+  async updateUserAccess(adminId: string, userId: string, dto: UpdateUserAccessDto) {
+    const users = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        accessType: string | null;
+        accessStatus: string | null;
+        currentPlan: string | null;
+        accessExpiresAt: Date | null;
+      }>
+    >`
+      SELECT id, "accessType", "accessStatus", "currentPlan", "accessExpiresAt"
+      FROM "User"
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+    const user = users[0];
+    if (!user) throw new NotFoundException('用户不存在');
+
+    const oldAccessType = user.accessType ?? 'INTERNAL';
+    const oldAccessStatus = user.accessStatus ?? 'ACTIVE';
+    const oldAccessPlan = user.currentPlan ?? 'NONE';
+    const oldExpiresAt = user.accessExpiresAt;
+
+    let nextAccessType = oldAccessType;
+    let nextAccessStatus = dto.disabled === true ? 'DISABLED' : oldAccessStatus;
+    let nextPlan = oldAccessPlan;
+    let nextExpiresAt = oldExpiresAt;
+    let nextDailyLimit: number | null | undefined;
+    let nextUnlimited: boolean | undefined;
+
+    if (dto.accessType) nextAccessType = dto.accessType;
+    if (dto.plan) nextPlan = dto.plan;
+    if (dto.accessExpiresAt) nextExpiresAt = new Date(dto.accessExpiresAt);
+    if (dto.extendMonths && nextAccessType !== 'INTERNAL') {
+      const base = nextExpiresAt && nextExpiresAt.getTime() > Date.now() ? new Date(nextExpiresAt) : new Date();
+      const n = new Date(base);
+      n.setMonth(n.getMonth() + dto.extendMonths);
+      nextExpiresAt = n;
+      nextAccessStatus = 'ACTIVE';
+    }
+    if (nextAccessType === 'TRIAL') {
+      nextDailyLimit = dto.dailyTrainingLimit ?? 5;
+      nextUnlimited = false;
+      if (!nextExpiresAt) {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        nextExpiresAt = d;
+      }
+    } else if (nextAccessType === 'PAID') {
+      nextDailyLimit = null;
+      nextUnlimited = true;
+      if (!nextExpiresAt) {
+        const d = new Date();
+        const months = nextPlan === 'QUARTERLY' ? 3 : nextPlan === 'YEARLY' ? 12 : 1;
+        d.setMonth(d.getMonth() + months);
+        nextExpiresAt = d;
+      }
+    } else {
+      nextPlan = 'NONE';
+      nextDailyLimit = null;
+      nextUnlimited = true;
+      nextExpiresAt = null;
+      if (dto.disabled !== true) nextAccessStatus = 'ACTIVE';
+    }
+    if (dto.disabled === false) nextAccessStatus = 'ACTIVE';
+
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE "User"
+        SET "accessType" = CAST(${nextAccessType} AS "AccessType"),
+            "accessStatus" = CAST(${nextAccessStatus} AS "AccessStatus"),
+            "currentPlan" = CAST(${nextPlan} AS "AccessPlan"),
+            "accessExpiresAt" = ${nextExpiresAt},
+            "dailyTrainingLimit" = ${nextDailyLimit},
+            "isTrainingUnlimited" = ${nextUnlimited ?? true},
+            "accessStartAt" = COALESCE("accessStartAt", ${now})
+        WHERE id = ${userId}
+      `;
+      if (dto.disabled === true) {
+        await tx.$executeRaw`
+          UPDATE "RefreshToken" SET "revokedAt" = ${now}
+          WHERE "userId" = ${userId} AND "revokedAt" IS NULL
+        `;
+      }
+      if (!dto.extendMonths) {
+        const logId = `acl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await tx.$executeRaw`
+          INSERT INTO "UserAccessChangeLog" (
+            id, "userId", "operatorUserId", action,
+            "oldAccessType", "newAccessType", "oldAccessPlan", "newAccessPlan",
+            "oldExpiresAt", "newExpiresAt", "oldAccessStatus", "newAccessStatus", remark, "createdAt"
+          ) VALUES (
+            ${logId}, ${userId}, ${adminId}, ${'ACCESS_UPDATE'},
+            CAST(${oldAccessType} AS "AccessType"), CAST(${nextAccessType} AS "AccessType"),
+            CAST(${oldAccessPlan} AS "AccessPlan"), CAST(${nextPlan} AS "AccessPlan"),
+            ${oldExpiresAt}, ${nextExpiresAt},
+            CAST(${oldAccessStatus} AS "AccessStatus"), CAST(${nextAccessStatus} AS "AccessStatus"),
+            ${dto.remark ?? null}, ${now}
+          )
+        `;
+      }
+    });
+    return { ok: true };
+  }
+
+  async resetUserPassword(_adminId: string, userId: string, dto: AdminResetUserPasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) throw new BadRequestException('两次密码不一致');
+    if (!isPasswordStrong(dto.newPassword)) throw new BadRequestException(passwordStrengthMessage());
+
+    const users = await this.prisma.$queryRaw<Array<{ id: string; password: string | null }>>`
+      SELECT id, password FROM "User" WHERE id = ${userId} LIMIT 1
+    `;
+    const user = users[0];
+    if (!user) throw new NotFoundException('用户不存在');
+
+    if (user.password) {
+      const sameAsOld = await bcrypt.compare(dto.newPassword, user.password);
+      if (sameAsOld) throw new BadRequestException('新密码不能与旧密码相同');
+    }
+
+    const now = new Date();
+    const nextHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE "User" SET password = ${nextHash}
+        WHERE id = ${userId}
+      `;
+      await tx.$executeRaw`
+        UPDATE "RefreshToken" SET "revokedAt" = ${now}
+        WHERE "userId" = ${userId} AND "revokedAt" IS NULL
+      `;
+    });
+
+    return { ok: true, message: '用户密码已重置' };
   }
 }

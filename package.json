@@ -17,6 +17,7 @@
     "dev:up": "bash scripts/dev-up.sh",
     "dev:down": "bash scripts/dev-down.sh",
     "preflight:prod": "bash scripts/preflight-prod.sh",
+    "deploy:update": "bash scripts/deploy-update.sh",
     "dev:up:local": "bash scripts/dev-up-local.sh",
     "dev:up:lite": "bash scripts/dev-up-lite.sh",
     "data:download-binance": "tsx scripts/data/download-binance-data.ts",

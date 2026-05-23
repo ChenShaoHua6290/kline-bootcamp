@@ -34,7 +34,18 @@ export class AuthService {
 
     const invite = await prisma.inviteCode.findFirst({
       where: { code, deletedAt: null },
-      select: { id: true, isActive: true, maxUses: true, usedCount: true, expiresAt: true },
+      select: {
+        id: true,
+        isActive: true,
+        maxUses: true,
+        usedCount: true,
+        expiresAt: true,
+        type: true,
+        trialDays: true,
+        dailyTrainingLimit: true,
+        paidPlan: true,
+        durationMonths: true,
+      },
     });
     if (!invite) throw new BadRequestException('邀请码错误');
     if (!invite.isActive) throw new BadRequestException('邀请码已失效');
@@ -45,13 +56,60 @@ export class AuthService {
     const user = await prisma.$transaction(async (tx: any) => {
       const latestInvite = await tx.inviteCode.findUnique({
         where: { id: invite.id },
-        select: { id: true, isActive: true, maxUses: true, usedCount: true, expiresAt: true },
+        select: {
+          id: true,
+          isActive: true,
+          maxUses: true,
+          usedCount: true,
+          expiresAt: true,
+          type: true,
+          trialDays: true,
+          dailyTrainingLimit: true,
+          paidPlan: true,
+          durationMonths: true,
+        },
       });
       if (!latestInvite || !latestInvite.isActive) throw new BadRequestException('邀请码已失效');
       if (latestInvite.expiresAt && latestInvite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
       if (latestInvite.usedCount >= latestInvite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
 
-      const created = await tx.user.create({ data: { email: dto.email, password: hashed, nickname } });
+      const now = new Date();
+      let accessType: 'TRIAL' | 'PAID' | 'INTERNAL' = latestInvite.type as 'TRIAL' | 'PAID' | 'INTERNAL';
+      let accessStartAt: Date | null = now;
+      let accessExpiresAt: Date | null = null;
+      let dailyTrainingLimit: number | null = null;
+      let isTrainingUnlimited = true;
+      let currentPlan: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' = 'NONE';
+
+      if (accessType === 'TRIAL') {
+        const trialDays = latestInvite.trialDays ?? 7;
+        accessExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+        dailyTrainingLimit = latestInvite.dailyTrainingLimit ?? 5;
+        isTrainingUnlimited = false;
+      } else if (accessType === 'PAID') {
+        const plan = (latestInvite.paidPlan as 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY') ?? 'MONTHLY';
+        const months = latestInvite.durationMonths ?? (plan === 'QUARTERLY' ? 3 : plan === 'YEARLY' ? 12 : 1);
+        const d = new Date(now);
+        d.setMonth(d.getMonth() + months);
+        accessExpiresAt = d;
+        currentPlan = plan === 'NONE' ? 'MONTHLY' : plan;
+      }
+
+      const created = await tx.user.create({
+        data: {
+          email: dto.email,
+          password: hashed,
+          nickname,
+          accessType,
+          accessStartAt,
+          accessExpiresAt,
+          dailyTrainingLimit,
+          isTrainingUnlimited,
+          accessStatus: 'ACTIVE',
+          currentPlan,
+          accessInviteCodeId: latestInvite.id,
+        },
+      });
       await tx.inviteCode.update({ where: { id: latestInvite.id }, data: { usedCount: { increment: 1 } } });
       await tx.inviteCodeRedemption.create({ data: { inviteCodeId: latestInvite.id, userId: created.id } });
       return created;

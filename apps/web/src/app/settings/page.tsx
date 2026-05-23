@@ -57,7 +57,12 @@ export default function SettingsPage() {
     <main className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md">
         <CardBody className="space-y-4 p-5">
-          <h1 className="text-lg font-semibold text-slate-100">修改密码</h1>
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-lg font-semibold text-slate-100">修改密码</h1>
+            <Button type="button" variant="ghost" size="sm" className="h-8 px-3 text-xs" onClick={() => router.push('/')}>
+              返回首页
+            </Button>
+          </div>
           <form className="space-y-3" onSubmit={onSubmit}>
             <label className="block text-sm">
               <span className="mb-1 block text-slate-300">当前密码</span>

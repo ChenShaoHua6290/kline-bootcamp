@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AdminGuard } from '../auth/admin.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminService } from './admin.service';
-import { BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto } from './dto';
+import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
 
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
@@ -50,5 +50,15 @@ export class AdminController {
   unbanUser(@Req() req: { user: { sub: string } }, @Param('id') id: string) {
     return this.adminService.unbanUser(req.user.sub, id);
   }
-}
 
+  @Patch('users/:id/access')
+  updateUserAccess(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: UpdateUserAccessDto) {
+    return this.adminService.updateUserAccess(req.user.sub, id, dto);
+  }
+
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Patch('users/:id/reset-password')
+  resetUserPassword(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: AdminResetUserPasswordDto) {
+    return this.adminService.resetUserPassword(req.user.sub, id, dto);
+  }
+}

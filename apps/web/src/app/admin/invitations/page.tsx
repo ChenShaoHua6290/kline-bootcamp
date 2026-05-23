@@ -36,7 +36,16 @@ export default function AdminInvitationsPage() {
   const reload = () => invitationsQuery.refetch();
 
   const createMutation = useMutation({
-    mutationFn: async (payload: { code: string; maxUses: number; expiresAt?: string; isActive: boolean }) =>
+    mutationFn: async (payload: {
+      code: string;
+      maxUses: number;
+      expiresAt?: string;
+      isActive: boolean;
+      type: 'TRIAL' | 'PAID' | 'INTERNAL';
+      trialDays?: number;
+      dailyTrainingLimit?: number;
+      paidPlan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+    }) =>
       (await api.post('/admin/invitations', payload)).data,
     onSuccess: () => {
       setCreateOpen(false);

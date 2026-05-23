@@ -1,6 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 
 type NoticeTone = 'error' | 'warning' | 'info';
@@ -15,6 +16,7 @@ export function NoticeModal({
   confirmText = '确定',
   cancelText = '取消',
   maskClosable = true,
+  children,
 }: {
   open: boolean;
   title: string;
@@ -25,12 +27,14 @@ export function NoticeModal({
   confirmText?: string;
   cancelText?: string;
   maskClosable?: boolean;
+  children?: ReactNode;
 }) {
   const [modalScale, setModalScale] = useState(1);
   const modalRef = useRef<HTMLDivElement | null>(null);
-  if (!open) return null;
 
   useLayoutEffect(() => {
+    if (!open) return;
+    if (typeof window === 'undefined') return;
     const fitModal = () => {
       const el = modalRef.current;
       if (!el) return;
@@ -43,15 +47,18 @@ export function NoticeModal({
       setModalScale(Math.max(0.7, next));
     };
     const raf = requestAnimationFrame(fitModal);
-    const observer = new ResizeObserver(fitModal);
-    if (modalRef.current) observer.observe(modalRef.current);
+    const ResizeObserverCtor = window.ResizeObserver;
+    const observer = ResizeObserverCtor ? new ResizeObserverCtor(fitModal) : null;
+    if (observer && modalRef.current) observer.observe(modalRef.current);
     window.addEventListener('resize', fitModal);
     return () => {
       cancelAnimationFrame(raf);
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener('resize', fitModal);
     };
   }, [open]);
+
+  if (!open) return null;
 
   const toneStyle =
     tone === 'error'
@@ -102,6 +109,7 @@ export function NoticeModal({
         <div className="space-y-3 px-5 py-5">
           <h3 className={`text-[22px] font-semibold leading-tight ${toneStyle.title}`}>{title}</h3>
           <p className="text-[15px] leading-7 text-slate-300">{message}</p>
+          {children}
           {onConfirm ? (
             <div className="flex flex-wrap justify-end gap-2">
               <Button
