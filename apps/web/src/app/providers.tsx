@@ -81,7 +81,7 @@ export function Providers({ children }: { children: ReactNode }) {
         event.preventDefault();
         return true;
       }
-      if (typeof prevOnUnhandledRejection === 'function') return prevOnUnhandledRejection(event);
+      if (typeof prevOnUnhandledRejection === 'function') return prevOnUnhandledRejection.call(window, event);
       return false;
     };
 
