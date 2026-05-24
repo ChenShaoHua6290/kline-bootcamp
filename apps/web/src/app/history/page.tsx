@@ -120,6 +120,11 @@ export default function HistoryPage() {
     enabled: Boolean(selectedId),
     queryFn: async () => normalizeSession((await api.get<Session>(`/training/${selectedId}`)).data),
   });
+  const reviewDetailQuery = useQuery({
+    queryKey: ['training-history-review-detail', selectedId],
+    enabled: Boolean(selectedId),
+    queryFn: async () => (await api.get<{ review: { content: string; problemTags?: string[] } | null }>(`/training/${selectedId}/review`)).data,
+  });
 
   const items = useMemo(() => {
     const raw = historyQuery.data?.items ?? [];
@@ -306,7 +311,9 @@ export default function HistoryPage() {
               <section className="rounded-xl border border-slate-700/70 bg-slate-900/45 p-4">
                 <h4 className="text-base font-semibold text-slate-100">复盘总结</h4>
                 <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/55 p-3 text-xs text-slate-300">
-                  暂无结构化总结内容，请前往“查看复盘”页面补充你的复盘结论。
+                  {reviewDetailQuery.isLoading
+                    ? '正在加载复盘总结...'
+                    : reviewDetailQuery.data?.review?.content?.trim() || '暂无结构化总结内容，请前往“查看复盘”页面补充你的复盘结论。'}
                 </div>
               </section>
             </div>

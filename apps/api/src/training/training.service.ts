@@ -735,32 +735,47 @@ export class TrainingService {
     await this.ensureOwnership(userId, sessionId);
     const content = this.sanitizeReviewContent(dto.content);
     const problemTags = this.normalizeProblemTags(dto.problemTags ?? []);
-
-    const serializedTags = this.stringifyProblemTags(problemTags);
-    let existing: Array<{ id: string }> = [];
+    let review:
+      | {
+          id: string;
+          sessionId: string;
+          userId: string;
+          content: string;
+          problemTags: unknown;
+          createdAt: Date;
+          updatedAt: Date;
+        }
+      | null = null;
     try {
-      existing = await this.prisma.$queryRaw<Array<{ id: string }>>(
-        Prisma.sql`SELECT "id" FROM "TrainingReview" WHERE "sessionId" = ${sessionId} LIMIT 1`,
-      );
-    } catch {
-      throw new BadRequestException('复盘表未初始化，请先执行数据库同步');
+      review = await this.prisma.trainingReview.upsert({
+        where: { sessionId },
+        update: {
+          content,
+          problemTags: problemTags as Prisma.InputJsonValue,
+        },
+        create: {
+          sessionId,
+          userId,
+          content,
+          problemTags: problemTags as Prisma.InputJsonValue,
+        },
+        select: {
+          id: true,
+          sessionId: true,
+          userId: true,
+          content: true,
+          problemTags: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (err: any) {
+      // Table may not exist in environments that haven't applied the migration yet.
+      if (err?.code === 'P2021') {
+        throw new BadRequestException('复盘表未初始化，请先执行数据库同步');
+      }
+      throw err;
     }
-
-    if (existing[0]?.id) {
-      await this.prisma.$executeRaw(
-        Prisma.sql`UPDATE "TrainingReview" SET "content" = ${content}, "problemTags" = ${serializedTags}, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${existing[0].id}`,
-      );
-    } else {
-      const id = `trv_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-      await this.prisma.$executeRaw(
-        Prisma.sql`INSERT INTO "TrainingReview" ("id","sessionId","userId","content","problemTags","createdAt","updatedAt") VALUES (${id}, ${sessionId}, ${userId}, ${content}, ${serializedTags}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-      );
-    }
-
-    const rows = await this.prisma.$queryRaw<Array<{ id: string; sessionId: string; userId: string; content: string; problemTags: unknown; createdAt: Date; updatedAt: Date }>>(
-      Prisma.sql`SELECT "id","sessionId","userId","content","problemTags","createdAt","updatedAt" FROM "TrainingReview" WHERE "sessionId" = ${sessionId} LIMIT 1`,
-    );
-    const review = rows[0];
     if (!review) throw new NotFoundException('Review not found');
 
     return {
