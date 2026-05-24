@@ -27,7 +27,7 @@ compose() {
 }
 
 choose_scope() {
-  cat <<'EOF'
+  cat >&2 <<'EOF'
 选择更新范围：
 1) 全量（api + web + nginx）
    - 适用：后端和前端都有改动；或不确定改动范围时
@@ -50,7 +50,7 @@ choose_scope() {
 7) 仅查看日志
    - 适用：排查问题（可选 api/web/nginx/postgres/redis）
 EOF
-  read -rp "请输入选项 [1-7]: " scope
+  read -rp "请输入选项 [1-7]: " scope >&2
   echo "$scope"
 }
 
@@ -99,13 +99,19 @@ show_logs() {
   cat <<'EOF'
 选择日志服务：
 1) api
+   - 适用：接口错误、鉴权、业务逻辑、数据库访问问题
 2) web
+   - 适用：页面报错、构建产物问题、前端运行异常
 3) nginx
+   - 适用：反向代理、路由转发、静态资源访问问题
 4) postgres
+   - 适用：数据库连接、慢查询、迁移问题
 5) redis
+   - 适用：缓存/队列/限流相关问题
 EOF
   read -rp "请输入选项 [1-5]（默认 1: api）: " log_scope
   log_scope="${log_scope:-1}"
+  log "你选择了日志查看项: $log_scope"
   case "$log_scope" in
     1) compose logs -f api ;;
     2) compose logs -f web ;;
@@ -224,6 +230,8 @@ EOF
     if [[ "${do_pull:-Y}" =~ ^[Yy]$ ]]; then
       log "拉取最新代码..."
       git pull --ff-only || fail "git pull 失败"
+    else
+      log "已选择跳过 git pull。"
     fi
   fi
 
@@ -242,6 +250,7 @@ EOF
 EOF
       read -rp "请输入 [y/N]（默认 N）: " no_cache
       if [[ "${do_migrate:-Y}" =~ ^[Yy]$ ]]; then run_migrate; fi
+      if [[ ! "${do_migrate:-Y}" =~ ^[Yy]$ ]]; then log "已选择跳过数据库迁移。"; fi
       build_and_up "" "${no_cache:-N}"
       ;;
     2)
@@ -258,6 +267,7 @@ EOF
 EOF
       read -rp "请输入 [y/N]（默认 N）: " no_cache
       if [[ "${do_migrate:-Y}" =~ ^[Yy]$ ]]; then run_migrate; fi
+      if [[ ! "${do_migrate:-Y}" =~ ^[Yy]$ ]]; then log "已选择跳过数据库迁移。"; fi
       build_and_up "api" "${no_cache:-N}"
       ;;
     3)
