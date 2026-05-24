@@ -35,6 +35,20 @@ export default function AdminInvitationsPage() {
 
   const reload = () => invitationsQuery.refetch();
 
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const buildInviteText = (code: string) => {
+    const authAddress = `${window.location.origin}/auth`;
+    return `注册地址：${authAddress}\n邀请码：${code}\n操作说明：打开注册地址，输入邀请码完成注册并登录。`;
+  };
+
   const createMutation = useMutation({
     mutationFn: async (payload: {
       code: string;
@@ -114,6 +128,10 @@ export default function AdminInvitationsPage() {
           pendingDeleteId={pendingDeleteId}
           onToggleActive={(row) => updateMutation.mutate({ id: row.id, isActive: !row.isActive })}
           onDelete={(row) => deleteMutation.mutate(row.id)}
+          onCopyInviteText={async (row) => {
+            const ok = await copyText(buildInviteText(row.code));
+            setToast({ open: true, message: ok ? '地址和邀请码文本已复制' : '复制失败，请手动复制', tone: ok ? 'success' : 'error' });
+          }}
         />
       ) : null}
 

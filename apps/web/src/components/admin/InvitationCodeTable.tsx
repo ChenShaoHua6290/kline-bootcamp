@@ -37,12 +37,14 @@ export function InvitationCodeTable({
   pendingDeleteId,
   onToggleActive,
   onDelete,
+  onCopyInviteText,
 }: {
   rows: InvitationRow[];
   pendingToggleId?: string | null;
   pendingDeleteId?: string | null;
   onToggleActive: (row: InvitationRow) => void;
   onDelete: (row: InvitationRow) => void;
+  onCopyInviteText?: (row: InvitationRow) => void;
 }) {
   const desktopCols = 'grid-cols-[1.05fr_0.55fr_0.65fr_0.6fr_0.55fr_0.62fr_0.9fr_0.9fr_0.85fr]';
   return (
@@ -62,6 +64,9 @@ export function InvitationCodeTable({
               <div>创建时间: <span className="text-slate-200">{new Date(row.createdAt).toLocaleString('zh-CN')}</span></div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button size="sm" variant="ghost" onClick={() => onCopyInviteText?.(row)}>
+                复制文本
+              </Button>
               <Button size="sm" variant="ghost" disabled={pendingToggleId === row.id || pendingDeleteId === row.id} onClick={() => onToggleActive(row)}>
                 {pendingToggleId === row.id ? '处理中...' : row.isActive ? '停用' : '启用'}
               </Button>
@@ -108,6 +113,14 @@ export function InvitationCodeTable({
             <div className="truncate text-center text-xs tabular-nums text-slate-400">{row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN') : '--'}</div>
             <div className="truncate text-center text-xs tabular-nums text-slate-400">{new Date(row.createdAt).toLocaleString('zh-CN')}</div>
             <div className="flex justify-center gap-1.5">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 whitespace-nowrap px-2 py-0.5 text-[11px]"
+                onClick={() => onCopyInviteText?.(row)}
+              >
+                复制文本
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"
