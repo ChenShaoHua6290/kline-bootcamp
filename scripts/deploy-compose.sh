@@ -30,15 +30,41 @@ choose_scope() {
   cat <<'EOF'
 选择更新范围：
 1) 全量（api + web + nginx）
+   - 适用：后端和前端都有改动；或不确定改动范围时
+
 2) 仅 API
+   - 适用：只改了后端接口/服务/权限逻辑/数据库访问
+
 3) 仅 Web + Nginx
+   - 适用：只改了前端页面、样式、交互（如弹窗、按钮、文案）
+
 4) 仅 Nginx
+   - 适用：只改了 nginx 配置（反向代理、路由、缓存头等）
+
 5) 仅迁移数据库（不重建服务）
+   - 适用：只想先执行 Prisma migration
+
 6) 仅查看服务状态
+   - 适用：快速检查容器是否正常运行
+
 7) 仅查看日志
+   - 适用：排查问题（可选 api/web/nginx/postgres/redis）
 EOF
   read -rp "请输入选项 [1-7]: " scope
   echo "$scope"
+}
+
+scope_desc() {
+  case "$1" in
+    1) echo "全量发布（api + web + nginx）" ;;
+    2) echo "仅 API（后端逻辑）" ;;
+    3) echo "仅 Web + Nginx（前端页面/样式）" ;;
+    4) echo "仅 Nginx（网关配置）" ;;
+    5) echo "仅数据库迁移（不重建服务）" ;;
+    6) echo "仅查看服务状态" ;;
+    7) echo "仅查看服务日志" ;;
+    *) echo "未知选项" ;;
+  esac
 }
 
 run_migrate() {
@@ -78,7 +104,8 @@ show_logs() {
 4) postgres
 5) redis
 EOF
-  read -rp "请输入选项 [1-5]: " log_scope
+  read -rp "请输入选项 [1-5]（默认 1: api）: " log_scope
+  log_scope="${log_scope:-1}"
   case "$log_scope" in
     1) compose logs -f api ;;
     2) compose logs -f web ;;
@@ -180,9 +207,20 @@ main() {
   [[ -f "$COMPOSE_FILE" ]] || fail "$COMPOSE_FILE 不存在"
 
   scope="$(choose_scope)"
+  log "你选择了：$(scope_desc "$scope")"
+
+  do_pull="N"
+  do_migrate="N"
+  no_cache="N"
+  do_health="Y"
 
   if [[ "$scope" != "6" && "$scope" != "7" ]]; then
-    read -rp "是否先执行 git pull --ff-only? [Y/n]: " do_pull
+    cat <<'EOF'
+[选择] 是否先执行 git pull --ff-only?
+- Y（默认，推荐）：拉取远端最新代码，避免用旧代码部署
+- n：跳过拉代码（仅当你确认本机代码已是目标版本）
+EOF
+    read -rp "请输入 [Y/n]（默认 Y）: " do_pull
     if [[ "${do_pull:-Y}" =~ ^[Yy]$ ]]; then
       log "拉取最新代码..."
       git pull --ff-only || fail "git pull 失败"
@@ -191,23 +229,53 @@ main() {
 
   case "$scope" in
     1)
-      read -rp "是否先执行数据库迁移? [Y/n]: " do_migrate
-      read -rp "是否使用 --no-cache 构建? [y/N]: " no_cache
+      cat <<'EOF'
+[选择] 是否先执行数据库迁移?
+- Y（默认，推荐）：有 schema 变更时先迁移，避免 API 启动后报表结构错误
+- n：确认本次无数据库变更时可跳过
+EOF
+      read -rp "请输入 [Y/n]（默认 Y）: " do_migrate
+      cat <<'EOF'
+[选择] 是否使用 --no-cache 构建?
+- y：彻底重建镜像（最干净，但更慢）
+- N（默认）：使用缓存构建（更快，常规推荐）
+EOF
+      read -rp "请输入 [y/N]（默认 N）: " no_cache
       if [[ "${do_migrate:-Y}" =~ ^[Yy]$ ]]; then run_migrate; fi
       build_and_up "" "${no_cache:-N}"
       ;;
     2)
-      read -rp "是否先执行数据库迁移? [Y/n]: " do_migrate
-      read -rp "是否使用 --no-cache 构建? [y/N]: " no_cache
+      cat <<'EOF'
+[选择] 是否先执行数据库迁移?
+- Y（默认，推荐）：后端涉及 Prisma/schema 时建议执行
+- n：确认本次后端无数据库结构变更可跳过
+EOF
+      read -rp "请输入 [Y/n]（默认 Y）: " do_migrate
+      cat <<'EOF'
+[选择] 是否使用 --no-cache 构建?
+- y：彻底重建 api 镜像（更慢）
+- N（默认）：使用缓存构建（更快）
+EOF
+      read -rp "请输入 [y/N]（默认 N）: " no_cache
       if [[ "${do_migrate:-Y}" =~ ^[Yy]$ ]]; then run_migrate; fi
       build_and_up "api" "${no_cache:-N}"
       ;;
     3)
-      read -rp "是否使用 --no-cache 构建? [y/N]: " no_cache
+      cat <<'EOF'
+[选择] 是否使用 --no-cache 构建?
+- y：彻底重建 web/nginx 镜像（更慢）
+- N（默认）：使用缓存构建（更快，前端改动常用）
+EOF
+      read -rp "请输入 [y/N]（默认 N）: " no_cache
       build_and_up "web nginx" "${no_cache:-N}"
       ;;
     4)
-      read -rp "是否使用 --no-cache 构建? [y/N]: " no_cache
+      cat <<'EOF'
+[选择] 是否使用 --no-cache 构建?
+- y：彻底重建 nginx 镜像
+- N（默认）：使用缓存构建
+EOF
+      read -rp "请输入 [y/N]（默认 N）: " no_cache
       build_and_up "nginx" "${no_cache:-N}"
       ;;
     5)
@@ -224,6 +292,23 @@ main() {
       ;;
   esac
 
+  if [[ "$scope" == "1" || "$scope" == "2" || "$scope" == "3" || "$scope" == "4" ]]; then
+    cat <<EOF
+
+[执行摘要]
+- 范围：$(scope_desc "$scope")
+- git pull：$([[ "${do_pull:-Y}" =~ ^[Yy]$ ]] && echo "是" || echo "否")
+- 数据库迁移：$([[ "${do_migrate:-N}" =~ ^[Yy]$ ]] && echo "是" || echo "否")
+- 构建模式：$([[ "${no_cache:-N}" =~ ^[Yy]$ ]] && echo "--no-cache（彻底重建）" || echo "默认缓存构建")
+EOF
+    cat <<'EOF'
+[选择] 是否执行发布后健康检查?
+- Y（默认，推荐）：检查服务是否健康，失败会给出回滚指引
+- n：跳过检查（不推荐）
+EOF
+    read -rp "请输入 [Y/n]（默认 Y）: " do_health
+  fi
+
   if [[ "$scope" != "7" ]]; then
     log "当前服务状态："
     compose ps
@@ -237,8 +322,12 @@ main() {
       3) services_for_check="web nginx" ;;
       4) services_for_check="nginx" ;;
     esac
-    if ! post_deploy_health_check "$services_for_check" "$HEALTH_TIMEOUT"; then
-      exit 1
+    if [[ "${do_health:-Y}" =~ ^[Yy]$ ]]; then
+      if ! post_deploy_health_check "$services_for_check" "$HEALTH_TIMEOUT"; then
+        exit 1
+      fi
+    else
+      log "已跳过健康检查。"
     fi
   fi
 }
