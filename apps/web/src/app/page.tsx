@@ -77,13 +77,20 @@ export default function HomePage() {
     queryKey: ['training-profile-stats'],
     enabled: ready && Boolean(user),
     queryFn: async () => (await api.get<ProfileStats>('/training/profile')).data,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const dashboardQuery = useQuery({
     queryKey: ['training-dashboard'],
     enabled: ready && Boolean(user),
     queryFn: async () => (await api.get<DashboardData>('/training/dashboard')).data,
-    refetchInterval: 10000,
+    staleTime: 20_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchIntervalInBackground: false,
   });
 
   useEffect(() => {
