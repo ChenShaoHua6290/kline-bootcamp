@@ -33,7 +33,7 @@ export function TestimonialsSection() {
     const el = ref.current;
     if (!el) return;
     pauseAndResumeLater();
-    const amount = Math.round(el.clientWidth * 0.82) * dir;
+    const amount = Math.round(el.clientWidth * 0.8) * dir;
     el.scrollBy({ left: amount, behavior: 'smooth' });
   };
 
@@ -71,7 +71,7 @@ export function TestimonialsSection() {
         scrollToIndex(next);
         return next;
       });
-    }, 3500);
+    }, 4200);
     return () => window.clearInterval(timer);
   }, [paused, cardCount]);
 
@@ -84,15 +84,16 @@ export function TestimonialsSection() {
   const dots = useMemo(() => Array.from({ length: cardCount }, (_, i) => i), [cardCount]);
 
   return (
-    <section id="testimonials" className="mx-auto max-w-[1360px] scroll-mt-24 px-4 pb-28 sm:px-6 lg:pb-36">
-      <div className="relative mb-8">
-        <h2 className="text-center text-[30px] font-semibold sm:text-4xl lg:text-[40px]">学员真实反馈</h2>
+    <section id="testimonials" className="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-32 sm:px-6 lg:pb-44">
+      <div className="relative mb-6 lg:mb-8">
+        <h2 className="text-center text-[28px] font-semibold tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">学员真实反馈</h2>
       </div>
+
       <div className="relative">
         <button
           type="button"
           aria-label="上一组反馈"
-          className="absolute left-[-8px] top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-300/35 bg-slate-900/70 text-cyan-100 transition hover:bg-cyan-500/15 lg:flex"
+          className="absolute left-[-6px] top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-300/35 bg-slate-900/75 text-cyan-100 transition hover:bg-cyan-500/15 lg:flex"
           onClick={() => scrollByCard(-1)}
         >
           ←
@@ -100,7 +101,7 @@ export function TestimonialsSection() {
         <button
           type="button"
           aria-label="下一组反馈"
-          className="absolute right-[-8px] top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-300/35 bg-slate-900/70 text-cyan-100 transition hover:bg-cyan-500/15 lg:flex"
+          className="absolute right-[-6px] top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-300/35 bg-slate-900/75 text-cyan-100 transition hover:bg-cyan-500/15 lg:flex"
           onClick={() => scrollByCard(1)}
         >
           →
@@ -108,7 +109,7 @@ export function TestimonialsSection() {
 
         <div
           ref={ref}
-          className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => pauseAndResumeLater()}
           onTouchStart={() => setPaused(true)}
@@ -118,19 +119,25 @@ export function TestimonialsSection() {
             <article
               key={item.name + item.tag}
               data-feedback-card="1"
-              className={`min-w-[78%] snap-start rounded-3xl border bg-[linear-gradient(150deg,rgba(15,23,42,0.9),rgba(8,47,73,0.45))] p-4 shadow-[0_16px_34px_rgba(2,6,23,0.48)] transition-all sm:min-w-[42%] lg:min-w-[31%] ${idx === activeIndex ? 'border-cyan-200/55 shadow-[0_0_0_1px_rgba(103,232,249,0.2),0_18px_36px_rgba(6,182,212,0.16)]' : 'border-cyan-300/25'}`}
+              className={`min-w-[88%] min-w-0 snap-start rounded-3xl border p-4 shadow-[0_18px_40px_rgba(2,6,23,0.5)] transition-all sm:min-w-[46%] lg:min-w-[32%] ${idx % 3 === 0 ? 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(8,47,73,0.5))]' : idx % 3 === 1 ? 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(30,58,138,0.42))]' : 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(180,83,9,0.28))]'} ${idx === activeIndex ? 'border-cyan-200/60 shadow-[0_0_0_1px_rgba(103,232,249,0.2),0_18px_38px_rgba(6,182,212,0.18)]' : 'border-cyan-300/25'}`}
             >
-              <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/55 p-2">
+              <div className="rounded-2xl border border-cyan-300/18 bg-slate-950/60 p-2.5 backdrop-blur-sm">
                 <div className="relative overflow-hidden rounded-xl">
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.2),transparent_60%)]" />
-                  <img src={item.image} alt={`${item.name} 反馈截图`} className="relative z-[1] h-full w-full rounded-xl object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                  <img
+                    src={item.image}
+                    alt={`${item.name} 反馈截图`}
+                    className="relative z-[1] aspect-[4/5] w-full rounded-xl object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  />
                 </div>
               </div>
             </article>
           ))}
         </div>
       </div>
-      <div className="mt-4 flex items-center justify-center gap-2">
+
+      <div className="mt-5 flex items-center justify-center gap-2">
         {dots.map((dot) => (
           <button
             key={dot}

@@ -1,34 +1,85 @@
 import Link from 'next/link';
 import { systemCards } from '@/data/official-home-content';
 
+const orbitConfig = [
+  'lg:top-0 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-3',
+  'lg:top-1/2 lg:right-0 lg:-translate-y-1/2',
+  'lg:bottom-0 lg:left-1/2 lg:-translate-x-1/2 lg:translate-y-3',
+  'lg:top-1/2 lg:left-0 lg:-translate-y-1/2',
+] as const;
+
 export function SystemOverviewSection() {
+  const centerCard = systemCards[4];
+  const orbitCards = systemCards.slice(0, 4);
+
   return (
-    <section id="service-intro" className="mx-auto max-w-[1360px] scroll-mt-24 px-4 pb-28 sm:px-6 lg:pb-36">
-      <div className="mb-10 text-center">
-        <h2 className="text-[30px] font-semibold tracking-[-0.01em] sm:text-4xl lg:text-[40px]">一套完整的交易系统体系</h2>
-        <p className="mt-4 text-lg leading-8 text-slate-300 sm:text-xl">学 → 看 → 辅助 → 训练 → 复盘，形成完整闭环。</p>
+    <section id="service-intro" className="mx-auto max-w-[1320px] scroll-mt-24 px-4 pb-28 sm:px-6 lg:pb-36">
+      <div className="mb-4 text-center lg:mb-6">
+        <h2 className="text-[28px] font-semibold tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">一套完整的交易系统体系</h2>
+        <p className="mx-auto mt-1 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg sm:leading-9">学 → 看 → 辅助 → 训练 → 复盘，形成完整闭环。</p>
       </div>
 
-      <div className="rounded-[28px] border border-cyan-300/20 bg-slate-900/45 p-5 shadow-[0_22px_55px_rgba(2,6,23,0.45)] sm:p-7">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
-          {systemCards.map((card) => (
-            <Card key={card.title} title={card.title} lines={card.lines} />
+      <div className="rounded-[30px] border border-cyan-300/20 bg-[linear-gradient(160deg,rgba(15,23,42,0.84),rgba(8,47,73,0.36))] p-4 shadow-[0_20px_52px_rgba(2,6,23,0.48)] sm:p-6 lg:p-8">
+        <div className="grid gap-5 lg:hidden">
+          <CenterCard title={centerCard?.title ?? ''} lines={centerCard?.lines ?? []} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {orbitCards.map((card) => (
+              <OrbitCard key={card.title} title={card.title} lines={card.lines} />
+            ))}
+          </div>
+        </div>
+
+        <div className="relative hidden min-h-[590px] lg:block">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[540px] w-[540px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/10" />
+
+          <div className="absolute left-1/2 top-1/2 w-[320px] -translate-x-1/2 -translate-y-1/2">
+            <CenterCard title={centerCard?.title ?? ''} lines={centerCard?.lines ?? []} />
+          </div>
+
+          {orbitCards.map((card, idx) => (
+            <div key={card.title} className={`absolute w-[270px] ${orbitConfig[idx]}`}>
+              <OrbitCard title={card.title} lines={card.lines} />
+            </div>
           ))}
         </div>
       </div>
 
-      <div className="mt-6 text-center">
-        <Link href="/system#learning-content" className="text-sm font-semibold text-cyan-200 hover:text-cyan-100">进入体系中心查看详情 →</Link>
+      <div className="mt-7 text-center">
+        <Link href="/system#learning-content" className="inline-flex items-center rounded-xl border border-cyan-300/30 px-5 py-2.5 text-base font-semibold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-500/10">
+          查看详情 →
+        </Link>
       </div>
     </section>
   );
 }
 
-function Card({ title, lines }: { title: string; lines: string[] }) {
+function CenterCard({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-3xl border border-cyan-300/25 bg-slate-950/50 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/70 hover:shadow-[0_16px_36px_rgba(6,182,212,0.14)]">
-      <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
-      <ul className="mt-3 space-y-2 text-base leading-8 text-slate-300">
+    <div className="rounded-[26px] border border-cyan-200/35 bg-[linear-gradient(145deg,rgba(14,165,233,0.2),rgba(15,23,42,0.88))] px-4 py-4 text-center shadow-[0_16px_38px_rgba(2,6,23,0.44)]">
+      <p className="text-sm tracking-[0.2em] text-cyan-200/90">核心系统</p>
+      <h3 className="mt-2 text-[20px] font-semibold leading-[1.3] text-slate-100">{title}</h3>
+      <ul className="mt-3 space-y-0.5 text-[15px] leading-6 text-slate-200/95">
+        {lines.map((x) => <li key={x}>• {x}</li>)}
+      </ul>
+      <p className="mt-3 text-xs text-cyan-100/80">只做一种模式</p>
+    </div>
+  );
+}
+
+function OrbitCard({ title, lines }: { title: string; lines: string[] }) {
+  const toneByTitle: Record<string, string> = {
+    系统课件: 'bg-[linear-gradient(150deg,rgba(15,23,42,0.92),rgba(8,47,73,0.38))]',
+    视频教学: 'bg-[linear-gradient(150deg,rgba(15,23,42,0.92),rgba(30,58,138,0.34))]',
+    指标系统: 'bg-[linear-gradient(150deg,rgba(15,23,42,0.92),rgba(14,116,144,0.34))]',
+    多周期共振提醒: 'bg-[linear-gradient(150deg,rgba(15,23,42,0.92),rgba(180,83,9,0.26))]',
+  };
+  const toneClass = toneByTitle[title] ?? 'bg-slate-950/55';
+
+  return (
+    <div className={`rounded-3xl border border-cyan-300/25 ${toneClass} p-4 shadow-[0_14px_34px_rgba(2,6,23,0.4)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/60 hover:shadow-[0_18px_34px_rgba(8,145,178,0.2)]`}>
+      <h3 className="text-[20px] font-semibold text-slate-100">{title}</h3>
+      <ul className="mt-3 space-y-1 text-base leading-7 text-slate-300">
         {lines.map((x) => <li key={x}>• {x}</li>)}
       </ul>
     </div>
