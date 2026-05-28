@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { normalizeSession } from '@/lib/session';
@@ -95,16 +96,29 @@ function ActionTag({ actionType }: { actionType: string }) {
 }
 
 export default function HistoryPage() {
+  return (
+    <Suspense fallback={<main className="h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] p-4 text-slate-100"><LoadingState message="正在加载历史记录..." /></main>}>
+      <HistoryPageInner />
+    </Suspense>
+  );
+}
+
+function HistoryPageInner() {
+  const searchParams = useSearchParams();
+  const adminUserId = searchParams.get('adminUserId')?.trim() ?? '';
+  const from = searchParams.get('from')?.trim() ?? '';
+  const targetLabel = searchParams.get('label')?.trim() ?? '';
+  const isAdminView = Boolean(adminUserId);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('CLOSED');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const historyQuery = useQuery({
-    queryKey: ['training-history', page, pageSize, statusFilter],
+    queryKey: ['training-history', isAdminView ? adminUserId : 'self', page, pageSize, statusFilter],
     queryFn: async () =>
       (
-        await api.get<HistoryResponse>('/training/history', {
+        await api.get<HistoryResponse>(isAdminView ? `/admin/users/${adminUserId}/history` : '/training/history', {
           params: {
             page,
             pageSize,
@@ -116,14 +130,20 @@ export default function HistoryPage() {
   });
 
   const detailQuery = useQuery({
-    queryKey: ['training-history-detail', selectedId],
+    queryKey: ['training-history-detail', isAdminView ? adminUserId : 'self', selectedId],
     enabled: Boolean(selectedId),
-    queryFn: async () => normalizeSession((await api.get<Session>(`/training/${selectedId}`)).data),
+    queryFn: async () =>
+      normalizeSession((await api.get<Session>(isAdminView ? `/admin/users/${adminUserId}/training/${selectedId}` : `/training/${selectedId}`)).data),
   });
   const reviewDetailQuery = useQuery({
-    queryKey: ['training-history-review-detail', selectedId],
+    queryKey: ['training-history-review-detail', isAdminView ? adminUserId : 'self', selectedId],
     enabled: Boolean(selectedId),
-    queryFn: async () => (await api.get<{ review: { content: string; problemTags?: string[] } | null }>(`/training/${selectedId}/review`)).data,
+    queryFn: async () =>
+      (
+        await api.get<{ review: { content: string; problemTags?: string[] } | null }>(
+          isAdminView ? `/admin/users/${adminUserId}/training/${selectedId}/review` : `/training/${selectedId}/review`,
+        )
+      ).data,
   });
 
   const items = useMemo(() => {
@@ -148,11 +168,11 @@ export default function HistoryPage() {
       <header className="app-nav shrink-0">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
           <div>
-            <PageTitle>历史训练记录</PageTitle>
-            <PageDescription>查看历史成绩并复盘操作细节</PageDescription>
+            <PageTitle>{isAdminView ? `用户历史训练记录（${targetLabel || '未命名用户'}）` : '历史训练记录'}</PageTitle>
+            <PageDescription>{isAdminView ? `查看 ${targetLabel || '该用户'} 的历史成绩与复盘细节` : '查看历史成绩并复盘操作细节'}</PageDescription>
           </div>
-          <Link href="/">
-            <Button variant="ghost" size="sm">返回训练</Button>
+          <Link href={isAdminView && from === 'admin-users' ? '/admin/users' : '/'}>
+            <Button variant="ghost" size="sm">{isAdminView && from === 'admin-users' ? '返回用户列表' : '返回训练'}</Button>
           </Link>
         </div>
       </header>
@@ -236,7 +256,7 @@ export default function HistoryPage() {
                               {item.isLiquidated ? '已爆仓' : item.status === 'ACTIVE' ? '训练中' : item.status === 'TERMINATED' ? '已终止' : '已完成'}
                             </span>
                             <Link
-                              href={`/history/${item.id}/review`}
+                              href={isAdminView ? `/history/${item.id}/review?adminUserId=${encodeURIComponent(adminUserId)}&from=${encodeURIComponent(from)}&label=${encodeURIComponent(targetLabel)}` : `/history/${item.id}/review`}
                               className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/25"
                               onClick={(e) => e.stopPropagation()}
                             >

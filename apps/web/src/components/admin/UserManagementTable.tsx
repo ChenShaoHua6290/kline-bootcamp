@@ -46,6 +46,7 @@ export function UserManagementTable({
   onUnban,
   onAccessAction,
   onResetPassword,
+  onViewHistory,
 }: {
   rows: AdminUserRow[];
   pendingBanId?: string | null;
@@ -54,6 +55,7 @@ export function UserManagementTable({
   onUnban: (row: AdminUserRow) => void;
   onAccessAction?: (row: AdminUserRow, action: 'renew_monthly' | 'renew_quarterly' | 'renew_yearly' | 'to_trial' | 'to_paid' | 'to_internal' | 'disable_access' | 'enable_access') => void;
   onResetPassword?: (row: AdminUserRow) => void;
+  onViewHistory?: (row: AdminUserRow) => void;
 }) {
   const desktopCols = 'grid-cols-[0.85fr_1.05fr_0.45fr_0.62fr_0.85fr_0.7fr_0.38fr_0.38fr_0.88fr_1.1fr]';
   return (
@@ -75,15 +77,20 @@ export function UserManagementTable({
             </div>
             <div className="mt-2">
               {row.role !== 'ADMIN' ? (
-                row.isBanned ? (
-                  <Button size="sm" variant="success" className="w-full" disabled={pendingUnbanId === row.id || pendingBanId === row.id} onClick={() => onUnban(row)}>
-                    {pendingUnbanId === row.id ? '处理中...' : '解封'}
+                <div className="grid grid-cols-2 gap-2">
+                  {row.isBanned ? (
+                    <Button size="sm" variant="success" className="w-full" disabled={pendingUnbanId === row.id || pendingBanId === row.id} onClick={() => onUnban(row)}>
+                      {pendingUnbanId === row.id ? '处理中...' : '解封'}
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="danger" className="w-full" disabled={pendingBanId === row.id || pendingUnbanId === row.id} onClick={() => onBan(row)}>
+                      {pendingBanId === row.id ? '处理中...' : '封禁'}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" className="w-full" onClick={() => onViewHistory?.(row)}>
+                    历史记录
                   </Button>
-                ) : (
-                  <Button size="sm" variant="danger" className="w-full" disabled={pendingBanId === row.id || pendingUnbanId === row.id} onClick={() => onBan(row)}>
-                    {pendingBanId === row.id ? '处理中...' : '封禁'}
-                  </Button>
-                )
+                </div>
               ) : (
                 <span className="text-slate-500">管理员不可操作</span>
               )}
@@ -149,6 +156,9 @@ export function UserManagementTable({
                   ) : null}
                   <Button size="sm" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 py-0 text-[10px]" onClick={() => onResetPassword?.(row)}>
                     重置密码
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 py-0 text-[10px]" onClick={() => onViewHistory?.(row)}>
+                    历史记录
                   </Button>
                 </>
               ) : (

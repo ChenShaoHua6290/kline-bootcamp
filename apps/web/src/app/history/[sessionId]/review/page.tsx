@@ -88,6 +88,11 @@ function aggregateBars(
 
 export default function HistoryReviewPage() {
   const params = useParams<{ sessionId: string }>();
+  const searchParams = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  const adminUserId = searchParams.get('adminUserId')?.trim() ?? '';
+  const from = searchParams.get('from')?.trim() ?? '';
+  const label = searchParams.get('label')?.trim() ?? '';
+  const isAdminView = Boolean(adminUserId);
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<{ open: boolean; message: string; tone: 'success' | 'error' | 'info' }>({
     open: false,
@@ -100,9 +105,11 @@ export default function HistoryReviewPage() {
   const [focusedTimestamp, setFocusedTimestamp] = useState<number | undefined>(undefined);
 
   const reviewQuery = useQuery({
-    queryKey: ['training-review-detail', params.sessionId],
+    queryKey: ['training-review-detail', isAdminView ? adminUserId : 'self', params.sessionId],
     queryFn: async () => {
-      const data = (await api.get(`/training/${params.sessionId}/review`)).data;
+      const data = (
+        await api.get(isAdminView ? `/admin/users/${adminUserId}/training/${params.sessionId}/review` : `/training/${params.sessionId}/review`)
+      ).data;
       return { ...data, session: normalizeSession(data.session) };
     },
   });
@@ -117,7 +124,7 @@ export default function HistoryReviewPage() {
       const to = sessionForBars.currentTimePointer ?? sessionForBars.barsData?.[sessionForBars.pointer]?.time;
       if (!from || !to) return { bars: [] as Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> };
       return (
-        await api.get(`/training/${params.sessionId}/bars`, {
+        await api.get(isAdminView ? `/admin/users/${adminUserId}/training/${params.sessionId}/bars` : `/training/${params.sessionId}/bars`, {
           params: { timeframe: viewTimeframe, from, to },
         })
       ).data as { bars: Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null }> };
@@ -190,7 +197,7 @@ export default function HistoryReviewPage() {
       <div className="mx-auto flex h-full max-w-[1400px] min-h-0 flex-col gap-3">
         <div className="flex h-8 shrink-0 items-center justify-between">
           <PageTitle className="text-sm sm:text-base">训练复盘详情</PageTitle>
-          <Link href="/history">
+          <Link href={isAdminView ? `/history?adminUserId=${encodeURIComponent(adminUserId)}&from=${encodeURIComponent(from)}&label=${encodeURIComponent(label)}` : '/history'}>
             <Button variant="default" size="sm">返回历史记录</Button>
           </Link>
         </div>

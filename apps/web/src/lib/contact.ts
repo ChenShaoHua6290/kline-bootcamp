@@ -10,7 +10,7 @@ export function resolveAdminWechatQr() {
   const raw =
     process.env.NEXT_PUBLIC_ADMIN_WECHAT_QR?.trim() ||
     process.env.NEXT_PUBLIC_CONTACT_WECHAT_QR?.trim() ||
-    '/images/wechat-qr.png';
+    '/images/official/wechat-qr-hd.png';
 
   if (!raw) return '';
   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('/')) return raw;

@@ -2,13 +2,18 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuard
 import { Throttle } from '@nestjs/throttler';
 import { AdminGuard } from '../auth/admin.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { HistoryQueryDto } from '../training/dto';
+import { TrainingService } from '../training/training.service';
 import { AdminService } from './admin.service';
 import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
 
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly trainingService: TrainingService,
+  ) {}
 
   @Get('summary')
   summary() {
@@ -60,5 +65,31 @@ export class AdminController {
   @Patch('users/:id/reset-password')
   resetUserPassword(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: AdminResetUserPasswordDto) {
     return this.adminService.resetUserPassword(req.user.sub, id, dto);
+  }
+
+  @Get('users/:id/history')
+  userHistory(@Param('id') id: string, @Query() query: HistoryQueryDto) {
+    return this.trainingService.history(id, query);
+  }
+
+  @Get('users/:id/training/:sessionId')
+  userTrainingDetail(@Param('id') id: string, @Param('sessionId') sessionId: string) {
+    return this.trainingService.getByIdForAdmin(id, sessionId);
+  }
+
+  @Get('users/:id/training/:sessionId/review')
+  userTrainingReview(@Param('id') id: string, @Param('sessionId') sessionId: string) {
+    return this.trainingService.getReviewDetailForAdmin(id, sessionId);
+  }
+
+  @Get('users/:id/training/:sessionId/bars')
+  userTrainingBars(
+    @Param('id') id: string,
+    @Param('sessionId') sessionId: string,
+    @Query('timeframe') timeframe: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.trainingService.getBarsWindow(id, sessionId, timeframe, from, to);
   }
 }

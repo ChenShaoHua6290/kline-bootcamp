@@ -684,6 +684,10 @@ export class TrainingService {
     };
   }
 
+  async getByIdForAdmin(targetUserId: string, sessionId: string) {
+    return this.getById(targetUserId, sessionId);
+  }
+
   async getReviewDetail(userId: string, sessionId: string) {
     const session = await this.prisma.trainingSession.findFirst({
       where: { id: sessionId, userId },
@@ -729,6 +733,10 @@ export class TrainingService {
           }
         : null,
     };
+  }
+
+  async getReviewDetailForAdmin(targetUserId: string, sessionId: string) {
+    return this.getReviewDetail(targetUserId, sessionId);
   }
 
   async saveReview(userId: string, sessionId: string, dto: SaveTrainingReviewDto) {

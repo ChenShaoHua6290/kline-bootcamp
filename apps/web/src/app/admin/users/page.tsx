@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { getAuthUser, getToken } from '@/lib/auth';
@@ -18,6 +19,7 @@ import { NoticeModal } from '@/components/NoticeModal';
 import { PASSWORD_STRENGTH_HINT, isPasswordStrong } from '@/lib/password';
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const generateTempPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
     let randomPart = '';
@@ -229,6 +231,15 @@ export default function AdminUsersPage() {
             }
           }}
           onResetPassword={(row) => setResetPasswordModal({ open: true, row, newPassword: '', confirmPassword: '', generatedPassword: '' })}
+          onViewHistory={(row) => {
+            const label = (row.nickname || row.email || '').trim();
+            const qs = new URLSearchParams({
+              adminUserId: row.id,
+              from: 'admin-users',
+              label,
+            });
+            router.push(`/history?${qs.toString()}`);
+          }}
         />
       ) : null}
 

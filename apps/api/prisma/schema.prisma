@@ -396,34 +396,6 @@ model SecurityLog {
   @@index([action, createdAt])
 }
 
-model DataImportJob {
-  id              String              @id @default(cuid())
-  market          String
-  source          String
-  symbols         Json
-  interval        String
-  startMonth      String?
-  endMonth        String?
-  status          DataImportJobStatus @default(PENDING)
-  totalFiles      Int                 @default(0)
-  downloadedFiles Int                 @default(0)
-  normalizedFiles Int                 @default(0)
-  importedRows    Int                 @default(0)
-  skippedRows     Int                 @default(0)
-  failedFiles     Json?
-  errorMessage    String?
-  startedAt       DateTime?
-  finishedAt      DateTime?
-  createdBy       String
-  autoAggregate   Boolean             @default(false)
-  overwrite       Boolean             @default(false)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  @@index([status, createdAt])
-  @@index([createdBy, createdAt])
-}
-
 model SymbolDataStats {
   id          String    @id @default(cuid())
   symbolId    String
@@ -491,18 +463,6 @@ enum AuditAction {
   INVITE_UPDATE
   INVITE_DELETE
   LOGIN_FAILED
-}
-
-enum DataImportJobStatus {
-  PENDING
-  DOWNLOADING
-  UNZIPPING
-  NORMALIZING
-  IMPORTING
-  AGGREGATING
-  COMPLETED
-  FAILED
-  CANCELLED
 }
 
 enum InviteCodeType {

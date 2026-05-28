@@ -213,6 +213,17 @@ function buildChartStyles(settings: ChartSettings, hideTimeAxisLabels = false) {
   } as const;
 }
 
+function decimalPlacesOf(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  const s = value.toString().toLowerCase();
+  if (s.includes('e-')) {
+    const exp = Number(s.split('e-')[1]);
+    return Number.isFinite(exp) ? exp : 0;
+  }
+  const dot = s.indexOf('.');
+  return dot >= 0 ? s.length - dot - 1 : 0;
+}
+
 export function KLineChart({
   data,
   actions = [],
@@ -265,6 +276,7 @@ export function KLineChart({
   const [chartSettings, setChartSettings] = useState<ChartSettings>(DEFAULT_CHART_SETTINGS);
   const [selectedIndicators, setSelectedIndicators] = useState<string[]>(['EMA', 'MACD', 'VOL']);
   const [indicatorParams, setIndicatorParams] = useState<Record<string, number[]>>({});
+  const [indicatorPrefsReady, setIndicatorPrefsReady] = useState(false);
   const [paramModal, setParamModal] = useState<{ name: string; values: string[] } | null>(null);
   const [paramToast, setParamToast] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -282,10 +294,11 @@ export function KLineChart({
   const prevViewTimeframeRef = useRef<string | null>(null);
   const viewportSyncRafRef = useRef<number | null>(null);
   const viewportGuardPendingRef = useRef(false);
+  const lastAxisDebugLogAtRef = useRef(0);
   const TRAINING_RIGHT_WHITESPACE_BARS = 0;
   const DEFAULT_VISIBLE_BARS = 120;
   const PRICE_PADDING_RATIO = 0.15;
-  const MIN_PRICE_RANGE_RATIO = 0.003;
+  const MIN_PRICE_RANGE_RATIO = 0.00015;
   const TRAINING_PRICE_WINDOW_BARS = 50;
   const toolBtn = 'rounded-lg border border-slate-600/70 bg-slate-800/80 px-2.5 py-1 text-[12px] font-medium text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
   const activeToolBtn = 'rounded-lg border border-blue-300/60 bg-blue-600/90 px-2.5 py-1 text-[12px] font-semibold text-white shadow shadow-blue-900/50 transition hover:bg-blue-500';
@@ -294,6 +307,65 @@ export function KLineChart({
   const periods = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
   const MAIN_INDICATORS = useMemo(() => new Set(['MA', 'EMA', 'SMA', 'BOLL', 'BBI']), []);
   const SUB_INDICATOR_WHITELIST = useMemo(() => new Set(['VOL', 'MACD', 'RSI', 'KDJ']), []);
+  const INDICATOR_PREFS_STORAGE_KEY = 'kline_indicator_prefs_v1';
+  const pricePrecision = useMemo(() => {
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return 2;
+    let maxDp = 0;
+    const start = Math.max(0, rows.length - 800);
+    for (let i = start; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (!row) continue;
+      maxDp = Math.max(maxDp, decimalPlacesOf(row.open), decimalPlacesOf(row.high), decimalPlacesOf(row.low), decimalPlacesOf(row.close));
+    }
+    return Math.max(2, Math.min(8, maxDp));
+  }, [data]);
+  const isAxisDebugEnabled = () => {
+    if (typeof window === 'undefined') return false;
+    const localFlag = window.localStorage.getItem('kline_debug_axis');
+    if (localFlag === '1' || localFlag === 'true') return true;
+    const globalFlag = (window as unknown as { __KLINE_DEBUG_AXIS?: boolean }).__KLINE_DEBUG_AXIS;
+    return Boolean(globalFlag);
+  };
+
+  const logAxisDebug = (source: string) => {
+    if (!isAxisDebugEnabled()) return;
+    const now = Date.now();
+    if (now - lastAxisDebugLogAtRef.current < 220) return;
+    lastAxisDebugLogAtRef.current = now;
+    const chart = chartRef.current as unknown as {
+      getVisibleRange?: () => { from?: number; to?: number; realFrom?: number; realTo?: number };
+    } | null;
+    if (!chart?.getVisibleRange || rowsRef.current.length === 0) return;
+    const vr = chart.getVisibleRange();
+    const fromRaw = typeof vr.realFrom === 'number' ? vr.realFrom : vr.from;
+    const toRaw = typeof vr.realTo === 'number' ? vr.realTo : vr.to;
+    if (!Number.isFinite(fromRaw) || !Number.isFinite(toRaw)) return;
+    const from = Math.max(0, Math.floor(fromRaw as number));
+    const to = Math.max(from, Math.min(rowsRef.current.length - 1, Math.ceil(toRaw as number)));
+    let minPrice = Number.POSITIVE_INFINITY;
+    let maxPrice = Number.NEGATIVE_INFINITY;
+    for (let i = from; i <= to; i += 1) {
+      const row = rowsRef.current[i];
+      if (!row) continue;
+      minPrice = Math.min(minPrice, row.low, row.open, row.close);
+      maxPrice = Math.max(maxPrice, row.high, row.open, row.close);
+    }
+    const payload = {
+      source,
+      timeframe,
+      visibleRange: vr,
+      clamped: { from, to, count: to - from + 1 },
+      visiblePrice: {
+        min: Number.isFinite(minPrice) ? minPrice : null,
+        max: Number.isFinite(maxPrice) ? maxPrice : null,
+        spread: Number.isFinite(minPrice) && Number.isFinite(maxPrice) ? maxPrice - minPrice : null,
+      },
+      focusedBar: typeof focusDataIndex === 'number' ? rowsRef.current[focusDataIndex] ?? null : null,
+    };
+    console.info('[kline-axis-debug]', payload);
+    console.info('[kline-axis-debug-json]', JSON.stringify(payload));
+  };
   const INDICATOR_LABELS = useMemo<Record<string, string>>(
     () => ({
       MA: 'MA(移动平均线)',
@@ -427,23 +499,58 @@ export function KLineChart({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(INDICATOR_PREFS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        selectedIndicators?: string[];
+        indicatorParams?: Record<string, number[]>;
+      };
+      if (Array.isArray(parsed.selectedIndicators)) {
+        const deduped = Array.from(new Set(parsed.selectedIndicators))
+          .filter((name) => supportedIndicators.includes(name));
+        if (deduped.length > 0) setSelectedIndicators(deduped);
+      }
+      if (parsed.indicatorParams && typeof parsed.indicatorParams === 'object') {
+        const cleaned: Record<string, number[]> = {};
+        Object.entries(parsed.indicatorParams).forEach(([name, values]) => {
+          if (!supportedIndicators.includes(name) || !Array.isArray(values)) return;
+          const safeVals = values
+            .map((v) => Number(v))
+            .filter((v) => Number.isFinite(v) && v > 0)
+            .slice(0, 8);
+          if (safeVals.length > 0) cleaned[name] = safeVals;
+        });
+        setIndicatorParams(cleaned);
+      }
+    } catch {
+      // ignore invalid local indicator prefs
+    } finally {
+      setIndicatorPrefsReady(true);
+    }
+    if (!window.localStorage.getItem(INDICATOR_PREFS_STORAGE_KEY)) {
+      setIndicatorPrefsReady(true);
+    }
+  }, [INDICATOR_PREFS_STORAGE_KEY, supportedIndicators]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     window.localStorage.setItem('kline_chart_settings_v1', JSON.stringify(chartSettings));
   }, [chartSettings]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!indicatorPrefsReady) return;
+    const payload = {
+      selectedIndicators,
+      indicatorParams,
+    };
+    window.localStorage.setItem(INDICATOR_PREFS_STORAGE_KEY, JSON.stringify(payload));
+  }, [INDICATOR_PREFS_STORAGE_KEY, selectedIndicators, indicatorParams, indicatorPrefsReady]);
+
   const formatNumber = (value: unknown) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
-    return value.toFixed(2);
-  };
-
-  const decimalPlaces = (value: number) => {
-    if (!Number.isFinite(value)) return 0;
-    const s = value.toString().toLowerCase();
-    if (s.includes('e-')) {
-      const exp = Number(s.split('e-')[1]);
-      return Number.isFinite(exp) ? exp : 0;
-    }
-    const dot = s.indexOf('.');
-    return dot >= 0 ? s.length - dot - 1 : 0;
+    return value.toFixed(pricePrecision);
   };
 
   const getTimeframeMs = (tf: string) => {
@@ -621,7 +728,7 @@ export function KLineChart({
         callback(chartRowsRef.current, false);
       },
     });
-    chart.setSymbol({ ticker: 'TRAIN', pricePrecision: 2, volumePrecision: 2 });
+    chart.setSymbol({ ticker: 'TRAIN', pricePrecision, volumePrecision: 2 });
     chart.setPeriod({ type: 'minute', span: 1 });
     chart.setScrollEnabled(!disableScrollZoom);
     chart.setZoomEnabled(!disableScrollZoom);
@@ -658,44 +765,71 @@ export function KLineChart({
       }) => void;
       getVisibleRange?: () => { from?: number; to?: number; realFrom?: number; realTo?: number };
     };
-    axisCapableChart.overrideYAxis?.({
+    if (hideTimeAxisLabels) {
+      axisCapableChart.overrideYAxis?.({
       paneId: 'candle_pane',
       id: 'candle_pane',
       createRange: ({ defaultRange }) => {
         const vr = axisCapableChart.getVisibleRange?.();
         const fromIdxRaw = typeof vr?.realFrom === 'number' ? vr.realFrom : vr?.from;
         const toIdxRaw = typeof vr?.realTo === 'number' ? vr.realTo : vr?.to;
-        if (!Number.isFinite(fromIdxRaw) || !Number.isFinite(toIdxRaw) || rowsRef.current.length === 0) return defaultRange;
-        const fromIdx = Math.max(0, Math.floor(fromIdxRaw as number));
-        const toIdx = Math.max(fromIdx, Math.min(rowsRef.current.length - 1, Math.ceil(toIdxRaw as number)));
+        if (rowsRef.current.length === 0) return defaultRange;
+        const fallbackToIdx = rowsRef.current.length - 1;
+        const fallbackFromIdx = Math.max(0, fallbackToIdx - DEFAULT_VISIBLE_BARS + 1);
+        const fromIdx = Number.isFinite(fromIdxRaw) ? Math.max(0, Math.floor(fromIdxRaw as number)) : fallbackFromIdx;
+        const toIdx = Number.isFinite(toIdxRaw)
+          ? Math.max(fromIdx, Math.min(rowsRef.current.length - 1, Math.ceil(toIdxRaw as number)))
+          : fallbackToIdx;
         const trainingToIdx = rowsRef.current.length - 1;
         const trainingFromIdx = Math.max(0, trainingToIdx - TRAINING_PRICE_WINDOW_BARS);
         const effectiveFromIdx = hideTimeAxisLabels ? trainingFromIdx : fromIdx;
         const effectiveToIdx = hideTimeAxisLabels ? trainingToIdx : toIdx;
-        const lows: number[] = [];
-        const highs: number[] = [];
+        let minPrice = Number.POSITIVE_INFINITY;
+        let maxPrice = Number.NEGATIVE_INFINITY;
         let maxDecimals = 0;
         for (let i = effectiveFromIdx; i <= effectiveToIdx; i += 1) {
           const row = rowsRef.current[i];
           if (!row) continue;
-          if (Number.isFinite(row.low)) lows.push(row.low);
-          if (Number.isFinite(row.high)) highs.push(row.high);
-          if (Number.isFinite(row.close)) maxDecimals = Math.max(maxDecimals, decimalPlaces(row.close));
+          if (Number.isFinite(row.low)) minPrice = Math.min(minPrice, row.low);
+          if (Number.isFinite(row.high)) maxPrice = Math.max(maxPrice, row.high);
+          if (Number.isFinite(row.open)) {
+            minPrice = Math.min(minPrice, row.open);
+            maxPrice = Math.max(maxPrice, row.open);
+          }
+          if (Number.isFinite(row.close)) {
+            minPrice = Math.min(minPrice, row.close);
+            maxPrice = Math.max(maxPrice, row.close);
+          }
+          if (Number.isFinite(row.close)) maxDecimals = Math.max(maxDecimals, decimalPlacesOf(row.close));
         }
-        if (lows.length === 0 || highs.length === 0) return defaultRange;
-        lows.sort((a, b) => a - b);
-        highs.sort((a, b) => a - b);
-        const trim = lows.length >= 20 ? Math.min(10, Math.floor(lows.length * 0.25)) : 0;
-        const low = lows[Math.min(lows.length - 1, trim)];
-        const high = highs[Math.max(0, highs.length - 1 - trim)];
+        const low = minPrice;
+        const high = maxPrice;
         if (!Number.isFinite(low) || !Number.isFinite(high)) return defaultRange;
         const mid = (high + low) / 2;
         const rawRange = Math.max(0, high - low);
         const minRangeByPrice = Math.max(5e-8, Math.abs(mid) * MIN_PRICE_RANGE_RATIO);
-        const tick = Math.pow(10, -Math.min(10, maxDecimals));
-        const minRangeByTick = Math.max(5e-8, tick * 220);
-        const finalRange = Math.max(rawRange, minRangeByPrice, minRangeByTick);
-        const pad = finalRange * PRICE_PADDING_RATIO;
+        const fallbackTick = Math.pow(10, -Math.min(10, maxDecimals));
+        let inferredTick = Number.POSITIVE_INFINITY;
+        for (let i = effectiveFromIdx; i <= effectiveToIdx; i += 1) {
+          const row = rowsRef.current[i];
+          if (!row) continue;
+          const span = Math.abs(row.high - row.low);
+          if (Number.isFinite(span) && span > 0) inferredTick = Math.min(inferredTick, span);
+          if (i > effectiveFromIdx) {
+            const prev = rowsRef.current[i - 1];
+            if (prev) {
+              const closeStep = Math.abs(row.close - prev.close);
+              if (Number.isFinite(closeStep) && closeStep > 0) inferredTick = Math.min(inferredTick, closeStep);
+            }
+          }
+        }
+        const tick = Number.isFinite(inferredTick) ? inferredTick : fallbackTick;
+        const minRangeByTick = Math.max(5e-8, tick * 2);
+        const hasMeaningfulMove = rawRange > minRangeByTick * 1.2;
+        const finalRange = hasMeaningfulMove
+          ? Math.max(rawRange, minRangeByTick)
+          : Math.max(rawRange, minRangeByPrice, minRangeByTick);
+        const pad = hasMeaningfulMove ? finalRange * PRICE_PADDING_RATIO : finalRange * 0.08;
         const minValue = mid - finalRange / 2 - pad;
         const maxValue = mid + finalRange / 2 + pad;
         if (!Number.isFinite(minValue) || !Number.isFinite(maxValue) || maxValue <= minValue) return defaultRange;
@@ -712,7 +846,8 @@ export function KLineChart({
           displayRange: maxValue - minValue,
         };
       },
-    });
+      });
+    }
     const initChartWithApply = chart as unknown as { applyNewData?: (rows: KLineData[], more?: boolean) => void };
     if (typeof initChartWithApply.applyNewData === 'function') {
       initChartWithApply.applyNewData(chartRowsRef.current, false);
@@ -768,6 +903,12 @@ export function KLineChart({
       chart.subscribeAction('onScroll', maybeTriggerLoadOlder);
       chart.subscribeAction('onZoom', maybeTriggerLoadOlder);
     }
+    const debugOnScroll = () => logAxisDebug('scroll');
+    const debugOnZoom = () => logAxisDebug('zoom');
+    const debugOnCrosshair = () => logAxisDebug('crosshair');
+    chart.subscribeAction('onScroll', debugOnScroll);
+    chart.subscribeAction('onZoom', debugOnZoom);
+    chart.subscribeAction('onCrosshairChange', debugOnCrosshair);
     setChartReady(true);
 
     const paneEl = chartPaneRef.current;
@@ -789,11 +930,14 @@ export function KLineChart({
         chart.unsubscribeAction('onScroll', maybeTriggerLoadOlder);
         chart.unsubscribeAction('onZoom', maybeTriggerLoadOlder);
       }
+      chart.unsubscribeAction('onScroll', debugOnScroll);
+      chart.unsubscribeAction('onZoom', debugOnZoom);
+      chart.unsubscribeAction('onCrosshairChange', debugOnCrosshair);
       dispose(chart);
       chartRef.current = null;
       setChartReady(false);
     };
-  }, [disableScrollZoom]);
+  }, [disableScrollZoom, pricePrecision]);
 
   useEffect(() => {
     if (!loadingOlder) leftEdgeLockRef.current = false;
@@ -815,7 +959,7 @@ export function KLineChart({
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !chartReady) return;
+    if (!chart || !chartReady || !indicatorPrefsReady) return;
     chart.removeIndicator();
     selectedIndicators.forEach((name) => {
       const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
@@ -834,7 +978,7 @@ export function KLineChart({
     }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS]);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady]);
 
   useLayoutEffect(() => {
     const prevRows = rowsRef.current;
@@ -859,15 +1003,15 @@ export function KLineChart({
     const timeframeChanged = prevViewTimeframeRef.current !== timeframe;
     const rowsShapeChanged =
       rowsRef.current.length !== prevRows.length || currentFirstTs !== prevFirstTs || currentLastTs !== prevLastTs;
-    if (timeframeChanged && !rowsShapeChanged) {
-      return;
-    }
+    const skipDataApplyOnly = timeframeChanged && !rowsShapeChanged;
     const shouldInitViewport = !viewportInitRef.current || timeframeChanged;
-    const chartWithApply = chart as unknown as { applyNewData?: (rows: KLineData[], more?: boolean) => void };
-    if (typeof chartWithApply.applyNewData === 'function') {
-      chartWithApply.applyNewData(chartRowsRef.current, false);
-    } else {
-      chart.resetData();
+    if (!skipDataApplyOnly) {
+      const chartWithApply = chart as unknown as { applyNewData?: (rows: KLineData[], more?: boolean) => void };
+      if (typeof chartWithApply.applyNewData === 'function') {
+        chartWithApply.applyNewData(chartRowsRef.current, false);
+      } else {
+        chart.resetData();
+      }
     }
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
@@ -930,7 +1074,7 @@ export function KLineChart({
           { timestamp, value: baseValue },
           { timestamp, value: labelValue },
         ],
-        extendData: `${meta.label} ${a.price.toFixed(2)}`,
+        extendData: `${meta.label} ${a.price.toFixed(pricePrecision)}`,
         styles: {
           line: { color: palette.line, size: emphasized ? 2 : 1 },
           polygon: { color: palette.line, borderColor: palette.line },
@@ -992,7 +1136,7 @@ export function KLineChart({
           name: 'simpleAnnotation',
           groupId: 'risk-lines',
           points: [{ timestamp: lastTimestamp, value: stopLossPrice }],
-          extendData: `止损 ${stopLossPrice.toFixed(2)}`,
+          extendData: `止损 ${stopLossPrice.toFixed(pricePrecision)}`,
           styles: {
             text: { backgroundColor: '#7f1d1d', borderColor: '#b91c1c', color: '#fecaca' },
             line: { color: '#ef4444' },
@@ -1013,7 +1157,7 @@ export function KLineChart({
           name: 'simpleAnnotation',
           groupId: 'risk-lines',
           points: [{ timestamp: lastTimestamp, value: takeProfitPrice }],
-          extendData: `止盈 ${takeProfitPrice.toFixed(2)}`,
+          extendData: `止盈 ${takeProfitPrice.toFixed(pricePrecision)}`,
           styles: {
             text: { backgroundColor: '#064e3b', borderColor: '#059669', color: '#a7f3d0' },
             line: { color: '#10b981' },
@@ -1032,7 +1176,7 @@ export function KLineChart({
     }
     prevViewTimeframeRef.current = timeframe;
     refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-  }, [data, actions, stopLossPrice, takeProfitPrice, highlightedActionId, showTradeOverlays, hideTimeAxisLabels, timeframe]);
+  }, [chartReady, data, actions, stopLossPrice, takeProfitPrice, highlightedActionId, showTradeOverlays, hideTimeAxisLabels, timeframe]);
 
   useEffect(() => {
     refreshIndicatorLegend(focusDataIndex);
@@ -1210,6 +1354,17 @@ export function KLineChart({
     setParamToast(`${paramModal.name} 参数已更新`);
   };
 
+  const resetIndicatorParamsToDefault = () => {
+    const next: Record<string, number[]> = {};
+    selectedIndicators.forEach((name) => {
+      const params = DEFAULT_INDICATOR_PARAMS[name];
+      if (Array.isArray(params) && params.length > 0) next[name] = [...params];
+    });
+    setIndicatorParams(next);
+    setParamModal(null);
+    setParamToast('已恢复默认指标参数');
+  };
+
   const priceInfo = useMemo(() => {
     const focusBar = typeof focusDataIndex === 'number' && focusDataIndex >= 0 && focusDataIndex < rowsRef.current.length ? rowsRef.current[focusDataIndex] : null;
     if (!focusBar) {
@@ -1338,13 +1493,14 @@ export function KLineChart({
         </div>
       </div>
 
-      {showIndicatorModal ? (
-        <div className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-[1px]" onClick={() => setShowIndicatorModal(false)}>
+      {showIndicatorModal && canPortal
+        ? createPortal((
+        <div className="fixed inset-0 z-[420] overflow-y-auto bg-black/55 px-3 py-5 backdrop-blur-[1px] sm:px-4 sm:py-8" onClick={() => setShowIndicatorModal(false)}>
           <div
-            className="mx-auto mt-20 w-[440px] max-w-[94vw] rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
+            className="mx-auto my-2 flex max-h-[calc(100vh-112px)] w-[470px] max-w-[88vw] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl sm:my-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3.5">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-700 px-3.5 py-3">
               <div>
                 <h3 className="text-[15px] font-semibold tracking-[0.01em] text-slate-100">指标设置</h3>
                 <p className="mt-0.5 text-[11px] text-slate-500">选择要显示的指标，并按需调整参数。</p>
@@ -1353,7 +1509,7 @@ export function KLineChart({
                 ✕
               </Button>
             </div>
-            <div className="max-h-[68vh] overflow-y-auto px-4 py-3 text-sm">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2.5 text-sm">
               {paramToast ? (
                 <div className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">{paramToast}</div>
               ) : null}
@@ -1438,8 +1594,26 @@ export function KLineChart({
               </div>
               </section>
             </div>
+            <div className="shrink-0 flex items-center justify-end gap-2 border-t border-slate-700 px-3.5 py-2.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="!px-3 !py-1.5 text-[12px]"
+                onClick={resetIndicatorParamsToDefault}
+              >
+                恢复默认指标参数
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="!px-3 !py-1.5 text-[12px]"
+                onClick={() => setShowIndicatorModal(false)}
+              >
+                完成
+              </Button>
+            </div>
             {paramModal ? (
-              <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-3" onClick={() => setParamModal(null)}>
+              <div className="fixed inset-0 z-[430] flex items-center justify-center bg-black/45 px-3" onClick={() => setParamModal(null)}>
                 <div className="w-full max-w-[360px] rounded-2xl border border-slate-700 bg-slate-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3.5">
                     <div>
@@ -1489,14 +1663,14 @@ export function KLineChart({
             ) : null}
           </div>
         </div>
-      ) : null}
+      ), document.body) : null}
 
       {showSettingsModal && canPortal
         ? createPortal(
         <div className="fixed inset-0 z-[400] flex items-start justify-center bg-black/55 pt-16 backdrop-blur-[1px] sm:pt-20" onClick={() => setShowSettingsModal(false)}>
           <div
             ref={settingsModalRef}
-            className="w-[560px] max-h-[calc(100vh-28px)] max-w-[95vw] overflow-hidden rounded-2xl border border-slate-700 bg-[#1b1e27] text-slate-100 shadow-2xl"
+            className="w-[560px] max-h-[calc(100vh-112px)] max-w-[95vw] overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
             style={{ transform: `scale(${settingsModalScale})`, transformOrigin: 'center top', willChange: 'transform' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1509,7 +1683,7 @@ export function KLineChart({
                 ×
               </Button>
             </div>
-            <div className="max-h-[calc(100vh-210px)] space-y-3 overflow-y-auto px-5 py-4 text-sm sm:px-6 sm:py-4">
+            <div className="max-h-[calc(100vh-294px)] space-y-3 overflow-y-auto px-5 py-4 text-sm sm:px-6 sm:py-4">
               <section className="rounded-xl border border-slate-700/80 bg-slate-900/35 p-3">
                 <div className="mb-2 text-[15px] font-semibold tracking-[0.02em] text-cyan-300">图表显示</div>
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
