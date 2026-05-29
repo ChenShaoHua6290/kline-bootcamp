@@ -1,11 +1,10 @@
-import Link from 'next/link';
 import { systemCards } from '@/data/official-home-content';
 
 const orbitConfig = [
-  'lg:top-0 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-3',
-  'lg:top-1/2 lg:right-0 lg:-translate-y-1/2',
-  'lg:bottom-0 lg:left-1/2 lg:-translate-x-1/2 lg:translate-y-3',
-  'lg:top-1/2 lg:left-0 lg:-translate-y-1/2',
+  'lg:top-3 lg:left-1/2 lg:-translate-x-1/2',
+  'lg:top-1/2 lg:right-6 lg:-translate-y-1/2',
+  'lg:bottom-3 lg:left-1/2 lg:-translate-x-1/2',
+  'lg:top-1/2 lg:left-6 lg:-translate-y-1/2',
 ] as const;
 
 export function SystemOverviewSection() {
@@ -19,7 +18,7 @@ export function SystemOverviewSection() {
         <p className="mx-auto mt-1 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg sm:leading-9">学 → 看 → 辅助 → 训练 → 复盘，形成完整闭环。</p>
       </div>
 
-      <div className="rounded-[30px] border border-cyan-300/20 bg-[linear-gradient(160deg,rgba(15,23,42,0.84),rgba(8,47,73,0.36))] p-4 shadow-[0_20px_52px_rgba(2,6,23,0.48)] sm:p-6 lg:p-8">
+      <div className="rounded-[30px] border border-cyan-300/20 bg-[linear-gradient(160deg,rgba(15,23,42,0.84),rgba(8,47,73,0.36))] p-4 shadow-[0_20px_52px_rgba(2,6,23,0.48)] sm:p-6 lg:p-6">
         <div className="grid gap-5 lg:hidden">
           <CenterCard title={centerCard?.title ?? ''} lines={centerCard?.lines ?? []} />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -33,7 +32,7 @@ export function SystemOverviewSection() {
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20" />
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-[540px] w-[540px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/10" />
 
-          <div className="absolute left-1/2 top-1/2 w-[320px] -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute left-1/2 top-1/2 w-[286px] -translate-x-1/2 -translate-y-1/2">
             <CenterCard title={centerCard?.title ?? ''} lines={centerCard?.lines ?? []} />
           </div>
 
@@ -45,24 +44,19 @@ export function SystemOverviewSection() {
         </div>
       </div>
 
-      <div className="mt-7 text-center">
-        <Link href="/system#learning-content" className="inline-flex items-center rounded-xl border border-cyan-300/30 px-5 py-2.5 text-base font-semibold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-500/10">
-          查看详情 →
-        </Link>
-      </div>
     </section>
   );
 }
 
 function CenterCard({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-[26px] border border-cyan-200/35 bg-[linear-gradient(145deg,rgba(14,165,233,0.2),rgba(15,23,42,0.88))] px-4 py-4 text-center shadow-[0_16px_38px_rgba(2,6,23,0.44)]">
-      <p className="text-sm tracking-[0.2em] text-cyan-200/90">核心系统</p>
+    <div className="rounded-[26px] border border-cyan-200/35 bg-[linear-gradient(145deg,rgba(14,165,233,0.2),rgba(15,23,42,0.88))] px-3 py-4 text-left shadow-[0_16px_38px_rgba(2,6,23,0.44)]">
+      <p className="text-sm tracking-[0.2em] text-cyan-200/90">只做一种模式</p>
       <h3 className="mt-2 text-[20px] font-semibold leading-[1.3] text-slate-100">{title}</h3>
       <ul className="mt-3 space-y-0.5 text-[15px] leading-6 text-slate-200/95">
         {lines.map((x) => <li key={x}>• {x}</li>)}
       </ul>
-      <p className="mt-3 text-xs text-cyan-100/80">只做一种模式</p>
+      {/* <p className="mt-3 text-xs text-cyan-100/80">只做一种模式</p> */}
     </div>
   );
 }
@@ -79,7 +73,7 @@ function OrbitCard({ title, lines }: { title: string; lines: string[] }) {
   return (
     <div className={`rounded-3xl border border-cyan-300/25 ${toneClass} p-4 shadow-[0_14px_34px_rgba(2,6,23,0.4)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/60 hover:shadow-[0_18px_34px_rgba(8,145,178,0.2)]`}>
       <h3 className="text-[20px] font-semibold text-slate-100">{title}</h3>
-      <ul className="mt-3 space-y-1 text-base leading-7 text-slate-300">
+      <ul className="mt-3 space-y-0.5 text-[15px] leading-6 text-slate-300">
         {lines.map((x) => <li key={x}>• {x}</li>)}
       </ul>
     </div>

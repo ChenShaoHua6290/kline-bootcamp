@@ -18,7 +18,7 @@ export function HeroSection() {
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <a href="#signup" className="rounded-2xl bg-[linear-gradient(135deg,#67e8f9,#22d3ee_35%,#0ea5e9)] px-7 py-3.5 text-base font-bold text-slate-950 shadow-[0_16px_36px_rgba(6,182,212,0.42)] transition-all hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,#67e8f9,#22d3ee_28%,#0ea5e9_72%,#f59e0b)] hover:shadow-[0_18px_38px_rgba(245,158,11,0.26)]">立即报名</a>
-          <Link href="/system" className="rounded-2xl border border-cyan-300/35 bg-slate-900/65 px-7 py-3.5 text-base font-semibold text-cyan-50 transition-all hover:-translate-y-0.5 hover:border-amber-200/65 hover:bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(245,158,11,0.12))]">查看完整体系</Link>
+          <Link href="/auth" className="rounded-2xl border border-cyan-300/35 bg-slate-900/65 px-7 py-3.5 text-base font-semibold text-cyan-50 transition-all hover:-translate-y-0.5 hover:border-amber-200/65 hover:bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(245,158,11,0.12))]">开始K线训练</Link>
         </div>
       </div>
     </section>

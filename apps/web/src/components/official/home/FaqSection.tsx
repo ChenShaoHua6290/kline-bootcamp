@@ -1,12 +1,27 @@
 'use client';
 
-import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { homeFaqs } from '@/data/official-home-content';
 
 export function FaqSection() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const visibleFaqs = homeFaqs.slice(0, 7);
+  const [showAll, setShowAll] = useState(false);
+  const visibleFaqs = showAll ? homeFaqs : homeFaqs.slice(0, 6);
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      if (window.location.hash !== '#faq-fee') return;
+      const feeIndex = homeFaqs.findIndex(([q]) => q.includes('学习费用'));
+      if (feeIndex >= 0) {
+        setShowAll(true);
+        setActiveIndex(feeIndex);
+      }
+    };
+
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, []);
 
   return (
     <section id="faq" className="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-24 sm:px-6 lg:px-10 lg:pb-32">
@@ -33,7 +48,7 @@ export function FaqSection() {
               <div className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                 <div className="overflow-hidden">
                   <div className="px-6 pb-3 sm:px-7 sm:pb-4">
-                    <p className="text-base leading-8 text-slate-300">{a}</p>
+                    <p className="whitespace-pre-line text-base leading-8 text-slate-300">{a}</p>
                   </div>
                 </div>
               </div>
@@ -42,9 +57,18 @@ export function FaqSection() {
         })}
 
         <div className="pt-2 text-center">
-          <Link href="/system#faq-system" className="inline-flex items-center rounded-xl border border-cyan-300/30 px-5 py-2.5 text-base font-semibold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-500/10">
-            查看更多问题 →
-          </Link>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-xl border border-cyan-300/30 px-5 py-2.5 text-base font-semibold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-500/10"
+            onClick={() => {
+              setShowAll((prev) => {
+                if (prev && activeIndex >= 6) setActiveIndex(-1);
+                return !prev;
+              });
+            }}
+          >
+            {showAll ? '收起更多问题' : '查看更多问题'}
+          </button>
         </div>
       </div>
     </section>

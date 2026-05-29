@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { painPoints } from '@/data/official-home-content';
 
 export function PainPointsSection() {
@@ -38,9 +37,6 @@ export function PainPointsSection() {
         真正限制大多数人的，不是“没学过技术”，而是没有建立固定模式 + 执行体系 + 训练流程。
         所以我们整理了「只做一种模式」完整交易系统体系。
       </p>
-      <div className="mt-6 text-center">
-        <Link href="/system#why-one-mode" className="inline-flex items-center rounded-xl border border-cyan-300/30 px-5 py-2.5 text-base font-semibold text-cyan-100 transition hover:-translate-y-0.5 hover:border-cyan-200/70 hover:bg-cyan-500/10">查看体系逻辑 →</Link>
-      </div>
     </section>
   );
 }

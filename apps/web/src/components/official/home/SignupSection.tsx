@@ -11,11 +11,14 @@ export function SignupSection() {
         <div className="grid gap-4 rounded-3xl border border-cyan-300/25 bg-slate-900/45 p-4 sm:p-5 lg:grid-cols-[1.4fr_auto] lg:items-start lg:gap-6">
           <div>
             <h2 className="text-[28px] font-semibold tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">我要报名</h2>
-            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
+            <p className="mt-4 max-w-3xl text-base leading-4 text-slate-300">
               为了减少不必要沟通，建议先查看体系中心中的服务介绍、学习流程、价格与常见问题。
             </p>
-            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
-              如果确认适合你，再通过微信联系报名。我们会根据你的阶段给出学习与训练建议。
+            <p className="mt-4 max-w-3xl text-base leading-4 text-slate-300">
+              如果你希望系统化建立固定模式执行能力，可直接微信联系报名学习。
+            </p>
+            <p className="mt-4 max-w-3xl text-base leading-4 text-slate-300">
+              如果有其他疑问，也随便欢迎微信上找我咨询，会根据你的阶段给出学习与训练建议。
             </p>
 
             <div className="mt-5 max-w-md rounded-2xl border border-cyan-300/24 bg-[linear-gradient(145deg,rgba(15,23,42,0.85),rgba(8,47,73,0.24))] p-4">
