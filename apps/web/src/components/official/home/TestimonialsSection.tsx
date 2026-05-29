@@ -128,6 +128,8 @@ export function TestimonialsSection() {
                     src={item.image}
                     alt={`${item.name} 反馈截图`}
                     className="relative z-[1] aspect-[4/5] w-full rounded-xl object-cover"
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
                 </div>
