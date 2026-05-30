@@ -321,7 +321,16 @@ export function KLineChart({
   const indicatorRecoverAttemptsRef = useRef(0);
   const indicatorSwitchRecoverTimerRef = useRef<number | null>(null);
   const indicatorSwitchRecoverAttemptsRef = useRef(0);
+  const wantedIndicatorsRef = useRef<string[]>(['EMA', 'MACD', 'VOL']);
   const pendingManualOverlayRestoreRef = useRef<OverlayCreate[] | null>(null);
+  const pendingSwitchTimeframeRef = useRef<string | null>(null);
+  const pendingSwitchStartedAtRef = useRef<number>(0);
+  const axisDampUntilRef = useRef(0);
+  const axisSettleUntilRef = useRef(0);
+  const axisShockUntilRef = useRef(0);
+  const prevYAxisRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const axisLockUntilRef = useRef(0);
+  const axisLockedRangeRef = useRef<{ from: number; to: number } | null>(null);
   const lastAxisDebugLogAtRef = useRef(0);
   const TRAINING_RIGHT_WHITESPACE_BARS = 0;
   const DEFAULT_VISIBLE_BARS = 120;
@@ -726,7 +735,8 @@ export function KLineChart({
 
   const rebuildIndicatorsOnChart = useCallback((chart: Chart) => {
     chart.removeIndicator();
-    selectedIndicators.forEach((name) => {
+    const wanted = wantedIndicatorsRef.current.length > 0 ? wantedIndicatorsRef.current : selectedIndicators;
+    wanted.forEach((name) => {
       const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
       const value: string | IndicatorCreate =
         Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
@@ -737,6 +747,10 @@ export function KLineChart({
       }
     });
   }, [selectedIndicators, indicatorParams, DEFAULT_INDICATOR_PARAMS, MAIN_INDICATORS]);
+
+  useEffect(() => {
+    wantedIndicatorsRef.current = Array.from(new Set(selectedIndicators));
+  }, [selectedIndicators]);
 
   const syncIndicatorParamsFromChart = () => {
     const chart = chartRef.current;
@@ -882,9 +896,64 @@ export function KLineChart({
           ? Math.max(rawRange, minRangeByTick)
           : Math.max(rawRange, minRangeByPrice, minRangeByTick);
         const pad = hasMeaningfulMove ? finalRange * PRICE_PADDING_RATIO : finalRange * 0.08;
-        const minValue = mid - finalRange / 2 - pad;
-        const maxValue = mid + finalRange / 2 + pad;
+        let minValue = mid - finalRange / 2 - pad;
+        let maxValue = mid + finalRange / 2 + pad;
+        const now = Date.now();
+        const locked = axisLockedRangeRef.current;
+        if (now < axisLockUntilRef.current && locked) {
+          prevYAxisRangeRef.current = { from: locked.from, to: locked.to };
+          return {
+            ...defaultRange,
+            from: locked.from,
+            to: locked.to,
+            realFrom: locked.from,
+            realTo: locked.to,
+            range: locked.to - locked.from,
+            realRange: locked.to - locked.from,
+            displayFrom: locked.from,
+            displayTo: locked.to,
+            displayRange: locked.to - locked.from,
+          };
+        }
+        const prevRange = prevYAxisRangeRef.current;
+        if (now < axisDampUntilRef.current && prevRange) {
+          const prevFrom = prevRange.from;
+          const prevTo = prevRange.to;
+          const prevSpan = Math.max(1e-8, prevTo - prevFrom);
+          const nextSpan = Math.max(1e-8, maxValue - minValue);
+          const clampedSpan = Math.min(prevSpan * 1.8, Math.max(prevSpan * 0.6, nextSpan));
+          const prevMid = (prevFrom + prevTo) / 2;
+          const nextMid = (minValue + maxValue) / 2;
+          const dampedMid = prevMid * 0.7 + nextMid * 0.3;
+          minValue = dampedMid - clampedSpan / 2;
+          maxValue = dampedMid + clampedSpan / 2;
+        }
+        if (now < axisSettleUntilRef.current && prevRange) {
+          const prevFrom = prevRange.from;
+          const prevTo = prevRange.to;
+          const prevSpan = Math.max(1e-8, prevTo - prevFrom);
+          const nextSpan = Math.max(1e-8, maxValue - minValue);
+          const clampedSpan = Math.min(prevSpan * 1.45, Math.max(prevSpan * 0.72, nextSpan));
+          const prevMid = (prevFrom + prevTo) / 2;
+          const nextMid = (minValue + maxValue) / 2;
+          const settleMid = prevMid * 0.82 + nextMid * 0.18;
+          minValue = settleMid - clampedSpan / 2;
+          maxValue = settleMid + clampedSpan / 2;
+        }
+        if (now < axisShockUntilRef.current && prevRange) {
+          const prevFrom = prevRange.from;
+          const prevTo = prevRange.to;
+          const prevSpan = Math.max(1e-8, prevTo - prevFrom);
+          const nextSpan = Math.max(1e-8, maxValue - minValue);
+          const clampedSpan = Math.min(prevSpan * 1.22, Math.max(prevSpan * 0.82, nextSpan));
+          const prevMid = (prevFrom + prevTo) / 2;
+          const nextMid = (minValue + maxValue) / 2;
+          const shockMid = prevMid * 0.88 + nextMid * 0.12;
+          minValue = shockMid - clampedSpan / 2;
+          maxValue = shockMid + clampedSpan / 2;
+        }
         if (!Number.isFinite(minValue) || !Number.isFinite(maxValue) || maxValue <= minValue) return defaultRange;
+        prevYAxisRangeRef.current = { from: minValue, to: maxValue };
         return {
           ...defaultRange,
           from: minValue,
@@ -1022,7 +1091,7 @@ export function KLineChart({
     chart.resize();
   }, [chartReady, chartSettings, hideTimeAxisLabels]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady || !indicatorPrefsReady) return;
     if (indicatorRecoverTimerRef.current != null) {
@@ -1033,16 +1102,13 @@ export function KLineChart({
     const applyIndicators = () => rebuildIndicatorsOnChart(chart);
     applyIndicators();
     const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
-    const want = Array.from(new Set(selectedIndicators));
+    const want = Array.from(new Set(wantedIndicatorsRef.current));
     if (isTransientIndicatorEmpty(want, actual)) {
       const retry = () => {
         indicatorRecoverAttemptsRef.current += 1;
         applyIndicators();
         const retried = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
         if (!isTransientIndicatorEmpty(want, retried)) {
-          if (retried.length > 0 && retried.slice().sort().join('|') !== want.slice().sort().join('|')) {
-            setSelectedIndicators(retried);
-          }
           syncIndicatorParamsFromChart();
           refreshIndicatorLegend(focusDataIndex);
           return;
@@ -1054,9 +1120,6 @@ export function KLineChart({
       indicatorRecoverTimerRef.current = window.setTimeout(retry, 80);
       return;
     }
-    if (actual.length > 0 && actual.slice().sort().join('|') !== want.slice().sort().join('|')) {
-      setSelectedIndicators(actual);
-    }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
   }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe, rebuildIndicatorsOnChart]);
@@ -1065,23 +1128,55 @@ export function KLineChart({
     const prevRows = rowsRef.current;
     const isTrainingMode = hideTimeAxisLabels;
     const rows = Array.isArray(data) ? data : [];
-    rowsRef.current = rows.map((d, idx) => {
+    const nextRows = rows.map((d, idx) => {
       const parsed = Date.parse(d.time);
       const timestamp = Number.isFinite(parsed) ? parsed : Date.now() + idx * 60_000;
       return { timestamp, open: d.open, high: d.high, low: d.low, close: d.close, volume: Number(d.volume ?? 0) };
     });
+    const chart = chartRef.current;
+    if (!chart) return;
+    const currentLastTs = nextRows[nextRows.length - 1]?.timestamp ?? null;
+    const prevLastTs = prevRows[prevRows.length - 1]?.timestamp ?? null;
+    const currentFirstTs = nextRows[0]?.timestamp ?? null;
+    const prevFirstTs = prevRows[0]?.timestamp ?? null;
+    const timeframeChanged = prevViewTimeframeRef.current !== timeframe;
+    if (timeframeChanged) {
+      pendingSwitchTimeframeRef.current = timeframe;
+      pendingSwitchStartedAtRef.current = Date.now();
+      axisLockedRangeRef.current = prevYAxisRangeRef.current ? { ...prevYAxisRangeRef.current } : null;
+      // Keep old axis briefly on timeframe switch to avoid large-span jitter,
+      // then hard switch to new range (no long damping delay).
+      axisLockUntilRef.current = Date.now() + 180;
+      axisDampUntilRef.current = Date.now() + 40;
+      axisSettleUntilRef.current = Date.now() + 320;
+      const prevLocked = axisLockedRangeRef.current;
+      if (prevLocked && nextRows.length > 0) {
+        let nextMin = Number.POSITIVE_INFINITY;
+        let nextMax = Number.NEGATIVE_INFINITY;
+        const start = Math.max(0, nextRows.length - TRAINING_PRICE_WINDOW_BARS);
+        for (let i = start; i < nextRows.length; i += 1) {
+          const row = nextRows[i];
+          nextMin = Math.min(nextMin, row.low, row.open, row.close);
+          nextMax = Math.max(nextMax, row.high, row.open, row.close);
+        }
+        const prevSpan = Math.max(1e-8, prevLocked.to - prevLocked.from);
+        const nextSpan = Number.isFinite(nextMin) && Number.isFinite(nextMax) ? Math.max(1e-8, nextMax - nextMin) : prevSpan;
+        const spanRatio = Math.max(prevSpan, nextSpan) / Math.max(1e-8, Math.min(prevSpan, nextSpan));
+        axisShockUntilRef.current = Date.now() + (spanRatio >= 2.2 ? 380 : 0);
+      } else {
+        axisShockUntilRef.current = 0;
+      }
+    }
+    if (pendingSwitchTimeframeRef.current === timeframe && nextRows.length > 0) {
+      pendingSwitchTimeframeRef.current = null;
+      pendingSwitchStartedAtRef.current = 0;
+    }
+    rowsRef.current = nextRows;
     chartRowsRef.current = hideTimeAxisLabels ? appendRightWhitespaceBars(rowsRef.current, getTimeframeMs(timeframe)) : rowsRef.current;
     setFocusDataIndex((prev) => {
       if (typeof prev === 'number' && prev >= 0 && prev < rowsRef.current.length) return prev;
       return rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null;
     });
-    const chart = chartRef.current;
-    if (!chart) return;
-    const currentLastTs = rowsRef.current[rowsRef.current.length - 1]?.timestamp ?? null;
-    const prevLastTs = prevRows[prevRows.length - 1]?.timestamp ?? null;
-    const currentFirstTs = rowsRef.current[0]?.timestamp ?? null;
-    const prevFirstTs = prevRows[0]?.timestamp ?? null;
-    const timeframeChanged = prevViewTimeframeRef.current !== timeframe;
     const rowsShapeChanged =
       rowsRef.current.length !== prevRows.length || currentFirstTs !== prevFirstTs || currentLastTs !== prevLastTs;
     const skipDataApplyOnly = timeframeChanged && !rowsShapeChanged;
@@ -1094,26 +1189,48 @@ export function KLineChart({
         chart.resetData();
       }
     }
+    const wantedCountNow = Array.from(new Set(wantedIndicatorsRef.current)).length;
+    const actualCountNow = Array.from(new Set(chart.getIndicators().map((i) => i.name))).length;
+    if (wantedCountNow > 0 && actualCountNow === 0 && indicatorPrefsReady) {
+      rebuildIndicatorsOnChart(chart);
+      requestAnimationFrame(() => {
+        const nextChart = chartRef.current;
+        if (!nextChart) return;
+        const actualAfter = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
+        if (actualAfter === 0) rebuildIndicatorsOnChart(nextChart);
+      });
+    }
     if (timeframeChanged && indicatorPrefsReady) {
       // Some timeframe switches can internally clear indicators without state change.
-      // Retry until indicator count is restored (bounded attempts).
+      // Rebuild immediately in the same tick, then do at most one extra recovery pass if still missing.
       if (indicatorSwitchRecoverTimerRef.current != null) {
         window.clearTimeout(indicatorSwitchRecoverTimerRef.current);
         indicatorSwitchRecoverTimerRef.current = null;
       }
       indicatorSwitchRecoverAttemptsRef.current = 0;
-      const wantCount = Array.from(new Set(selectedIndicators)).length;
+      const wantCount = Array.from(new Set(wantedIndicatorsRef.current)).length;
+      rebuildIndicatorsOnChart(chart);
+      const immediateCount = Array.from(new Set(chart.getIndicators().map((i) => i.name))).length;
+      if (immediateCount < wantCount) {
+      // Second pass in the same frame to reduce visible delayed indicator appearance.
+      rebuildIndicatorsOnChart(chart);
+      const secondPassCount = Array.from(new Set(chart.getIndicators().map((i) => i.name))).length;
+      if (secondPassCount < wantCount) {
       const recoverAfterSwitch = () => {
         const nextChart = chartRef.current;
         if (!nextChart) return;
+        const beforeCount = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
+        if (beforeCount >= wantCount) return;
         indicatorSwitchRecoverAttemptsRef.current += 1;
         rebuildIndicatorsOnChart(nextChart);
         const actualCount = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
         refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-        if (actualCount >= wantCount || indicatorSwitchRecoverAttemptsRef.current >= 10) return;
-        indicatorSwitchRecoverTimerRef.current = window.setTimeout(recoverAfterSwitch, 120);
+        if (actualCount >= wantCount || indicatorSwitchRecoverAttemptsRef.current >= 2) return;
+        requestAnimationFrame(recoverAfterSwitch);
       };
-      indicatorSwitchRecoverTimerRef.current = window.setTimeout(recoverAfterSwitch, 0);
+      requestAnimationFrame(recoverAfterSwitch);
+      }
+      }
     }
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
@@ -1279,9 +1396,11 @@ export function KLineChart({
       }
     }
     if (isTrainingMode && shouldInitViewport) {
-      syncTrainingViewportWithFallback(chart, rowsRef.current, timeframeChanged ? 'switch' : 'init', true, true);
+      if (!timeframeChanged) {
+        syncTrainingViewportWithFallback(chart, rowsRef.current, 'init', true, true);
+        userInteractedRef.current = false;
+      }
       viewportInitRef.current = true;
-      userInteractedRef.current = false;
     } else if (isTrainingMode && currentLastTs != null && prevLastTs != null && currentLastTs !== prevLastTs) {
       syncTrainingViewportWithFallback(chart, rowsRef.current, 'advance');
     }
@@ -1603,12 +1722,14 @@ export function KLineChart({
             </div>
             
           </div>
-          <div
-            ref={ref}
-            className={`h-full w-full rounded-xl border border-slate-700/90 bg-slate-950/70 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.06)] ${
-              fitContainerHeight ? 'min-h-0' : 'min-h-[420px] sm:min-h-[460px] xl:min-h-[560px] 2xl:min-h-[640px]'
-            }`}
-          />
+          <div className="relative h-full w-full">
+            <div
+              ref={ref}
+              className={`h-full w-full rounded-xl border border-slate-700/90 bg-slate-950/70 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.06)] ${
+                fitContainerHeight ? 'min-h-0' : 'min-h-[420px] sm:min-h-[460px] xl:min-h-[560px] 2xl:min-h-[640px]'
+              }`}
+            />
+          </div>
         </div>
       </div>
 

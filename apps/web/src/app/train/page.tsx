@@ -99,6 +99,10 @@ export default function TrainPage() {
   const [hasMoreOlderBars, setHasMoreOlderBars] = useState(false);
   const [loadingOlderBars, setLoadingOlderBars] = useState(false);
   const barsRequestKeyRef = useRef<string | null>(null);
+  const timeframeBarsMapRef = useRef<
+    Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>
+  >({});
+  const prefetchRequestKeyRef = useRef<string | null>(null);
   const actionInFlightRef = useRef(false);
   const latestPointerRef = useRef(0);
   const holdBatchActiveRef = useRef(false);
@@ -253,8 +257,15 @@ export default function TrainPage() {
   const clearClientTrainingState = () => {
     clearTrainingState();
     setTimeframeBars([]);
+    setTimeframeBarsTf(null);
+    setTimeframeBarsMap({});
+    setStableVisibleBars([]);
     setBarsFromTime(null);
     setHasMoreOlderBars(false);
+    setLoadingOlderBars(false);
+    barsRequestKeyRef.current = null;
+    prefetchRequestKeyRef.current = null;
+    timeframeBarsMapRef.current = {};
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('activeSessionId');
       window.sessionStorage.removeItem('activeSessionId');
@@ -334,6 +345,10 @@ export default function TrainPage() {
   }, [session?.status]);
 
   useEffect(() => {
+    timeframeBarsMapRef.current = timeframeBarsMap;
+  }, [timeframeBarsMap]);
+
+  useEffect(() => {
     if (!session) {
       setTimeframeBars([]);
       setTimeframeBarsTf(null);
@@ -342,6 +357,8 @@ export default function TrainPage() {
       setBarsFromTime(null);
       setHasMoreOlderBars(false);
       barsRequestKeyRef.current = null;
+      prefetchRequestKeyRef.current = null;
+      timeframeBarsMapRef.current = {};
       return;
     }
     const from = barsFromTime ?? session.contextStartTime ?? session.barsData?.[0]?.time;
@@ -359,6 +376,23 @@ export default function TrainPage() {
         setTimeframeBarsMap((prev) => ({ ...prev, [viewTimeframe]: rows }));
         setHasMoreOlderBars(Boolean(res.data?.hasMoreOlder));
         setLoadingOlderBars(false);
+
+        const allTfs = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
+        const pendingTfs = allTfs.filter((tf) => tf !== viewTimeframe && !Array.isArray(timeframeBarsMapRef.current[tf]));
+        if (pendingTfs.length > 0) {
+          prefetchRequestKeyRef.current = requestKey;
+          void Promise.allSettled(
+            pendingTfs.map(async (tf) => {
+              const prefetchRes = await api.get(`/training/${session.id}/bars`, { params: { timeframe: tf, from, to } });
+              if (prefetchRequestKeyRef.current !== requestKey) return;
+              const prefetchRows = Array.isArray(prefetchRes.data?.bars) ? prefetchRes.data.bars : [];
+              setTimeframeBarsMap((prev) => {
+                if (prefetchRequestKeyRef.current !== requestKey) return prev;
+                return { ...prev, [tf]: prefetchRows };
+              });
+            }),
+          );
+        }
       })
       .catch(() => {
         if (barsRequestKeyRef.current !== requestKey) return;
