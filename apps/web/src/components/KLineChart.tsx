@@ -990,12 +990,12 @@ export function KLineChart({
       });
       return;
     }
-    if (actual.slice().sort().join('|') !== want.slice().sort().join('|')) {
+    if (actual.length > 0 && actual.slice().sort().join('|') !== want.slice().sort().join('|')) {
       setSelectedIndicators(actual);
     }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady]);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe]);
 
   useLayoutEffect(() => {
     const prevRows = rowsRef.current;
