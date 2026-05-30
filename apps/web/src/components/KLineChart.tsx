@@ -301,6 +301,7 @@ export function KLineChart({
   const [indicatorParams, setIndicatorParams] = useState<Record<string, number[]>>({});
   const [indicatorPrefsReady, setIndicatorPrefsReady] = useState(false);
   const [initialIndicatorReady, setInitialIndicatorReady] = useState(false);
+  const [indicatorSyncMask, setIndicatorSyncMask] = useState(false);
   const [paramModal, setParamModal] = useState<{ name: string; values: string[] } | null>(null);
   const [paramToast, setParamToast] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -322,7 +323,11 @@ export function KLineChart({
   const indicatorRecoverAttemptsRef = useRef(0);
   const indicatorSwitchRecoverTimerRef = useRef<number | null>(null);
   const indicatorSwitchRecoverAttemptsRef = useRef(0);
+  const indicatorEnsureTimerRef = useRef<number | null>(null);
+  const indicatorEnsureAttemptsRef = useRef(0);
+  const indicatorTxnSeqRef = useRef(0);
   const wantedIndicatorsRef = useRef<string[]>(['EMA', 'MACD', 'VOL']);
+  const timeframeSwitchLockUntilRef = useRef(0);
   const pendingManualOverlayRestoreRef = useRef<OverlayCreate[] | null>(null);
   const pendingSwitchTimeframeRef = useRef<string | null>(null);
   const pendingSwitchStartedAtRef = useRef<number>(0);
@@ -734,20 +739,49 @@ export function KLineChart({
     setMainIndicatorLegend(rows);
   };
 
-  const rebuildIndicatorsOnChart = useCallback((chart: Chart) => {
-    chart.removeIndicator();
-    const wanted = wantedIndicatorsRef.current.length > 0 ? wantedIndicatorsRef.current : selectedIndicators;
+  const createIndicatorByName = useCallback((chart: Chart, name: string) => {
+    const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
+    const value: string | IndicatorCreate =
+      Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
+    if (MAIN_INDICATORS.has(name)) {
+      chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
+    } else {
+      chart.createIndicator(value, { isStack: true });
+    }
+  }, [indicatorParams, DEFAULT_INDICATOR_PARAMS, MAIN_INDICATORS]);
+
+  const syncIndicatorsOnChart = useCallback((chart: Chart, reconcile = false) => {
+    const wanted = Array.from(new Set(wantedIndicatorsRef.current.length > 0 ? wantedIndicatorsRef.current : selectedIndicators));
+    const actualIndicators = chart.getIndicators();
+    const actualNameSet = new Set(actualIndicators.map((i) => i.name));
+    const wantedNameSet = new Set(wanted);
+
+    if (reconcile) {
+      // Remove only obsolete indicators; avoid full clear to prevent pane-height jump/flicker.
+      actualNameSet.forEach((name) => {
+        if (!wantedNameSet.has(name)) chart.removeIndicator({ name });
+      });
+      // If params changed, replace that indicator only.
+      actualIndicators.forEach((ind) => {
+        if (!wantedNameSet.has(ind.name)) return;
+        const wantedParams = indicatorParams[ind.name] ?? DEFAULT_INDICATOR_PARAMS[ind.name] ?? [];
+        const actualParams = Array.isArray(ind.calcParams) ? ind.calcParams.map((v) => Number(v)).filter((v) => Number.isFinite(v)) : [];
+        if (wantedParams.join(',') !== actualParams.join(',')) {
+          chart.removeIndicator({ name: ind.name });
+        }
+      });
+    }
+
+    const refreshedNames = new Set(chart.getIndicators().map((i) => i.name));
     wanted.forEach((name) => {
-      const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
-      const value: string | IndicatorCreate =
-        Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
-      if (MAIN_INDICATORS.has(name)) {
-        chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
-      } else {
-        chart.createIndicator(value, { isStack: true });
-      }
+      if (!refreshedNames.has(name)) createIndicatorByName(chart, name);
     });
-  }, [selectedIndicators, indicatorParams, DEFAULT_INDICATOR_PARAMS, MAIN_INDICATORS]);
+  }, [selectedIndicators, indicatorParams, DEFAULT_INDICATOR_PARAMS, createIndicatorByName]);
+
+  const beginIndicatorTxn = () => {
+    indicatorTxnSeqRef.current += 1;
+    return indicatorTxnSeqRef.current;
+  };
 
   const chartIndicatorsMatchWanted = useCallback((chart: Chart) => {
     const want = Array.from(new Set(wantedIndicatorsRef.current));
@@ -785,11 +819,8 @@ export function KLineChart({
 
   useEffect(() => {
     if (!ref.current) return;
+    if (chartRef.current) return;
     // Dev (StrictMode) may mount effects twice; ensure we never keep stale chart instances.
-    if (chartRef.current) {
-      dispose(chartRef.current);
-      chartRef.current = null;
-    }
     ref.current.innerHTML = '';
 
     const chart = init(ref.current);
@@ -1065,7 +1096,22 @@ export function KLineChart({
       chartRef.current = null;
       setChartReady(false);
     };
-  }, [disableScrollZoom, pricePrecision]);
+  // Initialize chart instance once; avoid re-init on runtime prop changes,
+  // which can clear indicators and cause occasional state loss.
+  }, []);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !chartReady) return;
+    chart.setSymbol({ ticker: 'TRAIN', pricePrecision, volumePrecision: 2 });
+  }, [chartReady, pricePrecision]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !chartReady) return;
+    chart.setScrollEnabled(!disableScrollZoom);
+    chart.setZoomEnabled(!disableScrollZoom);
+  }, [chartReady, disableScrollZoom]);
 
   useEffect(() => {
     if (!loadingOlder) leftEdgeLockRef.current = false;
@@ -1080,6 +1126,10 @@ export function KLineChart({
       if (indicatorSwitchRecoverTimerRef.current != null) {
         window.clearTimeout(indicatorSwitchRecoverTimerRef.current);
         indicatorSwitchRecoverTimerRef.current = null;
+      }
+      if (indicatorEnsureTimerRef.current != null) {
+        window.clearTimeout(indicatorEnsureTimerRef.current);
+        indicatorEnsureTimerRef.current = null;
       }
     };
   }, []);
@@ -1105,19 +1155,26 @@ export function KLineChart({
   useLayoutEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady || !indicatorPrefsReady) return;
+    const txn = beginIndicatorTxn();
+    if (indicatorEnsureTimerRef.current != null) {
+      window.clearTimeout(indicatorEnsureTimerRef.current);
+      indicatorEnsureTimerRef.current = null;
+    }
+    indicatorEnsureAttemptsRef.current = 0;
     if (indicatorRecoverTimerRef.current != null) {
       window.clearTimeout(indicatorRecoverTimerRef.current);
       indicatorRecoverTimerRef.current = null;
     }
     indicatorRecoverAttemptsRef.current = 0;
     const applyIndicators = () => {
-      if (!chartIndicatorsMatchWanted(chart)) rebuildIndicatorsOnChart(chart);
+      if (!chartIndicatorsMatchWanted(chart)) syncIndicatorsOnChart(chart, true);
     };
     applyIndicators();
     const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
     const want = Array.from(new Set(wantedIndicatorsRef.current));
     if (isTransientIndicatorEmpty(want, actual)) {
       const retry = () => {
+        if (indicatorTxnSeqRef.current !== txn) return;
         indicatorRecoverAttemptsRef.current += 1;
         applyIndicators();
         const retried = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
@@ -1125,6 +1182,7 @@ export function KLineChart({
           syncIndicatorParamsFromChart();
           refreshIndicatorLegend(focusDataIndex);
           setInitialIndicatorReady(true);
+          setIndicatorSyncMask(false);
           return;
         }
         if (indicatorRecoverAttemptsRef.current < 8) {
@@ -1137,7 +1195,8 @@ export function KLineChart({
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
     setInitialIndicatorReady(true);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, rebuildIndicatorsOnChart, chartIndicatorsMatchWanted]);
+    setIndicatorSyncMask(false);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, syncIndicatorsOnChart, chartIndicatorsMatchWanted]);
 
   useLayoutEffect(() => {
     const prevRows = rowsRef.current;
@@ -1212,15 +1271,21 @@ export function KLineChart({
     const wantedCountNow = Array.from(new Set(wantedIndicatorsRef.current)).length;
     const actualCountNow = Array.from(new Set(chart.getIndicators().map((i) => i.name))).length;
     if (wantedCountNow > 0 && actualCountNow === 0 && indicatorPrefsReady) {
-      rebuildIndicatorsOnChart(chart);
+      setIndicatorSyncMask(true);
+      syncIndicatorsOnChart(chart, false);
       requestAnimationFrame(() => {
         const nextChart = chartRef.current;
         if (!nextChart) return;
         const actualAfter = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
-        if (actualAfter === 0) rebuildIndicatorsOnChart(nextChart);
+        if (actualAfter === 0) {
+          syncIndicatorsOnChart(nextChart, false);
+          return;
+        }
+        setIndicatorSyncMask(false);
       });
     }
     if (timeframeChanged && indicatorPrefsReady) {
+      const txn = beginIndicatorTxn();
       // Some timeframe switches can internally clear indicators without state change.
       // Rebuild immediately in the same tick, then do at most one extra recovery pass if still missing.
       if (indicatorSwitchRecoverTimerRef.current != null) {
@@ -1228,29 +1293,64 @@ export function KLineChart({
         indicatorSwitchRecoverTimerRef.current = null;
       }
       indicatorSwitchRecoverAttemptsRef.current = 0;
+      if (indicatorEnsureTimerRef.current != null) {
+        window.clearTimeout(indicatorEnsureTimerRef.current);
+        indicatorEnsureTimerRef.current = null;
+      }
+      indicatorEnsureAttemptsRef.current = 0;
       const wantCount = Array.from(new Set(wantedIndicatorsRef.current)).length;
-      if (!chartIndicatorsMatchWanted(chart)) rebuildIndicatorsOnChart(chart);
+      if (!chartIndicatorsMatchWanted(chart)) syncIndicatorsOnChart(chart, false);
       const immediateCount = Array.from(new Set(chart.getIndicators().map((i) => i.name))).length;
       if (immediateCount < wantCount) {
+      setIndicatorSyncMask(true);
       // Second pass in the same frame to reduce visible delayed indicator appearance.
-      rebuildIndicatorsOnChart(chart);
+      syncIndicatorsOnChart(chart, false);
       const secondPassCount = Array.from(new Set(chart.getIndicators().map((i) => i.name))).length;
       if (secondPassCount < wantCount) {
       const recoverAfterSwitch = () => {
+        if (indicatorTxnSeqRef.current !== txn) return;
         const nextChart = chartRef.current;
         if (!nextChart) return;
         const beforeCount = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
         if (beforeCount >= wantCount) return;
         indicatorSwitchRecoverAttemptsRef.current += 1;
-        rebuildIndicatorsOnChart(nextChart);
+        syncIndicatorsOnChart(nextChart, false);
         const actualCount = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
         refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-        if (actualCount >= wantCount || indicatorSwitchRecoverAttemptsRef.current >= 2) return;
+        if (actualCount >= wantCount || indicatorSwitchRecoverAttemptsRef.current >= 2) {
+          if (actualCount >= wantCount) setIndicatorSyncMask(false);
+          return;
+        }
         requestAnimationFrame(recoverAfterSwitch);
       };
       requestAnimationFrame(recoverAfterSwitch);
       }
+      else {
+        setIndicatorSyncMask(false);
       }
+      }
+      else {
+        setIndicatorSyncMask(false);
+      }
+
+      // Hard guard: some fast timeframe switches may clear indicators after data refresh.
+      // Keep checking for a short window and restore immediately if any are missing.
+      const ensureIndicatorsStable = () => {
+        if (indicatorTxnSeqRef.current !== txn) return;
+        const nextChart = chartRef.current;
+        if (!nextChart) return;
+        indicatorEnsureAttemptsRef.current += 1;
+        if (!chartIndicatorsMatchWanted(nextChart)) {
+          syncIndicatorsOnChart(nextChart, false);
+        }
+        const stableNow = chartIndicatorsMatchWanted(nextChart);
+        if (stableNow || indicatorEnsureAttemptsRef.current >= 8) {
+          if (stableNow) setIndicatorSyncMask(false);
+          return;
+        }
+        indicatorEnsureTimerRef.current = window.setTimeout(ensureIndicatorsStable, 70);
+      };
+      indicatorEnsureTimerRef.current = window.setTimeout(ensureIndicatorsStable, 30);
     }
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
@@ -1651,6 +1751,9 @@ export function KLineChart({
             key={p}
             className={timeframe === p ? activeToolBtn : toolBtn}
             onClick={() => {
+              const now = Date.now();
+              if (now < timeframeSwitchLockUntilRef.current) return;
+              timeframeSwitchLockUntilRef.current = now + 160;
               if (p !== timeframe) snapshotManualOverlaysForTimeframeSwitch();
               onTimeframeChange?.(p);
             }}
@@ -1753,6 +1856,9 @@ export function KLineChart({
             />
             {!initialIndicatorReady ? (
               <div className="pointer-events-none absolute inset-0 rounded-xl border border-slate-700/90 bg-slate-950/70" />
+            ) : null}
+            {indicatorSyncMask ? (
+              <div className="pointer-events-none absolute inset-0 rounded-xl bg-slate-950/45" />
             ) : null}
           </div>
         </div>
