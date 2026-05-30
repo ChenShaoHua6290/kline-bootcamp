@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dispose, getSupportedIndicators, getSupportedOverlays, init, type Chart, type IndicatorCreate, type KLineData } from 'klinecharts';
+import { dispose, getSupportedIndicators, getSupportedOverlays, init, type Chart, type IndicatorCreate, type KLineData, type Overlay, type OverlayCreate } from 'klinecharts';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -225,6 +225,28 @@ function decimalPlacesOf(value: number) {
   return dot >= 0 ? s.length - dot - 1 : 0;
 }
 
+function toManualOverlaySnapshot(overlay: Overlay, groupId: string): OverlayCreate {
+  return {
+    name: overlay.name,
+    groupId,
+    paneId: overlay.paneId,
+    lock: overlay.lock,
+    visible: overlay.visible,
+    zLevel: overlay.zLevel,
+    mode: overlay.mode,
+    modeSensitivity: overlay.modeSensitivity,
+    points: Array.isArray(overlay.points)
+      ? overlay.points.map((p) => ({
+          dataIndex: typeof p.dataIndex === 'number' ? p.dataIndex : undefined,
+          timestamp: typeof p.timestamp === 'number' ? p.timestamp : undefined,
+          value: typeof p.value === 'number' ? p.value : undefined,
+        }))
+      : [],
+    extendData: overlay.extendData,
+    styles: overlay.styles ?? undefined,
+  };
+}
+
 export function KLineChart({
   data,
   actions = [],
@@ -297,6 +319,7 @@ export function KLineChart({
   const viewportGuardPendingRef = useRef(false);
   const indicatorRecoverTimerRef = useRef<number | null>(null);
   const indicatorRecoverAttemptsRef = useRef(0);
+  const manualOverlaySnapshotRef = useRef<OverlayCreate[]>([]);
   const lastAxisDebugLogAtRef = useRef(0);
   const TRAINING_RIGHT_WHITESPACE_BARS = 0;
   const DEFAULT_VISIBLE_BARS = 120;
@@ -308,6 +331,7 @@ export function KLineChart({
   const sideBtn = 'h-8 w-8 rounded-lg border border-slate-600/70 bg-slate-800/80 text-xs text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
   const sideBtnActive = 'h-8 w-8 rounded-lg border border-blue-300/60 bg-blue-600/90 text-xs font-semibold text-white transition hover:bg-blue-500';
   const periods = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
+  const MANUAL_OVERLAY_GROUP_ID = 'manual-draw';
   const MAIN_INDICATORS = useMemo(() => new Set(['MA', 'EMA', 'SMA', 'BOLL', 'BBI']), []);
   const SUB_INDICATOR_WHITELIST = useMemo(() => new Set(['VOL', 'MACD', 'RSI', 'KDJ']), []);
   const INDICATOR_PREFS_STORAGE_KEY = 'kline_indicator_prefs_v1';
@@ -1340,8 +1364,24 @@ export function KLineChart({
     const chart = chartRef.current;
     if (!chart) return;
     // 同步手动画线可见性，确保“眼睛”按钮有即时可见反馈
-    chart.overrideOverlay({ groupId: 'manual-draw', visible: showTradeOverlays });
+    chart.overrideOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID, visible: showTradeOverlays });
   }, [showTradeOverlays]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !chartReady) return;
+    const manualOverlays = chart.getOverlays({ groupId: MANUAL_OVERLAY_GROUP_ID }) ?? [];
+    const completed = manualOverlays.filter((overlay) => overlay.currentStep >= overlay.totalStep);
+    if (completed.length > 0) {
+      manualOverlaySnapshotRef.current = completed.map((overlay) => toManualOverlaySnapshot(overlay, MANUAL_OVERLAY_GROUP_ID));
+      return;
+    }
+    if (manualOverlaySnapshotRef.current.length === 0) return;
+    manualOverlaySnapshotRef.current.forEach((overlay) => {
+      chart.createOverlay(overlay);
+    });
+    chart.overrideOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID, visible: showTradeOverlays });
+  }, [chartReady, timeframe, data, showTradeOverlays]);
 
   const addDraw = (name: string) => {
     if (drawLocked) return;
@@ -1351,7 +1391,7 @@ export function KLineChart({
       setParamToast('当前图表库不支持该画图工具');
       return;
     }
-    const created = chart.createOverlay({ name, groupId: 'manual-draw' });
+    const created = chart.createOverlay({ name, groupId: MANUAL_OVERLAY_GROUP_ID });
     if (created) {
       setActiveDrawTool(name);
       return;
@@ -1501,7 +1541,8 @@ export function KLineChart({
             className={`${sideBtn} m-1`}
             onClick={() => {
               if (drawLocked) return;
-              chartRef.current?.removeOverlay({ groupId: 'manual-draw' });
+              chartRef.current?.removeOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID });
+              manualOverlaySnapshotRef.current = [];
               setActiveDrawTool(null);
               setOpenDrawMenu(null);
             }}
