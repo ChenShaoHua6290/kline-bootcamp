@@ -960,19 +960,36 @@ export function KLineChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady || !indicatorPrefsReady) return;
-    chart.removeIndicator();
-    selectedIndicators.forEach((name) => {
-      const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
-      const value: string | IndicatorCreate =
-        Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
-      if (MAIN_INDICATORS.has(name)) {
-        chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
-      } else {
-        chart.createIndicator(value, { isStack: true });
-      }
-    });
+    const applyIndicators = () => {
+      chart.removeIndicator();
+      selectedIndicators.forEach((name) => {
+        const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
+        const value: string | IndicatorCreate =
+          Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
+        if (MAIN_INDICATORS.has(name)) {
+          chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
+        } else {
+          chart.createIndicator(value, { isStack: true });
+        }
+      });
+    };
+    applyIndicators();
     const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
     const want = Array.from(new Set(selectedIndicators));
+    const maybeTransientEmpty = want.length > 0 && actual.length === 0;
+    if (maybeTransientEmpty) {
+      // Switching timeframe can transiently return empty indicators; retry once and avoid persisting empty state.
+      requestAnimationFrame(() => {
+        applyIndicators();
+        const retried = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
+        if (retried.length > 0 && retried.slice().sort().join('|') !== want.slice().sort().join('|')) {
+          setSelectedIndicators(retried);
+        }
+        syncIndicatorParamsFromChart();
+        refreshIndicatorLegend(focusDataIndex);
+      });
+      return;
+    }
     if (actual.slice().sort().join('|') !== want.slice().sort().join('|')) {
       setSelectedIndicators(actual);
     }
