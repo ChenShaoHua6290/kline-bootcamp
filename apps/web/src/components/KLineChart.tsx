@@ -294,6 +294,8 @@ export function KLineChart({
   const prevViewTimeframeRef = useRef<string | null>(null);
   const viewportSyncRafRef = useRef<number | null>(null);
   const viewportGuardPendingRef = useRef(false);
+  const indicatorRecoverTimerRef = useRef<number | null>(null);
+  const indicatorRecoverAttemptsRef = useRef(0);
   const lastAxisDebugLogAtRef = useRef(0);
   const TRAINING_RIGHT_WHITESPACE_BARS = 0;
   const DEFAULT_VISIBLE_BARS = 120;
@@ -944,6 +946,15 @@ export function KLineChart({
   }, [loadingOlder, data.length]);
 
   useEffect(() => {
+    return () => {
+      if (indicatorRecoverTimerRef.current != null) {
+        window.clearTimeout(indicatorRecoverTimerRef.current);
+        indicatorRecoverTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady) return;
     chart.setStyles(buildChartStyles(chartSettings, hideTimeAxisLabels) as never);
@@ -960,6 +971,11 @@ export function KLineChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady || !indicatorPrefsReady) return;
+    if (indicatorRecoverTimerRef.current != null) {
+      window.clearTimeout(indicatorRecoverTimerRef.current);
+      indicatorRecoverTimerRef.current = null;
+    }
+    indicatorRecoverAttemptsRef.current = 0;
     const applyIndicators = () => {
       chart.removeIndicator();
       selectedIndicators.forEach((name) => {
@@ -976,18 +992,24 @@ export function KLineChart({
     applyIndicators();
     const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
     const want = Array.from(new Set(selectedIndicators));
-    const maybeTransientEmpty = want.length > 0 && actual.length === 0;
-    if (maybeTransientEmpty) {
-      // Switching timeframe can transiently return empty indicators; retry once and avoid persisting empty state.
-      requestAnimationFrame(() => {
+    if (isTransientIndicatorEmpty(want, actual)) {
+      const retry = () => {
+        indicatorRecoverAttemptsRef.current += 1;
         applyIndicators();
         const retried = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
-        if (retried.length > 0 && retried.slice().sort().join('|') !== want.slice().sort().join('|')) {
-          setSelectedIndicators(retried);
+        if (!isTransientIndicatorEmpty(want, retried)) {
+          if (retried.length > 0 && retried.slice().sort().join('|') !== want.slice().sort().join('|')) {
+            setSelectedIndicators(retried);
+          }
+          syncIndicatorParamsFromChart();
+          refreshIndicatorLegend(focusDataIndex);
+          return;
         }
-        syncIndicatorParamsFromChart();
-        refreshIndicatorLegend(focusDataIndex);
-      });
+        if (indicatorRecoverAttemptsRef.current < 8) {
+          indicatorRecoverTimerRef.current = window.setTimeout(retry, 80);
+        }
+      };
+      indicatorRecoverTimerRef.current = window.setTimeout(retry, 80);
       return;
     }
     if (actual.length > 0 && actual.slice().sort().join('|') !== want.slice().sort().join('|')) {
@@ -995,7 +1017,7 @@ export function KLineChart({
     }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe]);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe, data]);
 
   useLayoutEffect(() => {
     const prevRows = rowsRef.current;
