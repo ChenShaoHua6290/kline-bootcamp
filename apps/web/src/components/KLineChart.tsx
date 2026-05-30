@@ -225,7 +225,7 @@ function decimalPlacesOf(value: number) {
   return dot >= 0 ? s.length - dot - 1 : 0;
 }
 
-function toManualOverlaySnapshot(overlay: Overlay, groupId: string): OverlayCreate {
+function toOverlayCreateSnapshot(overlay: Overlay, groupId: string): OverlayCreate {
   return {
     name: overlay.name,
     groupId,
@@ -237,13 +237,13 @@ function toManualOverlaySnapshot(overlay: Overlay, groupId: string): OverlayCrea
     modeSensitivity: overlay.modeSensitivity,
     points: Array.isArray(overlay.points)
       ? overlay.points.map((p) => ({
-          dataIndex: typeof p.dataIndex === 'number' ? p.dataIndex : undefined,
           timestamp: typeof p.timestamp === 'number' ? p.timestamp : undefined,
+          dataIndex: typeof p.dataIndex === 'number' ? p.dataIndex : undefined,
           value: typeof p.value === 'number' ? p.value : undefined,
         }))
       : [],
-    extendData: overlay.extendData,
     styles: overlay.styles ?? undefined,
+    extendData: overlay.extendData,
   };
 }
 
@@ -319,7 +319,7 @@ export function KLineChart({
   const viewportGuardPendingRef = useRef(false);
   const indicatorRecoverTimerRef = useRef<number | null>(null);
   const indicatorRecoverAttemptsRef = useRef(0);
-  const manualOverlaySnapshotRef = useRef<OverlayCreate[]>([]);
+  const pendingManualOverlayRestoreRef = useRef<OverlayCreate[] | null>(null);
   const lastAxisDebugLogAtRef = useRef(0);
   const TRAINING_RIGHT_WHITESPACE_BARS = 0;
   const DEFAULT_VISIBLE_BARS = 120;
@@ -510,6 +510,15 @@ export function KLineChart({
     if (actionType === 'SL') return { label: 'SL', tone: 'sl' as const };
     if (actionType === 'LIQUIDATED') return { label: '爆仓', tone: 'liquidated' as const };
     return null;
+  };
+
+  const snapshotManualOverlaysForTimeframeSwitch = () => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const overlays = chart.getOverlays({ groupId: MANUAL_OVERLAY_GROUP_ID }) ?? [];
+    const completed = overlays.filter((overlay) => overlay.currentStep >= overlay.totalStep);
+    pendingManualOverlayRestoreRef.current =
+      completed.length > 0 ? completed.map((overlay) => toOverlayCreateSnapshot(overlay, MANUAL_OVERLAY_GROUP_ID)) : null;
   };
 
   useEffect(() => {
@@ -1042,7 +1051,7 @@ export function KLineChart({
     }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe, data]);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe]);
 
   useLayoutEffect(() => {
     const prevRows = rowsRef.current;
@@ -1080,6 +1089,15 @@ export function KLineChart({
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
     chart.removeOverlay({ groupId: 'partial-candle-hint' });
+    if (timeframeChanged && pendingManualOverlayRestoreRef.current && pendingManualOverlayRestoreRef.current.length > 0) {
+      const existingManual = chart.getOverlays({ groupId: MANUAL_OVERLAY_GROUP_ID }) ?? [];
+      if (existingManual.length === 0) {
+        pendingManualOverlayRestoreRef.current.forEach((overlay) => {
+          chart.createOverlay(overlay);
+        });
+      }
+      pendingManualOverlayRestoreRef.current = null;
+    }
 
     if (showTradeOverlays) {
       const actionRows = Array.isArray(actions) ? actions : [];
@@ -1367,22 +1385,6 @@ export function KLineChart({
     chart.overrideOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID, visible: showTradeOverlays });
   }, [showTradeOverlays]);
 
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart || !chartReady) return;
-    const manualOverlays = chart.getOverlays({ groupId: MANUAL_OVERLAY_GROUP_ID }) ?? [];
-    const completed = manualOverlays.filter((overlay) => overlay.currentStep >= overlay.totalStep);
-    if (completed.length > 0) {
-      manualOverlaySnapshotRef.current = completed.map((overlay) => toManualOverlaySnapshot(overlay, MANUAL_OVERLAY_GROUP_ID));
-      return;
-    }
-    if (manualOverlaySnapshotRef.current.length === 0) return;
-    manualOverlaySnapshotRef.current.forEach((overlay) => {
-      chart.createOverlay(overlay);
-    });
-    chart.overrideOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID, visible: showTradeOverlays });
-  }, [chartReady, timeframe, data, showTradeOverlays]);
-
   const addDraw = (name: string) => {
     if (drawLocked) return;
     const chart = chartRef.current;
@@ -1477,7 +1479,14 @@ export function KLineChart({
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-700/60 bg-slate-900/65 p-1.5 text-xs">
         <span className="mr-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-[11px] font-semibold text-slate-900">TRAIN</span>
         {periods.map((p) => (
-          <button key={p} className={timeframe === p ? activeToolBtn : toolBtn} onClick={() => onTimeframeChange?.(p)}>
+          <button
+            key={p}
+            className={timeframe === p ? activeToolBtn : toolBtn}
+            onClick={() => {
+              if (p !== timeframe) snapshotManualOverlaysForTimeframeSwitch();
+              onTimeframeChange?.(p);
+            }}
+          >
             {p}
           </button>
         ))}
@@ -1542,7 +1551,7 @@ export function KLineChart({
             onClick={() => {
               if (drawLocked) return;
               chartRef.current?.removeOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID });
-              manualOverlaySnapshotRef.current = [];
+              pendingManualOverlayRestoreRef.current = null;
               setActiveDrawTool(null);
               setOpenDrawMenu(null);
             }}
