@@ -102,7 +102,6 @@ export default function TrainPage() {
   const timeframeBarsMapRef = useRef<
     Record<string, Array<{ open: number; high: number; low: number; close: number; time: string; volume?: number | null; isPartial?: boolean }>>
   >({});
-  const prefetchRequestKeyRef = useRef<string | null>(null);
   const actionInFlightRef = useRef(false);
   const latestPointerRef = useRef(0);
   const holdBatchActiveRef = useRef(false);
@@ -264,7 +263,6 @@ export default function TrainPage() {
     setHasMoreOlderBars(false);
     setLoadingOlderBars(false);
     barsRequestKeyRef.current = null;
-    prefetchRequestKeyRef.current = null;
     timeframeBarsMapRef.current = {};
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('activeSessionId');
@@ -357,7 +355,6 @@ export default function TrainPage() {
       setBarsFromTime(null);
       setHasMoreOlderBars(false);
       barsRequestKeyRef.current = null;
-      prefetchRequestKeyRef.current = null;
       timeframeBarsMapRef.current = {};
       return;
     }
@@ -376,23 +373,6 @@ export default function TrainPage() {
         setTimeframeBarsMap((prev) => ({ ...prev, [viewTimeframe]: rows }));
         setHasMoreOlderBars(Boolean(res.data?.hasMoreOlder));
         setLoadingOlderBars(false);
-
-        const allTfs = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
-        const pendingTfs = allTfs.filter((tf) => tf !== viewTimeframe && !Array.isArray(timeframeBarsMapRef.current[tf]));
-        if (pendingTfs.length > 0) {
-          prefetchRequestKeyRef.current = requestKey;
-          void Promise.allSettled(
-            pendingTfs.map(async (tf) => {
-              const prefetchRes = await api.get(`/training/${session.id}/bars`, { params: { timeframe: tf, from, to } });
-              if (prefetchRequestKeyRef.current !== requestKey) return;
-              const prefetchRows = Array.isArray(prefetchRes.data?.bars) ? prefetchRes.data.bars : [];
-              setTimeframeBarsMap((prev) => {
-                if (prefetchRequestKeyRef.current !== requestKey) return prev;
-                return { ...prev, [tf]: prefetchRows };
-              });
-            }),
-          );
-        }
       })
       .catch(() => {
         if (barsRequestKeyRef.current !== requestKey) return;
@@ -415,8 +395,28 @@ export default function TrainPage() {
       setTimeframeBarsTf(null);
       return;
     }
+    const TF_MS: Record<string, number> = {
+      '15m': 15 * 60_000,
+      '30m': 30 * 60_000,
+      '1H': 60 * 60_000,
+      '2H': 2 * 60 * 60_000,
+      '4H': 4 * 60 * 60_000,
+      D: 24 * 60 * 60_000,
+      W: 7 * 24 * 60 * 60_000,
+      M: 30 * 24 * 60 * 60_000,
+    };
+    const to = session.currentTimePointer ?? session.barsData?.[session.pointer]?.time;
+    const toTs = Date.parse(to ?? '');
+    const isFresh = (bars: Array<{ time: string }>) => {
+      if (!Number.isFinite(toTs)) return false;
+      if (!Array.isArray(bars) || bars.length === 0) return false;
+      const lastTs = Date.parse(bars[bars.length - 1]?.time ?? '');
+      if (!Number.isFinite(lastTs)) return false;
+      const tolerance = Math.max(60_000, Math.floor((TF_MS[viewTimeframe] ?? 60 * 60_000) * 0.55));
+      return lastTs >= toTs - tolerance;
+    };
     const cached = timeframeBarsMap[viewTimeframe];
-    if (Array.isArray(cached)) {
+    if (Array.isArray(cached) && isFresh(cached)) {
       setTimeframeBars(cached);
       setTimeframeBarsTf(viewTimeframe);
       return;
@@ -475,9 +475,29 @@ export default function TrainPage() {
 
   const visibleBars = useMemo(() => {
     if (!session) return [];
+    const TF_MS: Record<string, number> = {
+      '15m': 15 * 60_000,
+      '30m': 30 * 60_000,
+      '1H': 60 * 60_000,
+      '2H': 2 * 60 * 60_000,
+      '4H': 4 * 60 * 60_000,
+      D: 24 * 60 * 60_000,
+      W: 7 * 24 * 60 * 60_000,
+      M: 30 * 24 * 60 * 60_000,
+    };
+    const to = session.currentTimePointer ?? session.barsData?.[session.pointer]?.time;
+    const toTs = Date.parse(to ?? '');
+    const isFresh = (bars: Array<{ time: string }>) => {
+      if (!Number.isFinite(toTs)) return false;
+      if (!Array.isArray(bars) || bars.length === 0) return false;
+      const lastTs = Date.parse(bars[bars.length - 1]?.time ?? '');
+      if (!Number.isFinite(lastTs)) return false;
+      const tolerance = Math.max(60_000, Math.floor((TF_MS[viewTimeframe] ?? 60 * 60_000) * 0.55));
+      return lastTs >= toTs - tolerance;
+    };
     if (timeframeBarsTf === viewTimeframe && timeframeBars.length > 0) return timeframeBars;
     const cached = timeframeBarsMap[viewTimeframe];
-    if (Array.isArray(cached) && cached.length > 0) return cached;
+    if (Array.isArray(cached) && cached.length > 0 && isFresh(cached)) return cached;
     const baseTf = String(session.drivingTimeframe || session.viewTimeframe || '1H').toUpperCase();
     if (viewTimeframe.toUpperCase() === baseTf) return session.barsData;
     return [];
