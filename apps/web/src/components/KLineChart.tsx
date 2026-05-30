@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { dispose, getSupportedIndicators, getSupportedOverlays, init, type Chart, type IndicatorCreate, type KLineData, type Overlay, type OverlayCreate } from 'klinecharts';
 import { Button } from '@/components/ui/Button';
@@ -722,6 +722,20 @@ export function KLineChart({
     setMainIndicatorLegend(rows);
   };
 
+  const rebuildIndicatorsOnChart = useCallback((chart: Chart) => {
+    chart.removeIndicator();
+    selectedIndicators.forEach((name) => {
+      const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
+      const value: string | IndicatorCreate =
+        Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
+      if (MAIN_INDICATORS.has(name)) {
+        chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
+      } else {
+        chart.createIndicator(value, { isStack: true });
+      }
+    });
+  }, [selectedIndicators, indicatorParams, DEFAULT_INDICATOR_PARAMS, MAIN_INDICATORS]);
+
   const syncIndicatorParamsFromChart = () => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -1010,19 +1024,7 @@ export function KLineChart({
       indicatorRecoverTimerRef.current = null;
     }
     indicatorRecoverAttemptsRef.current = 0;
-    const applyIndicators = () => {
-      chart.removeIndicator();
-      selectedIndicators.forEach((name) => {
-        const params = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name];
-        const value: string | IndicatorCreate =
-          Array.isArray(params) && params.length > 0 ? { name, calcParams: params } : name;
-        if (MAIN_INDICATORS.has(name)) {
-          chart.createIndicator(value, { isStack: true, pane: { id: 'candle_pane' } });
-        } else {
-          chart.createIndicator(value, { isStack: true });
-        }
-      });
-    };
+    const applyIndicators = () => rebuildIndicatorsOnChart(chart);
     applyIndicators();
     const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
     const want = Array.from(new Set(selectedIndicators));
@@ -1051,7 +1053,7 @@ export function KLineChart({
     }
     syncIndicatorParamsFromChart();
     refreshIndicatorLegend(focusDataIndex);
-  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe]);
+  }, [chartReady, selectedIndicators, indicatorParams, MAIN_INDICATORS, DEFAULT_INDICATOR_PARAMS, indicatorPrefsReady, timeframe, rebuildIndicatorsOnChart]);
 
   useLayoutEffect(() => {
     const prevRows = rowsRef.current;
@@ -1085,6 +1087,15 @@ export function KLineChart({
       } else {
         chart.resetData();
       }
+    }
+    if (timeframeChanged && indicatorPrefsReady) {
+      // Some timeframe switches can internally clear indicators without state change; force one re-apply.
+      requestAnimationFrame(() => {
+        const nextChart = chartRef.current;
+        if (!nextChart) return;
+        rebuildIndicatorsOnChart(nextChart);
+        refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
+      });
     }
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
