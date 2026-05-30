@@ -319,6 +319,8 @@ export function KLineChart({
   const viewportGuardPendingRef = useRef(false);
   const indicatorRecoverTimerRef = useRef<number | null>(null);
   const indicatorRecoverAttemptsRef = useRef(0);
+  const indicatorSwitchRecoverTimerRef = useRef<number | null>(null);
+  const indicatorSwitchRecoverAttemptsRef = useRef(0);
   const pendingManualOverlayRestoreRef = useRef<OverlayCreate[] | null>(null);
   const lastAxisDebugLogAtRef = useRef(0);
   const TRAINING_RIGHT_WHITESPACE_BARS = 0;
@@ -999,6 +1001,10 @@ export function KLineChart({
         window.clearTimeout(indicatorRecoverTimerRef.current);
         indicatorRecoverTimerRef.current = null;
       }
+      if (indicatorSwitchRecoverTimerRef.current != null) {
+        window.clearTimeout(indicatorSwitchRecoverTimerRef.current);
+        indicatorSwitchRecoverTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -1089,13 +1095,25 @@ export function KLineChart({
       }
     }
     if (timeframeChanged && indicatorPrefsReady) {
-      // Some timeframe switches can internally clear indicators without state change; force one re-apply.
-      requestAnimationFrame(() => {
+      // Some timeframe switches can internally clear indicators without state change.
+      // Retry until indicator count is restored (bounded attempts).
+      if (indicatorSwitchRecoverTimerRef.current != null) {
+        window.clearTimeout(indicatorSwitchRecoverTimerRef.current);
+        indicatorSwitchRecoverTimerRef.current = null;
+      }
+      indicatorSwitchRecoverAttemptsRef.current = 0;
+      const wantCount = Array.from(new Set(selectedIndicators)).length;
+      const recoverAfterSwitch = () => {
         const nextChart = chartRef.current;
         if (!nextChart) return;
+        indicatorSwitchRecoverAttemptsRef.current += 1;
         rebuildIndicatorsOnChart(nextChart);
+        const actualCount = Array.from(new Set(nextChart.getIndicators().map((i) => i.name))).length;
         refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-      });
+        if (actualCount >= wantCount || indicatorSwitchRecoverAttemptsRef.current >= 10) return;
+        indicatorSwitchRecoverTimerRef.current = window.setTimeout(recoverAfterSwitch, 120);
+      };
+      indicatorSwitchRecoverTimerRef.current = window.setTimeout(recoverAfterSwitch, 0);
     }
     chart.removeOverlay({ groupId: 'trade-actions' });
     chart.removeOverlay({ groupId: 'risk-lines' });
