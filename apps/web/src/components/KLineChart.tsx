@@ -1133,25 +1133,26 @@ export function KLineChart({
       const currentRange = rangeCapableChart.getVisibleRange?.();
       const from = typeof currentRange?.realFrom === 'number' ? currentRange.realFrom : currentRange?.from;
       const to = typeof currentRange?.realTo === 'number' ? currentRange.realTo : currentRange?.to;
-      const canSetRange = typeof rangeCapableChart.setVisibleRange === 'function';
+      const setVisibleRange =
+        typeof rangeCapableChart.setVisibleRange === 'function' ? rangeCapableChart.setVisibleRange.bind(rangeCapableChart) : null;
       if (
         typeof from === 'number' &&
         Number.isFinite(from) &&
         typeof to === 'number' &&
         Number.isFinite(to) &&
         to >= from &&
-        canSetRange
+        setVisibleRange
       ) {
-        rangeCapableChart.setVisibleRange({ from, to });
+        setVisibleRange({ from, to });
       } else if (
         typeof preFrom === 'number' &&
         Number.isFinite(preFrom) &&
         typeof preTo === 'number' &&
         Number.isFinite(preTo) &&
         preTo >= preFrom &&
-        canSetRange
+        setVisibleRange
       ) {
-        rangeCapableChart.setVisibleRange({ from: preFrom, to: preTo });
+        setVisibleRange({ from: preFrom, to: preTo });
       }
       if (hideTimeAxisLabels && rowsRef.current.length > 0) {
         // Keep training viewport pinned to the latest bar after layout shrink/reflow.
@@ -1175,9 +1176,9 @@ export function KLineChart({
           typeof preTo === 'number' &&
           Number.isFinite(preTo) &&
           preTo >= preFrom &&
-          canSetRange
+          setVisibleRange
         ) {
-          rangeCapableChart.setVisibleRange({ from: preFrom, to: preTo });
+          setVisibleRange({ from: preFrom, to: preTo });
         }
       });
     };
