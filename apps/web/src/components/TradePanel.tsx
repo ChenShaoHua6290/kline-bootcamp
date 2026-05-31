@@ -22,6 +22,9 @@ export function TradePanel({
     closePercent?: number;
     stopLossPrice?: number;
     takeProfitPrice?: number;
+    clearStopLossPrice?: boolean;
+    clearTakeProfitPrice?: boolean;
+    updateRiskOnly?: boolean;
   }) => void;
   onEnd?: () => void;
   busy?: boolean;
@@ -34,14 +37,11 @@ export function TradePanel({
 
   const [positionPercent, setPositionPercent] = useState(0.1);
   const [closePercent, setClosePercent] = useState(100);
-  const [stopLossPrice, setStopLossPrice] = useState<number | undefined>();
-  const [takeProfitPrice, setTakeProfitPrice] = useState<number | undefined>();
+  const [stopLossInput, setStopLossInput] = useState('');
+  const [takeProfitInput, setTakeProfitInput] = useState('');
   const prevHasPositionRef = useRef(Boolean(session.position));
   const ended = session.status !== 'ACTIVE';
 
-  const lastBar = session.barsData?.[session.pointer];
-  const currentPrice = lastBar?.close ?? 0;
-  const quantity = Math.max(1, Math.round((session.finalBalance * positionPercent) / Math.max(currentPrice, 0.0001)));
   const hasPosition = Boolean(session.position);
   const longOpen = session.position?.side === 'LONG';
   const shortOpen = session.position?.side === 'SHORT';
@@ -54,6 +54,17 @@ export function TradePanel({
   const canCloseAny = !ended && hasPosition && !busy;
   const canHold = !ended && !busy;
   const canEnd = !ended && !busy;
+  const stopLossPrice = parsePositivePrice(stopLossInput);
+  const takeProfitPrice = parsePositivePrice(takeProfitInput);
+  const currentStopLossPrice = session.position?.stopLossPrice;
+  const currentTakeProfitPrice = session.position?.takeProfitPrice;
+  const clearStopLossPrice = hasPosition && stopLossInput.trim() === '' && typeof currentStopLossPrice === 'number';
+  const clearTakeProfitPrice = hasPosition && takeProfitInput.trim() === '' && typeof currentTakeProfitPrice === 'number';
+  const canUpdateRisk =
+    !ended &&
+    hasPosition &&
+    !busy &&
+    (typeof stopLossPrice === 'number' || typeof takeProfitPrice === 'number' || clearStopLossPrice || clearTakeProfitPrice);
 
   useEffect(() => {
     const hadPosition = prevHasPositionRef.current;
@@ -62,11 +73,19 @@ export function TradePanel({
     const shouldClearByCloseAction = ['CLOSE', 'TP', 'SL', 'LIQUIDATED'].includes(lastActionType ?? '');
 
     if ((hadPosition && !hasPositionNow) || (!hasPositionNow && shouldClearByCloseAction)) {
-      setStopLossPrice(undefined);
-      setTakeProfitPrice(undefined);
+      setStopLossInput('');
+      setTakeProfitInput('');
     }
     prevHasPositionRef.current = hasPositionNow;
   }, [session.position, session.actions]);
+
+  useEffect(() => {
+    if (!hasPosition) return;
+    const nextStopLoss = typeof currentStopLossPrice === 'number' && Number.isFinite(currentStopLossPrice) ? String(currentStopLossPrice) : '';
+    const nextTakeProfit = typeof currentTakeProfitPrice === 'number' && Number.isFinite(currentTakeProfitPrice) ? String(currentTakeProfitPrice) : '';
+    setStopLossInput((prev) => (prev === nextStopLoss ? prev : nextStopLoss));
+    setTakeProfitInput((prev) => (prev === nextTakeProfit ? prev : nextTakeProfit));
+  }, [hasPosition, currentStopLossPrice, currentTakeProfitPrice]);
 
   return (
     <section className="surface-panel relative z-10 flex flex-col bg-[#0b152b] p-2 md:p-2.5">
@@ -75,7 +94,10 @@ export function TradePanel({
       <Card className="mb-1.5 shrink-0 p-2">
         <div className="mb-1 flex items-center justify-between text-[11px] text-slate-300 md:mb-1.5 md:text-[12px]">
           <span className="text-[11px] font-medium tracking-normal text-slate-300 md:text-[12px]">下单数量</span>
-          <span className="text-sm font-semibold text-slate-100">{quantity}</span>
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 md:text-[11px]">
+            <span>仓位 {(positionPercent * 100).toFixed(0)}%</span>
+            <Badge tone="info">按当前价格估算</Badge>
+          </div>
         </div>
         <Slider
           min={1}
@@ -106,29 +128,38 @@ export function TradePanel({
             </div>
           </>
         ) : null}
-        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+        <div className="mt-1.5 grid grid-cols-1 gap-1.5 md:grid-cols-3">
           <Input
             type="number"
-            step="0.01"
+            step="any"
             className="h-7 px-2 text-[10px] md:text-[11px]"
-            placeholder="止损点位 95.50"
-            value={stopLossPrice ?? ''}
-            onChange={(e) => setStopLossPrice(parsePositivePrice(e.target.value))}
+            placeholder="止损"
+            value={stopLossInput}
+            onChange={(e) => setStopLossInput(e.target.value)}
             disabled={busy}
           />
           <Input
             type="number"
-            step="0.01"
+            step="any"
             className="h-7 px-2 text-[10px] md:text-[11px]"
-            placeholder="止盈点位 108.80"
-            value={takeProfitPrice ?? ''}
-            onChange={(e) => setTakeProfitPrice(parsePositivePrice(e.target.value))}
+            placeholder="止盈"
+            value={takeProfitInput}
+            onChange={(e) => setTakeProfitInput(e.target.value)}
             disabled={busy}
           />
-        </div>
-        <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
-          <span>仓位比例 {(positionPercent * 100).toFixed(0)}%</span>
-          <Badge tone="info">按当前价格估算</Badge>
+          {hasPosition ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 rounded-xl border border-[rgba(100,141,199,0.3)] bg-[rgba(8,21,43,0.82)] px-2 !text-[10px] font-semibold text-slate-300 hover:border-[rgba(100,141,199,0.45)] hover:bg-[rgba(10,26,52,0.88)] disabled:opacity-40 md:!text-[11px]"
+              onClick={() => onAction({ action: 'HOLD', stopLossPrice, takeProfitPrice, clearStopLossPrice, clearTakeProfitPrice, updateRiskOnly: true })}
+              disabled={!canUpdateRisk}
+            >
+              更新
+            </Button>
+          ) : (
+            <div />
+          )}
         </div>
       </Card>
 
@@ -187,7 +218,7 @@ export function TradePanel({
         size="sm"
         variant="primary"
         className="mb-1.5 h-9 w-full shrink-0 !bg-blue-700/80 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
-        onClick={() => onAction({ action: 'HOLD', stopLossPrice, takeProfitPrice })}
+        onClick={() => onAction({ action: 'HOLD', stopLossPrice, takeProfitPrice, clearStopLossPrice, clearTakeProfitPrice })}
         disabled={!canHold}
       >
         下一条

@@ -295,6 +295,9 @@ export default function TrainPage() {
     closePercent?: number;
     stopLossPrice?: number;
     takeProfitPrice?: number;
+    clearStopLossPrice?: boolean;
+    clearTakeProfitPrice?: boolean;
+    updateRiskOnly?: boolean;
   }) => {
     if (!session) return;
     const isHold = payload.action === 'HOLD' || payload.actionType === 'HOLD';
@@ -310,8 +313,15 @@ export default function TrainPage() {
       ...payload,
       stopLossPrice: normalizePositive(payload.stopLossPrice),
       takeProfitPrice: normalizePositive(payload.takeProfitPrice),
+      clearStopLossPrice: payload.clearStopLossPrice === true,
+      clearTakeProfitPrice: payload.clearTakeProfitPrice === true,
+      updateRiskOnly: payload.updateRiskOnly === true,
       expectedPointer: session.pointer,
     };
+    if (safePayload.updateRiskOnly) {
+      actionMutation.mutate(safePayload);
+      return;
+    }
     // 到达最后一根后，观望与“结束训练”行为保持一致。
     const trainPointer = typeof session.trainPointer === 'number' ? session.trainPointer : session.pointer;
     if (isHold && trainPointer >= session.totalBars) {
@@ -658,7 +668,7 @@ export default function TrainPage() {
           maskClosable={false}
         />
       ) : null}
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-2 px-2 pb-2 pt-1 sm:gap-3 sm:px-3 sm:pb-3 sm:pt-1.5 xl:grid-cols-[minmax(0,1fr)_290px] 2xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_330px]">
+      <div className="grid flex-1 min-h-0 grid-cols-1 gap-0 px-0.5 pb-0.5 pt-0 sm:gap-1 sm:px-1 sm:pb-1 sm:pt-0 xl:grid-cols-[minmax(0,1fr)_290px] 2xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="z-0 flex min-h-[540px] overflow-hidden xl:min-h-0">
           {session ? (
             <div className="relative h-full w-full min-h-0">
@@ -672,8 +682,6 @@ export default function TrainPage() {
                 showActionSummary={false}
                 hideTimeAxisLabels
                 hideHeaderTime
-                stopLossPrice={session.position?.stopLossPrice}
-                takeProfitPrice={session.position?.takeProfitPrice}
                 hasMoreOlder={hasMoreOlderBars}
                 loadingOlder={loadingOlderBars}
                 onReachLeftEdge={loadOlderBars}

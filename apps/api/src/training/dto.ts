@@ -65,6 +65,21 @@ export class TrainingActionDto {
   takeProfitPrice?: number;
 
   @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  clearStopLossPrice?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  clearTakeProfitPrice?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  updateRiskOnly?: boolean;
+
+  @IsOptional()
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(0)

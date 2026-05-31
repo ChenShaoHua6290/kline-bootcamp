@@ -97,7 +97,7 @@ function ActionTag({ actionType }: { actionType: string }) {
 
 export default function HistoryPage() {
   return (
-    <Suspense fallback={<main className="h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] p-4 text-slate-100"><LoadingState message="正在加载历史记录..." /></main>}>
+    <Suspense fallback={<main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] p-4 text-slate-100"><LoadingState message="正在加载历史记录..." /></main>}>
       <HistoryPageInner />
     </Suspense>
   );
@@ -164,9 +164,9 @@ function HistoryPageInner() {
   const totalPnlPct = initialBalance > 0 ? (totalPnl / initialBalance) * 100 : 0;
 
   return (
-    <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] text-slate-100">
+    <main className="min-h-screen overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] text-slate-100 xl:h-screen xl:overflow-hidden">
       <header className="app-nav shrink-0">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+        <div className="mx-auto flex w-full items-center justify-between gap-3">
           <div>
             <PageTitle>{isAdminView ? `用户历史训练记录（${targetLabel || '未命名用户'}）` : '历史训练记录'}</PageTitle>
             <PageDescription>{isAdminView ? `查看 ${targetLabel || '该用户'} 的历史成绩与复盘细节` : '查看历史成绩并复盘操作细节'}</PageDescription>
@@ -177,7 +177,7 @@ function HistoryPageInner() {
         </div>
       </header>
 
-      <section className="mx-auto grid h-[calc(100vh-90px)] min-h-0 w-full max-w-[1600px] grid-cols-1 gap-4 p-3 sm:h-[calc(100vh-96px)] sm:p-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(420px,1fr)]">
+      <section className="mx-auto grid min-h-0 w-full grid-cols-1 gap-4 p-3 sm:p-4 xl:h-[calc(100vh-96px)] xl:grid-cols-[minmax(0,1fr)_minmax(420px,34vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(460px,32vw)]">
         <Card className="min-h-0 overflow-hidden">
           <div className="flex h-full min-h-0 flex-col">
             <div className="shrink-0 border-b border-slate-700/70 px-4 py-3 sm:px-5">

@@ -2,7 +2,7 @@ import { Session } from '@/types/training';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
-export function TrainingInfoPanel({ session, viewTimeframe }: { session: Session; viewTimeframe: string }) {
+export function TrainingInfoPanel({ session, viewTimeframe: _viewTimeframe }: { session: Session; viewTimeframe: string }) {
   const trainPointer = typeof session.trainPointer === 'number' ? session.trainPointer : session.pointer;
   const progress = Math.max(0, Math.min(100, (trainPointer / Math.max(1, session.totalBars)) * 100));
   const statusText =
@@ -27,16 +27,12 @@ export function TrainingInfoPanel({ session, viewTimeframe }: { session: Session
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-slate-300">
-          <span className="text-[11px] text-slate-400">训练K线数量</span>
-          <span className="text-[12px] font-semibold text-slate-100">{session.totalBars} 根</span>
-        </div>
-        <div className="flex items-center justify-between text-slate-300">
           <span className="text-[11px] text-slate-400">推进周期</span>
           <span className="text-[12px] font-semibold text-slate-100">{session.drivingTimeframe}</span>
         </div>
         <div className="flex items-center justify-between text-slate-300">
-          <span className="text-[11px] text-slate-400">当前查看</span>
-          <span className="text-[12px] font-semibold text-slate-100">{viewTimeframe}</span>
+          <span className="text-[11px] text-slate-400">训练长度</span>
+          <span className="text-[12px] font-semibold text-slate-100">{session.totalBars} 根</span>
         </div>
         <div className="flex items-center justify-between text-slate-300">
           <span className="text-[11px] text-slate-400">已推进</span>
@@ -48,7 +44,6 @@ export function TrainingInfoPanel({ session, viewTimeframe }: { session: Session
       <div className="mb-1 mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-700/70">
         <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" style={{ width: `${progress}%` }} />
       </div>
-      <div className="text-right text-[11px] text-slate-400">进度 {progress.toFixed(0)}%</div>
     </Card>
   );
 }

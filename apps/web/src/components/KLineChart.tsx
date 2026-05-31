@@ -252,8 +252,6 @@ export function KLineChart({
   actions = [],
   timeframe = '1H',
   onTimeframeChange,
-  stopLossPrice,
-  takeProfitPrice,
   hasMoreOlder = false,
   loadingOlder = false,
   onReachLeftEdge,
@@ -270,8 +268,6 @@ export function KLineChart({
   actions?: Action[];
   timeframe?: string;
   onTimeframeChange?: (v: string) => void;
-  stopLossPrice?: number;
-  takeProfitPrice?: number;
   hasMoreOlder?: boolean;
   loadingOlder?: boolean;
   onReachLeftEdge?: () => void;
@@ -343,10 +339,10 @@ export function KLineChart({
   const PRICE_PADDING_RATIO = 0.15;
   const MIN_PRICE_RANGE_RATIO = 0.00015;
   const TRAINING_PRICE_WINDOW_BARS = 50;
-  const toolBtn = 'rounded-lg border border-slate-600/70 bg-slate-800/80 px-2.5 py-1 text-[12px] font-medium text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
-  const activeToolBtn = 'rounded-lg border border-blue-300/60 bg-blue-600/90 px-2.5 py-1 text-[12px] font-semibold text-white shadow shadow-blue-900/50 transition hover:bg-blue-500';
-  const sideBtn = 'h-8 w-8 rounded-lg border border-slate-600/70 bg-slate-800/80 text-xs text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
-  const sideBtnActive = 'h-8 w-8 rounded-lg border border-blue-300/60 bg-blue-600/90 text-xs font-semibold text-white transition hover:bg-blue-500';
+  const toolBtn = 'rounded-lg border border-slate-600/70 bg-slate-800/80 px-2 py-0.5 text-[11px] font-medium text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
+  const activeToolBtn = 'rounded-lg border border-blue-300/60 bg-blue-600/90 px-2 py-0.5 text-[11px] font-semibold text-white shadow shadow-blue-900/50 transition hover:bg-blue-500';
+  const sideBtn = 'h-7 rounded-lg border border-slate-600/70 bg-slate-800/80 px-2 text-[11px] text-slate-100 transition hover:border-slate-400 hover:bg-slate-700/90';
+  const sideBtnActive = 'h-7 rounded-lg border border-blue-300/60 bg-blue-600/90 px-2 text-[11px] font-semibold text-white transition hover:bg-blue-500';
   const periods = ['15m', '30m', '1H', '2H', '4H', 'D', 'W', 'M'];
   const MANUAL_OVERLAY_GROUP_ID = 'manual-draw';
   const MAIN_INDICATORS = useMemo(() => new Set(['MA', 'EMA', 'SMA', 'BOLL', 'BBI']), []);
@@ -523,8 +519,8 @@ export function KLineChart({
     if (actionType === 'CLOSE') return { label: '平仓', tone: 'close' as const };
     if (actionType === 'PARTIAL_CLOSE') return { label: '减仓', tone: 'close' as const };
     if (actionType === 'FULL_CLOSE') return { label: '全平', tone: 'close' as const };
-    if (actionType === 'TP') return { label: 'TP', tone: 'tp' as const };
-    if (actionType === 'SL') return { label: 'SL', tone: 'sl' as const };
+    if (actionType === 'TP') return { label: '止盈', tone: 'tp' as const };
+    if (actionType === 'SL') return { label: '止损', tone: 'sl' as const };
     if (actionType === 'LIQUIDATED') return { label: '爆仓', tone: 'liquidated' as const };
     return null;
   };
@@ -1070,20 +1066,7 @@ export function KLineChart({
     chart.subscribeAction('onCrosshairChange', debugOnCrosshair);
     setChartReady(true);
 
-    const paneEl = chartPaneRef.current;
-    let resizeObserver: ResizeObserver | null = null;
-    const handleResize = () => {
-      chart.resize();
-    };
-    if (paneEl && typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => handleResize());
-      resizeObserver.observe(paneEl);
-    }
-    window.addEventListener('resize', handleResize);
-
     return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', handleResize);
       chart.unsubscribeAction('onCrosshairChange', onCrosshairChange);
       if (!disableScrollZoom) {
         chart.unsubscribeAction('onScroll', maybeTriggerLoadOlder);
@@ -1112,6 +1095,130 @@ export function KLineChart({
     chart.setScrollEnabled(!disableScrollZoom);
     chart.setZoomEnabled(!disableScrollZoom);
   }, [chartReady, disableScrollZoom]);
+
+  // Keep chart size in sync with container changes (window resize, split-layout reflow).
+  useEffect(() => {
+    const chart = chartRef.current;
+    const paneEl = chartPaneRef.current;
+    if (!chart || !chartReady || !paneEl) return;
+
+    let rafId: number | null = null;
+    let timerId: number | null = null;
+    let lastW = -1;
+    let lastH = -1;
+
+    const runResize = () => {
+      const w = paneEl.clientWidth;
+      const h = paneEl.clientHeight;
+      if (w <= 0 || h <= 0) return;
+      const widthShrunk = lastW > 0 && w < lastW;
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
+      const rangeCapableChart = chart as unknown as {
+        resize?: (width?: number, height?: number) => void;
+        getVisibleRange?: () => { from?: number; to?: number; realFrom?: number; realTo?: number };
+        setVisibleRange?: (range: { from: number; to: number }) => void;
+      };
+      const preRange = rangeCapableChart.getVisibleRange?.();
+      const preFrom = typeof preRange?.realFrom === 'number' ? preRange.realFrom : preRange?.from;
+      const preTo = typeof preRange?.realTo === 'number' ? preRange.realTo : preRange?.to;
+      if (typeof rangeCapableChart.resize === 'function') {
+        rangeCapableChart.resize(w, h);
+      } else {
+        chart.resize();
+      }
+      // Some layouts only recalculate viewport bounds after an explicit range write,
+      // especially when width shrinks.
+      const currentRange = rangeCapableChart.getVisibleRange?.();
+      const from = typeof currentRange?.realFrom === 'number' ? currentRange.realFrom : currentRange?.from;
+      const to = typeof currentRange?.realTo === 'number' ? currentRange.realTo : currentRange?.to;
+      const canSetRange = typeof rangeCapableChart.setVisibleRange === 'function';
+      if (
+        typeof from === 'number' &&
+        Number.isFinite(from) &&
+        typeof to === 'number' &&
+        Number.isFinite(to) &&
+        to >= from &&
+        canSetRange
+      ) {
+        rangeCapableChart.setVisibleRange({ from, to });
+      } else if (
+        typeof preFrom === 'number' &&
+        Number.isFinite(preFrom) &&
+        typeof preTo === 'number' &&
+        Number.isFinite(preTo) &&
+        preTo >= preFrom &&
+        canSetRange
+      ) {
+        rangeCapableChart.setVisibleRange({ from: preFrom, to: preTo });
+      }
+      if (hideTimeAxisLabels && rowsRef.current.length > 0) {
+        // Keep training viewport pinned to the latest bar after layout shrink/reflow.
+        if (widthShrunk) userInteractedRef.current = false;
+        syncTrainingViewportWithFallback(chart, rowsRef.current, 'advance', true, true);
+      }
+      // Two-phase stabilization: some browsers/layouts apply final width one frame later.
+      requestAnimationFrame(() => {
+        const nextW = paneEl.clientWidth;
+        const nextH = paneEl.clientHeight;
+        if (nextW > 0 && nextH > 0 && typeof rangeCapableChart.resize === 'function') {
+          rangeCapableChart.resize(nextW, nextH);
+        } else {
+          chart.resize();
+        }
+        if (hideTimeAxisLabels && rowsRef.current.length > 0) {
+          syncTrainingViewportWithFallback(chart, rowsRef.current, 'advance', true, true);
+        } else if (
+          typeof preFrom === 'number' &&
+          Number.isFinite(preFrom) &&
+          typeof preTo === 'number' &&
+          Number.isFinite(preTo) &&
+          preTo >= preFrom &&
+          canSetRange
+        ) {
+          rangeCapableChart.setVisibleRange({ from: preFrom, to: preTo });
+        }
+      });
+    };
+
+    const scheduleResize = () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        runResize();
+      });
+      if (timerId != null) window.clearTimeout(timerId);
+      timerId = window.setTimeout(() => {
+        timerId = null;
+        runResize();
+      }, 70);
+    };
+
+    scheduleResize();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => scheduleResize()) : null;
+    if (ro) {
+      const observed = new Set<Element>();
+      let current: Element | null = paneEl;
+      let depth = 0;
+      while (current && depth < 5) {
+        if (!observed.has(current)) {
+          ro.observe(current);
+          observed.add(current);
+        }
+        current = current.parentElement;
+        depth += 1;
+      }
+    }
+    window.addEventListener('resize', scheduleResize);
+
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      if (timerId != null) window.clearTimeout(timerId);
+      ro?.disconnect();
+      window.removeEventListener('resize', scheduleResize);
+    };
+  }, [chartReady, hideTimeAxisLabels]);
 
   useEffect(() => {
     if (!loadingOlder) leftEdgeLockRef.current = false;
@@ -1213,6 +1320,16 @@ export function KLineChart({
     const prevLastTs = prevRows[prevRows.length - 1]?.timestamp ?? null;
     const currentFirstTs = nextRows[0]?.timestamp ?? null;
     const prevFirstTs = prevRows[0]?.timestamp ?? null;
+    const prevLastRow = prevRows.length > 0 ? prevRows[prevRows.length - 1] : null;
+    const nextLastRow = nextRows.length > 0 ? nextRows[nextRows.length - 1] : null;
+    const lastBarValueChanged =
+      !!prevLastRow &&
+      !!nextLastRow &&
+      (prevLastRow.open !== nextLastRow.open ||
+        prevLastRow.high !== nextLastRow.high ||
+        prevLastRow.low !== nextLastRow.low ||
+        prevLastRow.close !== nextLastRow.close ||
+        Number(prevLastRow.volume ?? 0) !== Number(nextLastRow.volume ?? 0));
     const timeframeChanged = prevViewTimeframeRef.current !== timeframe;
     if (timeframeChanged) {
       pendingSwitchTimeframeRef.current = timeframe;
@@ -1258,6 +1375,7 @@ export function KLineChart({
     });
     const rowsShapeChanged =
       rowsRef.current.length !== prevRows.length || currentFirstTs !== prevFirstTs || currentLastTs !== prevLastTs;
+    const tailAdvanced = currentLastTs !== prevLastTs || lastBarValueChanged;
     const skipDataApplyOnly = timeframeChanged && !rowsShapeChanged;
     const shouldInitViewport = !viewportInitRef.current || timeframeChanged;
     if (!skipDataApplyOnly) {
@@ -1471,48 +1589,6 @@ export function KLineChart({
             },
           });
         }
-        if (typeof stopLossPrice === 'number' && Number.isFinite(stopLossPrice)) {
-        chart.createOverlay({
-          name: 'horizontalStraightLine',
-          groupId: 'risk-lines',
-          points: [{ timestamp: lastTimestamp, value: stopLossPrice }],
-          styles: {
-            line: { color: '#ef4444', size: 1.2, style: 'dashed', dashedValue: [5, 4] },
-          },
-        });
-        chart.createOverlay({
-          name: 'simpleAnnotation',
-          groupId: 'risk-lines',
-          points: [{ timestamp: lastTimestamp, value: stopLossPrice }],
-          extendData: `止损 ${stopLossPrice.toFixed(pricePrecision)}`,
-          styles: {
-            text: { backgroundColor: '#7f1d1d', borderColor: '#b91c1c', color: '#fecaca' },
-            line: { color: '#ef4444' },
-            polygon: { color: '#ef4444', borderColor: '#ef4444' },
-          },
-        });
-        }
-        if (typeof takeProfitPrice === 'number' && Number.isFinite(takeProfitPrice)) {
-        chart.createOverlay({
-          name: 'horizontalStraightLine',
-          groupId: 'risk-lines',
-          points: [{ timestamp: lastTimestamp, value: takeProfitPrice }],
-          styles: {
-            line: { color: '#10b981', size: 1.2, style: 'dashed', dashedValue: [5, 4] },
-          },
-        });
-        chart.createOverlay({
-          name: 'simpleAnnotation',
-          groupId: 'risk-lines',
-          points: [{ timestamp: lastTimestamp, value: takeProfitPrice }],
-          extendData: `止盈 ${takeProfitPrice.toFixed(pricePrecision)}`,
-          styles: {
-            text: { backgroundColor: '#064e3b', borderColor: '#059669', color: '#a7f3d0' },
-            line: { color: '#10b981' },
-            polygon: { color: '#10b981', borderColor: '#10b981' },
-          },
-        });
-        }
       }
     }
     if (isTrainingMode && shouldInitViewport) {
@@ -1521,12 +1597,14 @@ export function KLineChart({
         userInteractedRef.current = false;
       }
       viewportInitRef.current = true;
-    } else if (isTrainingMode && currentLastTs != null && prevLastTs != null && currentLastTs !== prevLastTs) {
-      syncTrainingViewportWithFallback(chart, rowsRef.current, 'advance');
+    } else if (isTrainingMode && tailAdvanced) {
+      // In training mode, clicking "next bar" should keep viewport pinned to latest
+      // even when aggregated timeframe keeps the same bucket timestamp.
+      syncTrainingViewportWithFallback(chart, rowsRef.current, 'advance', true, true);
     }
     prevViewTimeframeRef.current = timeframe;
     refreshIndicatorLegend(rowsRef.current.length > 0 ? rowsRef.current.length - 1 : null);
-  }, [chartReady, data, actions, stopLossPrice, takeProfitPrice, highlightedActionId, showTradeOverlays, hideTimeAxisLabels, timeframe]);
+  }, [chartReady, data, actions, highlightedActionId, showTradeOverlays, hideTimeAxisLabels, timeframe]);
 
   useEffect(() => {
     refreshIndicatorLegend(focusDataIndex);
@@ -1743,8 +1821,8 @@ export function KLineChart({
   }, [focusDataIndex, data]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-700/60 bg-slate-900/65 p-1.5 text-xs">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-xl border border-slate-700/60 bg-slate-900/65 p-1 text-[11px]">
         <span className="mr-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-[11px] font-semibold text-slate-900">TRAIN</span>
         {periods.map((p) => (
           <button
@@ -1762,6 +1840,81 @@ export function KLineChart({
           </button>
         ))}
         <div className="mx-1 h-4 w-px bg-slate-600/70" />
+        <div ref={drawToolbarRef} className="relative">
+          <button
+            className={openDrawMenu ? activeToolBtn : toolBtn}
+            onClick={() =>
+              setOpenDrawMenu((prev) => (prev ? null : drawMenus[0]?.key ?? null))
+            }
+          >
+            画线
+          </button>
+          {openDrawMenu ? (
+            <div className="absolute left-0 top-[34px] z-30 min-w-[280px] rounded-xl border border-slate-700/80 bg-slate-900/95 p-2 shadow-2xl">
+              <div className="mb-2 flex flex-wrap items-center gap-1">
+                {drawMenus.map((menu) => (
+                  <button
+                    key={menu.key}
+                    className={openDrawMenu === menu.key ? activeToolBtn : toolBtn}
+                    onClick={() => setOpenDrawMenu(menu.key)}
+                  >
+                    {menu.title}
+                  </button>
+                ))}
+              </div>
+              {drawMenus
+                .filter((menu) => menu.key === openDrawMenu)
+                .map((menu) => (
+                  <div key={menu.key} className="grid grid-cols-2 gap-1.5">
+                    {menu.items.map((item) => (
+                      <button
+                        key={item.overlay}
+                        className={`rounded-lg border px-2 py-1.5 text-left text-[11px] transition ${
+                          activeDrawTool === item.overlay
+                            ? 'border-blue-300/60 bg-blue-600/80 text-white'
+                            : 'border-slate-700/70 bg-slate-800/60 text-slate-100 hover:border-slate-500'
+                        }`}
+                        onClick={() => {
+                          addDraw(item.overlay);
+                          setOpenDrawMenu(null);
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              <div className="mt-2 flex items-center gap-1.5 border-t border-slate-700/70 pt-2">
+                <button
+                  className={drawLocked ? sideBtnActive : sideBtn}
+                  onClick={() => setDrawLocked((prev) => !prev)}
+                  title={drawLocked ? '已锁定画线' : '解锁后可画线'}
+                >
+                  {drawLocked ? '已锁定' : '未锁定'}
+                </button>
+                <button
+                  className={showTradeOverlays ? sideBtnActive : sideBtn}
+                  onClick={() => setShowTradeOverlays((prev) => !prev)}
+                  title={showTradeOverlays ? '隐藏标注与画线' : '显示标注与画线'}
+                >
+                  {showTradeOverlays ? '显示中' : '已隐藏'}
+                </button>
+                <button
+                  className={sideBtn}
+                  onClick={() => {
+                    if (drawLocked) return;
+                    chartRef.current?.removeOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID });
+                    pendingManualOverlayRestoreRef.current = null;
+                    setActiveDrawTool(null);
+                  }}
+                  title="清空划线"
+                >
+                  清空
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
         <button className={selectedIndicators.length > 0 ? activeToolBtn : toolBtn} onClick={() => setShowIndicatorModal(true)}>
           指标 {selectedIndicators.length > 0 ? `(${selectedIndicators.length})` : ''}
         </button>
@@ -1770,69 +1923,10 @@ export function KLineChart({
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-stretch gap-1.5">
-        <div ref={drawToolbarRef} className="relative flex w-[44px] flex-col rounded-xl border border-slate-700/50 bg-slate-900/80">
-          {drawMenus.map((menu) => (
-            <div key={menu.key} className="relative border-b border-slate-700/70 last:border-b-0">
-              <button
-                className={openDrawMenu === menu.key ? `${sideBtnActive} m-1` : `${sideBtn} m-1`}
-                onClick={() => setOpenDrawMenu((prev) => (prev === menu.key ? null : menu.key))}
-                title={menu.title}
-              >
-                {menu.icon}
-              </button>
-              {openDrawMenu === menu.key ? (
-                <div className="absolute left-[46px] top-1 z-20 min-w-[160px] rounded-xl border border-slate-700/80 bg-slate-900/95 p-1 shadow-2xl">
-                  {menu.items.map((item) => (
-                    <button
-                      key={item.overlay}
-                      className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-100 hover:bg-slate-700/80 ${activeDrawTool === item.overlay ? 'bg-blue-600/70' : ''}`}
-                      onClick={() => {
-                        addDraw(item.overlay);
-                        setOpenDrawMenu(null);
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
-          <div className="my-1 border-t border-slate-700/70" />
-          <button
-            className={`${drawLocked ? sideBtnActive : sideBtn} m-1`}
-            title={drawLocked ? '已锁定画线' : '解锁后可画线'}
-            onClick={() => {
-              setDrawLocked((prev) => !prev);
-              setOpenDrawMenu(null);
-            }}
-          >
-            🔒
-          </button>
-          <button
-            className={`${showTradeOverlays ? sideBtnActive : sideBtn} m-1`}
-            title={showTradeOverlays ? '隐藏标注与画线' : '显示标注与画线'}
-            onClick={() => setShowTradeOverlays((prev) => !prev)}
-          >
-            👁
-          </button>
-          <button
-            className={`${sideBtn} m-1`}
-            onClick={() => {
-              if (drawLocked) return;
-              chartRef.current?.removeOverlay({ groupId: MANUAL_OVERLAY_GROUP_ID });
-              pendingManualOverlayRestoreRef.current = null;
-              setActiveDrawTool(null);
-              setOpenDrawMenu(null);
-            }}
-            title="清空划线"
-          >
-            🗑
-          </button>
-        </div>
-        <div ref={chartPaneRef} className="flex min-h-0 flex-1 flex-col gap-1">
-          <div className="rounded-xl border border-slate-700/50 bg-slate-950/70 px-3 py-1.5 text-[12px] text-slate-200">
+      <div className="relative flex min-h-0 min-w-0 flex-1 items-stretch gap-0">
+        <div ref={chartPaneRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-slate-950/70 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.05)]">
+          <div className="shrink-0 border-b border-slate-700/60 px-3 py-1.5 text-[12px] text-slate-200">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               {!hideHeaderTime ? <span className="text-slate-400">时间: {formatTime(focusTimestamp)}</span> : null}
               <span>开: {priceInfo.open}</span>
@@ -1843,23 +1937,23 @@ export function KLineChart({
                 涨跌: {priceInfo.change} ({priceInfo.changePct})
               </span>
             </div>
-            
           </div>
-          <div className="relative h-full w-full">
+          <div className="relative min-h-0 flex-1">
             <div
               ref={ref}
-              className={`h-full w-full rounded-xl border border-slate-700/90 bg-slate-950/70 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.06)] transition-opacity duration-120 ${
+              className={`h-full w-full min-h-0 bg-slate-950/70 transition-opacity duration-120 ${
                 initialIndicatorReady ? 'opacity-100' : 'opacity-0'
               } ${
                 fitContainerHeight ? 'min-h-0' : 'min-h-[420px] sm:min-h-[460px] xl:min-h-[560px] 2xl:min-h-[640px]'
               }`}
             />
             {!initialIndicatorReady ? (
-              <div className="pointer-events-none absolute inset-0 rounded-xl border border-slate-700/90 bg-slate-950/70" />
+              <div className="pointer-events-none absolute inset-0 bg-slate-950/70" />
             ) : null}
             {indicatorSyncMask ? (
-              <div className="pointer-events-none absolute inset-0 rounded-xl bg-slate-950/45" />
+              <div className="pointer-events-none absolute inset-0 bg-slate-950/45" />
             ) : null}
+          </div>
           </div>
         </div>
       </div>

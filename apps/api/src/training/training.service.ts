@@ -936,8 +936,8 @@ export class TrainingService {
         const nextAmount = position.positionAmount + addAmount;
         const nextEntryPrice = (position.entryPrice * position.positionAmount + addPrice * addAmount) / nextAmount;
         const nextPositionPercent = Math.min(1, Math.max(0, nextAmount / Math.max(balance, 0.000001)));
-        const nextStopLossPrice = dto.stopLossPrice ?? position.stopLossPrice ?? null;
-        const nextTakeProfitPrice = dto.takeProfitPrice ?? position.takeProfitPrice ?? null;
+        const nextStopLossPrice = dto.clearStopLossPrice ? null : dto.stopLossPrice ?? position.stopLossPrice ?? null;
+        const nextTakeProfitPrice = dto.clearTakeProfitPrice ? null : dto.takeProfitPrice ?? position.takeProfitPrice ?? null;
         this.validateStopPrices(side, nextEntryPrice, nextStopLossPrice ?? undefined, nextTakeProfitPrice ?? undefined);
         await this.prisma.position.update({
           where: { sessionId },
@@ -974,10 +974,10 @@ export class TrainingService {
       if (!closePercentRatio) throw new BadRequestException('closePercent required');
       balance = await this.closePosition(sessionId, position, session.pointer, closePrice, balance, CloseReason.USER, closePercentRatio);
     } else if (normalizedAction === 'HOLD' && position) {
-      if (dto.stopLossPrice !== undefined || dto.takeProfitPrice !== undefined) {
+      if (dto.stopLossPrice !== undefined || dto.takeProfitPrice !== undefined || dto.clearStopLossPrice || dto.clearTakeProfitPrice) {
         const side = this.normalizePositionSide(position.side);
-        const nextStopLossPrice = dto.stopLossPrice ?? position.stopLossPrice ?? null;
-        const nextTakeProfitPrice = dto.takeProfitPrice ?? position.takeProfitPrice ?? null;
+        const nextStopLossPrice = dto.clearStopLossPrice ? null : dto.stopLossPrice ?? position.stopLossPrice ?? null;
+        const nextTakeProfitPrice = dto.clearTakeProfitPrice ? null : dto.takeProfitPrice ?? position.takeProfitPrice ?? null;
         this.validateStopPrices(side, position.entryPrice, nextStopLossPrice ?? undefined, nextTakeProfitPrice ?? undefined);
         await this.prisma.position.update({
           where: { sessionId },
@@ -988,6 +988,9 @@ export class TrainingService {
             takeProfitPrice: nextTakeProfitPrice,
           },
         });
+      }
+      if (dto.updateRiskOnly) {
+        return this.getById(userId, sessionId);
       }
     }
 
