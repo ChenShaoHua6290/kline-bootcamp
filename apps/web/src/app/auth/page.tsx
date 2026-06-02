@@ -14,6 +14,7 @@ import { ContactTeacherModal } from '@/components/contact/ContactTeacherModal';
 import { Toast } from '@/components/ui/Toast';
 import { resolveAdminWechatId, resolveAdminWechatQr } from '@/lib/contact';
 import { PASSWORD_STRENGTH_HINT } from '@/lib/password';
+import { IcpFooter } from '@/components/IcpFooter';
 
 type Mode = 'login' | 'register';
 
@@ -280,6 +281,7 @@ export default function AuthPage() {
         emptyText="暂未配置二维码，请联系平台管理员。"
       />
       <Toast open={toast.open} message={toast.message} tone={toast.tone} onClose={() => setToast((t) => ({ ...t, open: false }))} />
+      <IcpFooter className="pointer-events-auto absolute bottom-3 left-1/2 -translate-x-1/2 px-3" />
     </main>
   );
 }

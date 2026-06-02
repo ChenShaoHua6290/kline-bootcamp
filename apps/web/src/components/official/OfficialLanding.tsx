@@ -9,6 +9,7 @@ import { LearningFlowSection } from './home/LearningFlowSection';
 import { TestimonialsSection } from './home/TestimonialsSection';
 import { FaqSection } from './home/FaqSection';
 import { SignupSection } from './home/SignupSection';
+import { IcpFooter } from '@/components/IcpFooter';
 
 const navItems = [
   { label: '首页', href: '#home' },
@@ -108,6 +109,7 @@ export function OfficialLanding() {
       <div className="animate-[fadeInUp_.65s_ease-out] [animation-delay:.38s] [animation-fill-mode:both]">
         <SignupSection />
       </div>
+      <IcpFooter className="border-t border-cyan-500/10 px-4 py-5" />
     </main>
   );
 }
