@@ -1257,3 +1257,77 @@ pg_restore -l ./kline_prod.dump | head
 7. 配域名和 HTTPS（第 12、13 章）
 
 如果你愿意，我下一步可以再给你一份“只保留必须命令的极简上线清单（10 分钟复用版）”，方便你每次发新版时直接照抄执行。
+
+---
+
+# 21. HTTPS 证书配置（当前仓库可直接用）
+
+以下步骤以域名 `1mode.cn`、`www.1mode.cn` 为例，时间为 `2026-06-02`。
+
+## 21.1 前置条件
+
+1. DNS 已解析到服务器公网 IP（A 记录）
+2. 服务器已放行 `80/443` 端口
+3. 当前生产栈已可通过 HTTP 访问
+
+## 21.2 准备证书目录
+
+在项目根目录执行：
+
+```bash
+mkdir -p certbot/www certbot/conf
+```
+
+## 21.3 先用 HTTP 配置启动
+
+`docker-compose.prod.yml` 已开放 `80/443` 并挂载：
+
+- `./certbot/www:/var/www/certbot`
+- `./certbot/conf:/etc/letsencrypt`
+
+先确认当前仍使用 `nginx/default.conf`（HTTP 版本），启动服务：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d nginx
+```
+
+## 21.4 申请 Let’s Encrypt 证书
+
+```bash
+docker run --rm \
+  -v "$(pwd)/certbot/www:/var/www/certbot" \
+  -v "$(pwd)/certbot/conf:/etc/letsencrypt" \
+  certbot/certbot certonly --webroot \
+  -w /var/www/certbot \
+  -d 1mode.cn -d www.1mode.cn \
+  --email 你的邮箱 --agree-tos --no-eff-email
+```
+
+## 21.5 切换到 HTTPS Nginx 配置
+
+仓库已提供模板：`nginx/default.ssl.conf`。  
+执行切换：
+
+```bash
+cp nginx/default.ssl.conf nginx/default.conf
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d nginx
+```
+
+验证：
+
+```bash
+curl -I https://1mode.cn
+curl -I https://www.1mode.cn
+```
+
+## 21.6 自动续期（建议 crontab）
+
+```bash
+crontab -e
+```
+
+添加：
+
+```cron
+0 3 * * * cd /opt/kline-training && docker run --rm -v /opt/kline-training/certbot/www:/var/www/certbot -v /opt/kline-training/certbot/conf:/etc/letsencrypt certbot/certbot renew --webroot -w /var/www/certbot --quiet && docker compose --env-file .env.production -f docker-compose.prod.yml exec -T nginx nginx -s reload
+```
