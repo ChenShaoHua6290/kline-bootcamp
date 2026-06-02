@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 function sanitizeText(value: unknown) {
   if (typeof value !== 'string') return value;
@@ -65,6 +65,55 @@ export class UpdateInviteCodeDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  dailyTrainingLimit?: number;
+
+  @IsOptional()
+  @IsIn(['NONE', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
+  paidPlan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+}
+
+export class QuickCreateInviteCodeQueryDto {
+  @Transform(({ value }) => sanitizeText(value))
+  @IsString()
+  @MaxLength(256)
+  secret!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => sanitizeText(value))
+  @IsString()
+  @MaxLength(64)
+  code?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  maxUses?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  expiresInDays?: number;
+
+  @IsOptional()
+  @IsIn(['TRIAL', 'PAID', 'INTERNAL'])
+  type?: 'TRIAL' | 'PAID' | 'INTERNAL';
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  trialDays?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(1000)
   dailyTrainingLimit?: number;
 
   @IsOptional()

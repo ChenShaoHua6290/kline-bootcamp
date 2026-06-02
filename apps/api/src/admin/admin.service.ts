@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
 import { isPasswordStrong, passwordStrengthMessage } from '../auth/password-policy';
-import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
+import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, QuickCreateInviteCodeQueryDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
 
 @Injectable()
 export class AdminService {
@@ -142,6 +143,70 @@ export class AdminService {
       detail: `code=${code}`,
     });
     return { ok: true };
+  }
+
+  async quickCreateInvitation(dto: QuickCreateInviteCodeQueryDto) {
+    this.assertQuickInviteSecret(dto.secret);
+
+    const adminRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "User"
+      WHERE role = CAST('ADMIN' AS "UserRole") AND "isBanned" = FALSE
+      ORDER BY "createdAt" ASC
+      LIMIT 1
+    `;
+    const adminId = adminRows[0]?.id;
+    if (!adminId) throw new BadRequestException('未找到可用管理员账号，无法创建邀请码');
+
+    const code = dto.code?.trim() || (await this.generateUniqueInviteCode());
+    const inviteType = dto.type ?? 'TRIAL';
+    const maxUses = dto.maxUses ?? 1;
+    const expiresInDays = dto.expiresInDays ?? 3;
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString();
+
+    await this.createInvitation(adminId, {
+      code,
+      maxUses,
+      expiresAt,
+      isActive: true,
+      type: inviteType,
+      trialDays: inviteType === 'TRIAL' ? dto.trialDays ?? 3 : dto.trialDays,
+      dailyTrainingLimit: inviteType === 'TRIAL' ? dto.dailyTrainingLimit ?? 5 : dto.dailyTrainingLimit,
+      paidPlan: dto.paidPlan,
+    });
+
+    const appUrl = (process.env.APP_URL?.trim() || '').replace(/\/$/, '');
+    return {
+      ok: true,
+      code,
+      type: inviteType,
+      maxUses,
+      expiresAt,
+      registerUrl: appUrl ? `${appUrl}/auth` : '/auth',
+      message: appUrl ? `${appUrl}/auth?inviteCode=${encodeURIComponent(code)}` : `/auth?inviteCode=${encodeURIComponent(code)}`,
+    };
+  }
+
+  private assertQuickInviteSecret(input: string) {
+    const expected = process.env.AUTO_INVITE_SECRET?.trim();
+    if (!expected) throw new ForbiddenException('自动邀请码链接未启用');
+    const actualBuffer = Buffer.from(input || '');
+    const expectedBuffer = Buffer.from(expected);
+    if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+      throw new ForbiddenException('无权生成邀请码');
+    }
+  }
+
+  private async generateUniqueInviteCode() {
+    const prefix = process.env.AUTO_INVITE_PREFIX?.trim() || 'INV';
+    for (let i = 0; i < 8; i += 1) {
+      const code = `${prefix}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+      const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "InviteCode" WHERE code = ${code} LIMIT 1
+      `;
+      if (!existing[0]) return code;
+    }
+    throw new BadRequestException('生成邀请码失败，请重试');
   }
 
   async updateInvitation(adminId: string, id: string, dto: UpdateInviteCodeDto) {
