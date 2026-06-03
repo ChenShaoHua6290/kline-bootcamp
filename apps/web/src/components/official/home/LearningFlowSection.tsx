@@ -3,17 +3,17 @@
 import { useState } from 'react';
 import { learningStages } from '@/data/official-home-content';
 
-const routeLabels = ['认知', '模式', '指标/共振', '训练','复盘','执行'];
+const routeLabels = ['认知', '模式', '指标/共振', '训练', '复盘', '执行'];
 
 export function LearningFlowSection() {
   const [activeStage, setActiveStage] = useState(4);
 
   return (
-    <section className="mx-auto max-w-[1400px] px-4 pb-24 sm:px-6 lg:pb-32">
-      <h2 className="text-center text-[28px] font-semibold tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">完整学习与训练流程</h2>
-      <p className="mt-4 text-center text-base leading-8 text-slate-300 sm:text-lg">从认知，到训练，再到执行。</p>
+    <section className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6 sm:pb-24 lg:pb-32">
+      <h2 className="text-center text-[25px] font-semibold leading-tight tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">完整学习与训练流程</h2>
+      <p className="mt-3 text-center text-[15px] leading-7 text-slate-300 sm:mt-4 sm:text-lg sm:leading-8">从认知，到训练，再到执行。</p>
 
-      <div className="mt-6 rounded-[34px] border border-cyan-300/20 bg-[linear-gradient(165deg,rgba(15,23,42,0.85),rgba(7,29,51,0.52))] p-4 shadow-[0_24px_60px_rgba(2,6,23,0.5)] sm:p-6 lg:p-8">
+      <div className="mt-5 rounded-3xl border border-cyan-300/20 bg-[linear-gradient(165deg,rgba(15,23,42,0.85),rgba(7,29,51,0.52))] p-3 shadow-[0_24px_60px_rgba(2,6,23,0.5)] sm:mt-6 sm:p-6 lg:p-8">
         <div className="hidden lg:block">
           <div className="relative px-2">
             <div className="absolute left-5 right-5 top-[30px] h-px bg-cyan-300/30" />
@@ -59,7 +59,7 @@ export function LearningFlowSection() {
                 <p className="text-sm text-cyan-200">{routeLabels[Math.min(idx, routeLabels.length - 1)]}</p>
               </div>
               <p className="text-xs font-medium tracking-[0.12em] text-cyan-300">{stage.title}</p>
-              <p className="mt-1 text-lg font-semibold leading-8 text-slate-100">{stage.subtitle}</p>
+              <p className="mt-1 text-lg font-semibold leading-7 text-slate-100">{stage.subtitle}</p>
               <ul className="mt-2 space-y-0 text-base leading-7 text-slate-300">
                 {stage.points.slice(0, 3).map((p) => (
                   <li key={p}>• {p}</li>

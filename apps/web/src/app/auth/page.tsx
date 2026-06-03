@@ -108,29 +108,34 @@ export default function AuthPage() {
     });
   };
 
+  const switchMode = (nextMode: Mode) => {
+    setMode(nextMode);
+    setErrorMessage('');
+  };
+
   return (
-    <main className="relative mx-auto flex h-screen w-full items-center justify-center overflow-hidden px-3 py-5 md:px-4 md:py-8">
+    <main className="relative mx-auto flex min-h-screen w-full items-start justify-center overflow-x-hidden px-4 pb-14 pt-5 sm:items-center sm:px-5 sm:py-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(34,211,238,0.14),transparent_35%),radial-gradient(circle_at_82%_8%,rgba(59,130,246,0.16),transparent_32%),radial-gradient(circle_at_50%_95%,rgba(14,165,233,0.10),transparent_38%)]" />
-      <Card className="relative max-h-[calc(100vh-56px)] w-full max-w-[900px] origin-top border-cyan-400/25 bg-[linear-gradient(145deg,rgba(16,25,42,0.96)_0%,rgba(10,17,31,0.98)_52%,rgba(7,13,24,0.99)_100%)] shadow-[0_0_0_1px_rgba(34,211,238,0.14),0_28px_80px_rgba(2,6,23,0.72)] max-[420px]:scale-[0.9] max-[360px]:scale-[0.84]">
+      <Card className="relative w-full max-w-[900px] border-cyan-400/25 bg-[linear-gradient(145deg,rgba(16,25,42,0.96)_0%,rgba(10,17,31,0.98)_52%,rgba(7,13,24,0.99)_100%)] shadow-[0_0_0_1px_rgba(34,211,238,0.14),0_28px_80px_rgba(2,6,23,0.72)]">
         <CardBody className="p-0">
         <div className="grid md:grid-cols-[1fr_1.15fr]">
-          <section className="border-b border-slate-700/45 bg-slate-900/20 p-4 md:max-h-[calc(100vh-56px)] md:overflow-hidden md:border-b-0 md:border-r md:p-6">
-            <div className="rounded-2xl border border-slate-700/45 bg-slate-900/20 p-3.5 md:p-4">
+          <section className="border-b border-slate-700/45 bg-slate-900/20 p-4 md:border-b-0 md:border-r md:p-6">
+            <div className="rounded-2xl border border-slate-700/45 bg-slate-900/20 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-md border border-cyan-300/35 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.28)]">
                   欢迎使用
                 </span>
-              <PageTitle className="text-[clamp(1.15rem,1.55vw,1.55rem)] tracking-[0.01em]">
+              <PageTitle className="text-[clamp(1.25rem,5vw,1.55rem)] leading-tight tracking-[0.01em]">
                 <span className="bg-gradient-to-r from-cyan-200 via-sky-100 to-indigo-200 bg-clip-text text-transparent">
                   只做一种模式K线训练
                 </span>
               </PageTitle>
             </div>
-            <PageDescription className="mt-1 text-[12px] text-slate-300">登录后即可开始双盲训练。</PageDescription>
-            <div className="mt-4 space-y-2.5">
+            <PageDescription className="mt-2 text-[13px] leading-6 text-slate-300">登录后即可开始双盲训练。</PageDescription>
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-2 md:grid-cols-1">
               <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-3.5 py-3">
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-cyan-400/20 text-[11px] text-cyan-200">◆</span>
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-cyan-400/20 text-[11px] text-cyan-200">◆</span>
                   <div>
                     <div className="text-[12px] font-semibold text-cyan-100">只做一种模式</div>
                     <div className="mt-0.5 text-[11px] text-cyan-200/90">聚焦执行与盘感，不被复杂策略干扰</div>
@@ -139,7 +144,7 @@ export default function AuthPage() {
               </div>
               <div className="rounded-xl border border-slate-700/80 bg-slate-900/45 px-3.5 py-3">
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-sky-400/20 text-[11px] text-sky-200">▦</span>
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-sky-400/20 text-[11px] text-sky-200">▦</span>
                   <div>
                     <div className="text-[12px] font-semibold text-slate-200">真实K线回放</div>
                     <div className="mt-0.5 text-[11px] text-slate-400">按周期推进训练，支持复盘总结</div>
@@ -162,19 +167,20 @@ export default function AuthPage() {
             </div>
           </section>
 
-          <section className="flex items-center px-3.5 py-6 md:max-h-[calc(100vh-56px)] md:px-6 md:py-8">
-        <div className="w-full rounded-2xl border border-slate-700/45 bg-slate-900/20 p-3 md:p-3.5">
+          <section className="flex items-center px-4 py-5 md:px-6 md:py-8">
+        <div className="w-full rounded-2xl border border-slate-700/45 bg-slate-900/20 p-4 md:p-3.5">
         <div className="grid grid-cols-2 gap-2 text-[12px]">
-          <Button type="button" variant={mode === 'login' ? 'primary' : 'default'} className={mode === 'login' ? '!shadow-[0_8px_22px_rgba(37,99,235,0.35)]' : ''} onClick={() => setMode('login')}>
+          <Button type="button" variant={mode === 'login' ? 'primary' : 'default'} className={`h-11 ${mode === 'login' ? '!shadow-[0_8px_22px_rgba(37,99,235,0.35)]' : ''}`} onClick={() => switchMode('login')}>
             登录
           </Button>
-          <Button type="button" variant={mode === 'register' ? 'primary' : 'default'} className={mode === 'register' ? '!shadow-[0_8px_22px_rgba(37,99,235,0.35)]' : ''} onClick={() => setMode('register')}>
+          <Button type="button" variant={mode === 'register' ? 'primary' : 'default'} className={`h-11 ${mode === 'register' ? '!shadow-[0_8px_22px_rgba(37,99,235,0.35)]' : ''}`} onClick={() => switchMode('register')}>
             注册
           </Button>
         </div>
 
-        <form className="mt-3.5 space-y-2.5 md:mt-4 md:space-y-3 md:min-h-[350px]" onSubmit={submit}>
-          <label className={`block text-[12px] transition-opacity ${mode === 'register' ? 'opacity-100' : 'pointer-events-none select-none opacity-0'}`}>
+        <form className="mt-4 space-y-3" onSubmit={submit}>
+          {mode === 'register' ? (
+            <label className="block text-[12px]">
               <span className="field-label mb-1 block">昵称（2-20位，中文/英文/数字/下划线）</span>
               <Input
                 type="text"
@@ -186,8 +192,10 @@ export default function AuthPage() {
                 maxLength={20}
                 pattern="[\u4e00-\u9fa5A-Za-z0-9_]+"
                 placeholder="请输入昵称"
+                className="h-11 text-base sm:text-sm"
               />
             </label>
+          ) : null}
 
           <label className="block text-[12px]">
             <span className="field-label mb-1 block">邮箱</span>
@@ -197,6 +205,9 @@ export default function AuthPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
+              autoComplete="email"
+              inputMode="email"
+              className="h-11 text-base sm:text-sm"
             />
           </label>
 
@@ -209,11 +220,14 @@ export default function AuthPage() {
               required
               minLength={mode === 'register' ? 8 : 1}
               placeholder="******"
+              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+              className="h-11 text-base sm:text-sm"
             />
           </label>
-          {mode === 'register' ? <p className="text-[11px] text-slate-400">{PASSWORD_STRENGTH_HINT}</p> : null}
+          {mode === 'register' ? <p className="rounded-lg border border-slate-700/60 bg-slate-950/30 px-3 py-2 text-[11px] leading-5 text-slate-400">{PASSWORD_STRENGTH_HINT}</p> : null}
 
-            <label className={`block text-[12px] transition-opacity ${mode === 'register' ? 'opacity-100' : 'pointer-events-none select-none opacity-0'}`}>
+          {mode === 'register' ? (
+            <label className="block text-[12px]">
               <span className="field-label mb-1 block">邀请码（必填）</span>
               <Input
                 type="text"
@@ -222,16 +236,18 @@ export default function AuthPage() {
                 required={mode === 'register'}
                 disabled={mode !== 'register'}
                 placeholder="请输入邀请码"
+                className="h-11 text-base sm:text-sm"
               />
             </label>
+          ) : null}
 
           {errorMessage ? (
             <div className="space-y-2">
-              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-[12px] text-rose-200">{errorMessage}</p>
+              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-[12px] leading-5 text-rose-200">{errorMessage}</p>
               <button
                 type="button"
                 onClick={() => setContactOpen(true)}
-                className="inline-flex items-center rounded-lg border border-cyan-400/45 bg-cyan-500/12 px-2.5 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+                className="inline-flex min-h-9 items-center rounded-lg border border-cyan-400/45 bg-cyan-500/12 px-3 py-1.5 text-[12px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
               >
                 遇到问题？立即联系管理员
               </button>
@@ -243,7 +259,7 @@ export default function AuthPage() {
             disabled={mutation.isPending}
             variant="primary"
             size="lg"
-            className="h-9 w-full text-[13px] font-semibold"
+            className="h-11 w-full text-[15px] font-semibold"
           >
             {mutation.isPending ? '提交中...' : mode === 'login' ? '登录' : '注册并登录'}
           </Button>
@@ -259,7 +275,7 @@ export default function AuthPage() {
             <button
               type="button"
               onClick={() => setContactOpen(true)}
-              className="inline-flex items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-500/12 px-4 py-2 text-[12px] font-semibold text-cyan-200 shadow-[0_6px_18px_rgba(6,182,212,0.18)] transition hover:bg-cyan-500/22 hover:text-cyan-100"
+              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-500/12 px-4 py-2 text-[12px] font-semibold text-cyan-200 shadow-[0_6px_18px_rgba(6,182,212,0.18)] transition hover:bg-cyan-500/22 hover:text-cyan-100"
             >
               联系管理员
             </button>

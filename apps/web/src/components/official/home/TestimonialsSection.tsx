@@ -84,9 +84,9 @@ export function TestimonialsSection() {
   const dots = useMemo(() => Array.from({ length: cardCount }, (_, i) => i), [cardCount]);
 
   return (
-    <section id="testimonials" className="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-32 sm:px-6 lg:pb-44">
-      <div className="relative mb-6 lg:mb-8">
-        <h2 className="text-center text-[28px] font-semibold tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">学员真实反馈</h2>
+    <section id="testimonials" className="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-20 sm:px-6 sm:pb-28 lg:pb-44">
+      <div className="relative mb-5 lg:mb-8">
+        <h2 className="text-center text-[25px] font-semibold leading-tight tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">学员真实反馈</h2>
       </div>
 
       <div className="relative">
@@ -109,7 +109,7 @@ export function TestimonialsSection() {
 
         <div
           ref={ref}
-          className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [scrollbar-width:none] sm:gap-5 [&::-webkit-scrollbar]:hidden"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => pauseAndResumeLater()}
           onTouchStart={() => setPaused(true)}
@@ -119,7 +119,7 @@ export function TestimonialsSection() {
             <article
               key={item.name + item.tag}
               data-feedback-card="1"
-              className={`min-w-[88%] min-w-0 snap-start rounded-3xl border p-4 shadow-[0_18px_40px_rgba(2,6,23,0.5)] transition-all sm:min-w-[46%] lg:min-w-[32%] ${idx % 3 === 0 ? 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(8,47,73,0.5))]' : idx % 3 === 1 ? 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(30,58,138,0.42))]' : 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(180,83,9,0.28))]'} ${idx === activeIndex ? 'border-cyan-200/60 shadow-[0_0_0_1px_rgba(103,232,249,0.2),0_18px_38px_rgba(6,182,212,0.18)]' : 'border-cyan-300/25'}`}
+              className={`w-[86%] shrink-0 snap-start rounded-2xl border p-3 shadow-[0_18px_40px_rgba(2,6,23,0.5)] transition-all sm:w-[46%] sm:rounded-3xl sm:p-4 lg:w-[32%] ${idx % 3 === 0 ? 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(8,47,73,0.5))]' : idx % 3 === 1 ? 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(30,58,138,0.42))]' : 'bg-[linear-gradient(155deg,rgba(15,23,42,0.92),rgba(180,83,9,0.28))]'} ${idx === activeIndex ? 'border-cyan-200/60 shadow-[0_0_0_1px_rgba(103,232,249,0.2),0_18px_38px_rgba(6,182,212,0.18)]' : 'border-cyan-300/25'}`}
             >
               <div className="rounded-2xl border border-cyan-300/18 bg-slate-950/60 p-2.5 backdrop-blur-sm">
                 <div className="relative overflow-hidden rounded-xl">

@@ -12,13 +12,13 @@ export function SystemOverviewSection() {
   const orbitCards = systemCards.slice(0, 4);
 
   return (
-    <section id="service-intro" className="mx-auto max-w-[1320px] scroll-mt-24 px-4 pb-28 sm:px-6 lg:pb-36">
+    <section id="service-intro" className="mx-auto max-w-[1320px] scroll-mt-24 px-4 pb-20 sm:px-6 sm:pb-28 lg:pb-36">
       <div className="mb-4 text-center lg:mb-6">
-        <h2 className="text-[28px] font-semibold tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">一套完整的交易系统体系</h2>
-        <p className="mx-auto mt-1 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg sm:leading-9">学 → 看 → 辅助 → 训练 → 复盘，形成完整闭环。</p>
+        <h2 className="text-[25px] font-semibold leading-tight tracking-[-0.02em] text-slate-100 sm:text-[32px] lg:text-[38px]">一套完整的交易系统体系</h2>
+        <p className="mx-auto mt-2 max-w-3xl text-[15px] leading-7 text-slate-300 sm:mt-1 sm:text-lg sm:leading-9">学 → 看 → 辅助 → 训练 → 复盘，形成完整闭环。</p>
       </div>
 
-      <div className="rounded-[30px] border border-cyan-300/20 bg-[linear-gradient(160deg,rgba(15,23,42,0.84),rgba(8,47,73,0.36))] p-4 shadow-[0_20px_52px_rgba(2,6,23,0.48)] sm:p-6 lg:p-6">
+      <div className="rounded-3xl border border-cyan-300/20 bg-[linear-gradient(160deg,rgba(15,23,42,0.84),rgba(8,47,73,0.36))] p-3 shadow-[0_20px_52px_rgba(2,6,23,0.48)] sm:p-6 lg:p-6">
         <div className="grid gap-5 lg:hidden">
           <CenterCard title={centerCard?.title ?? ''} lines={centerCard?.lines ?? []} />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -50,8 +50,8 @@ export function SystemOverviewSection() {
 
 function CenterCard({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-[26px] border border-cyan-200/35 bg-[linear-gradient(145deg,rgba(14,165,233,0.2),rgba(15,23,42,0.88))] px-3 py-4 text-left shadow-[0_16px_38px_rgba(2,6,23,0.44)]">
-      <p className="text-sm tracking-[0.2em] text-cyan-200/90">只做一种模式</p>
+    <div className="rounded-2xl border border-cyan-200/35 bg-[linear-gradient(145deg,rgba(14,165,233,0.2),rgba(15,23,42,0.88))] px-4 py-4 text-left shadow-[0_16px_38px_rgba(2,6,23,0.44)] sm:rounded-[26px]">
+      <p className="text-xs tracking-[0.14em] text-cyan-200/90 sm:text-sm sm:tracking-[0.2em]">只做一种模式</p>
       <h3 className="mt-2 text-[20px] font-semibold leading-[1.3] text-slate-100">{title}</h3>
       <ul className="mt-3 space-y-0.5 text-[15px] leading-6 text-slate-200/95">
         {lines.map((x) => <li key={x}>• {x}</li>)}
@@ -71,7 +71,7 @@ function OrbitCard({ title, lines }: { title: string; lines: string[] }) {
   const toneClass = toneByTitle[title] ?? 'bg-slate-950/55';
 
   return (
-    <div className={`rounded-3xl border border-cyan-300/25 ${toneClass} p-4 shadow-[0_14px_34px_rgba(2,6,23,0.4)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/60 hover:shadow-[0_18px_34px_rgba(8,145,178,0.2)]`}>
+    <div className={`rounded-2xl border border-cyan-300/25 ${toneClass} p-4 shadow-[0_14px_34px_rgba(2,6,23,0.4)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/60 hover:shadow-[0_18px_34px_rgba(8,145,178,0.2)] sm:rounded-3xl`}>
       <h3 className="text-[20px] font-semibold text-slate-100">{title}</h3>
       <ul className="mt-3 space-y-0.5 text-[15px] leading-6 text-slate-300">
         {lines.map((x) => <li key={x}>• {x}</li>)}
