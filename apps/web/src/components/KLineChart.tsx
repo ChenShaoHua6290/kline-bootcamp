@@ -558,7 +558,8 @@ export function KLineChart({
       if (Array.isArray(parsed.selectedIndicators)) {
         const deduped = Array.from(new Set(parsed.selectedIndicators))
           .filter((name) => supportedIndicators.includes(name));
-        if (deduped.length > 0) setSelectedIndicators(deduped);
+        wantedIndicatorsRef.current = deduped;
+        setSelectedIndicators(deduped);
       }
       if (parsed.indicatorParams && typeof parsed.indicatorParams === 'object') {
         const cleaned: Record<string, number[]> = {};
@@ -781,13 +782,21 @@ export function KLineChart({
 
   const chartIndicatorsMatchWanted = useCallback((chart: Chart) => {
     const want = Array.from(new Set(wantedIndicatorsRef.current));
-    const actual = Array.from(new Set(chart.getIndicators().map((i) => i.name)));
+    const actualIndicators = chart.getIndicators();
+    const actual = Array.from(new Set(actualIndicators.map((i) => i.name)));
     if (want.length !== actual.length) return false;
     const actualSet = new Set(actual);
-    return want.every((name) => actualSet.has(name));
-  }, []);
+    if (!want.every((name) => actualSet.has(name))) return false;
+    return want.every((name) => {
+      const indicator = actualIndicators.find((i) => i.name === name);
+      if (!indicator) return false;
+      const wantedParams = indicatorParams[name] ?? DEFAULT_INDICATOR_PARAMS[name] ?? [];
+      const actualParams = Array.isArray(indicator.calcParams) ? indicator.calcParams.map((v) => Number(v)).filter((v) => Number.isFinite(v)) : [];
+      return wantedParams.join(',') === actualParams.join(',');
+    });
+  }, [indicatorParams, DEFAULT_INDICATOR_PARAMS]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     wantedIndicatorsRef.current = Array.from(new Set(selectedIndicators));
   }, [selectedIndicators]);
 
@@ -1748,8 +1757,17 @@ export function KLineChart({
     setParamToast('创建画图失败，请尝试其他工具');
   };
 
-  const toggleIndicator = (name: string) => {
-    setSelectedIndicators((prev) => (prev.includes(name) ? prev.filter((v) => v !== name) : [...prev, name]));
+  const setIndicatorEnabled = (name: string, enabled: boolean) => {
+    setSelectedIndicators((prev) => {
+      const exists = prev.includes(name);
+      if (exists === enabled) {
+        wantedIndicatorsRef.current = Array.from(new Set(prev));
+        return prev;
+      }
+      const next = enabled ? [...prev, name] : prev.filter((v) => v !== name);
+      wantedIndicatorsRef.current = Array.from(new Set(next));
+      return next;
+    });
   };
 
   const openParamEditor = (name: string) => {
@@ -1995,7 +2013,7 @@ export function KLineChart({
                   >
                     <div
                       className="flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
-                      onClick={() => toggleIndicator(name)}
+                      onClick={() => setIndicatorEnabled(name, !selectedIndicators.includes(name))}
                     >
                       <span className={selectedIndicators.includes(name) ? 'text-[13px] font-semibold text-cyan-200' : 'text-[13px] font-medium text-slate-300'}>
                         {INDICATOR_LABELS[name] ?? name}
@@ -2003,7 +2021,7 @@ export function KLineChart({
                       <Switch
                         checked={selectedIndicators.includes(name)}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleIndicator(name)}
+                        onChange={(next) => setIndicatorEnabled(name, next)}
                       />
                     </div>
                     <Button
@@ -2035,7 +2053,7 @@ export function KLineChart({
                   >
                     <div
                       className="flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
-                      onClick={() => toggleIndicator(name)}
+                      onClick={() => setIndicatorEnabled(name, !selectedIndicators.includes(name))}
                     >
                       <span className={selectedIndicators.includes(name) ? 'text-[13px] font-semibold text-cyan-200' : 'text-[13px] font-medium text-slate-300'}>
                         {INDICATOR_LABELS[name] ?? name}
@@ -2043,7 +2061,7 @@ export function KLineChart({
                       <Switch
                         checked={selectedIndicators.includes(name)}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleIndicator(name)}
+                        onChange={(next) => setIndicatorEnabled(name, next)}
                       />
                     </div>
                     <Button
