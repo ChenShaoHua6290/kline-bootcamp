@@ -31,7 +31,7 @@ function normalizeAuthErrorToZh(msg: string | undefined, mode: Mode) {
   if (text.includes('invalid credentials') || text.includes('unauthorized')) return '邮箱或密码错误';
   if (text.includes('banned')) return '账号已被封禁，请联系管理员';
   if (text.includes('email already') || text.includes('already exists') || text.includes('duplicate')) return '该邮箱已注册，请直接登录';
-  if (text.includes('invite') && text.includes('required')) return '注册需要填写邀请码';
+  if (text.includes('invite') && text.includes('required')) return '邀请码可选，不填写会注册为试用用户';
   if (text.includes('invite') && (text.includes('invalid') || text.includes('not found'))) return '邀请码无效，请检查后重试';
   if (text.includes('invite') && (text.includes('expired') || text.includes('inactive'))) return '邀请码已失效，请联系管理员';
   if (text.includes('invite') && (text.includes('max') || text.includes('limit') || text.includes('used up'))) return '邀请码使用次数已达上限';
@@ -103,7 +103,7 @@ export default function AuthPage() {
       email: email.trim(),
       password,
       mode,
-      inviteCode: mode === 'register' ? inviteCode.trim() : undefined,
+      inviteCode: mode === 'register' && inviteCode.trim() ? inviteCode.trim() : undefined,
       nickname: mode === 'register' ? nickname.trim() : undefined,
     });
   };
@@ -228,14 +228,13 @@ export default function AuthPage() {
 
           {mode === 'register' ? (
             <label className="block text-[12px]">
-              <span className="field-label mb-1 block">邀请码（必填）</span>
+              <span className="field-label mb-1 block">邀请码（选填）</span>
               <Input
                 type="text"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                required={mode === 'register'}
                 disabled={mode !== 'register'}
-                placeholder="请输入邀请码"
+                placeholder="如果有邀请码，请输入"
                 className="h-11 text-base sm:text-sm"
               />
             </label>
@@ -293,7 +292,7 @@ export default function AuthPage() {
         qrPath={qrPath}
         onCopy={copyWechat}
         title="联系管理员"
-        description="如果你遇到账号登录、邀请码、封禁等问题，请通过微信联系管理员。"
+        description="如果你遇到账号登录、邀请码开通、封禁等问题，请通过微信联系管理员。"
         emptyText="暂未配置二维码，请联系平台管理员。"
       />
       <Toast open={toast.open} message={toast.message} tone={toast.tone} onClose={() => setToast((t) => ({ ...t, open: false }))} />

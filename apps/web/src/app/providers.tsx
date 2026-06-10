@@ -2,6 +2,8 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useEffect, useState } from 'react';
+import { AUTH_SESSION_EVENT, type AuthSessionChangeDetail } from '@/lib/auth';
+import { useTrainingStore } from '@/stores/training.store';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -28,6 +30,18 @@ export function Providers({ children }: { children: ReactNode }) {
           : {}),
       }),
   );
+
+  useEffect(() => {
+    const onAuthSessionChange = (event: Event) => {
+      const detail = (event as CustomEvent<AuthSessionChangeDetail>).detail;
+      if (!detail || detail.previousUserId === detail.userId) return;
+      client.clear();
+      useTrainingStore.getState().clearTrainingState();
+    };
+
+    window.addEventListener(AUTH_SESSION_EVENT, onAuthSessionChange);
+    return () => window.removeEventListener(AUTH_SESSION_EVENT, onAuthSessionChange);
+  }, [client]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;

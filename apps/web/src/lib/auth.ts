@@ -8,6 +8,12 @@ export type AuthUser = {
 const TOKEN_KEY = 'token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'auth_user';
+export const AUTH_SESSION_EVENT = 'kline-auth-session-change';
+
+export type AuthSessionChangeDetail = {
+  previousUserId: string | null;
+  userId: string | null;
+};
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -29,10 +35,21 @@ export function getAuthUser(): AuthUser | null {
   }
 }
 
+function emitAuthSessionChange(detail: AuthSessionChangeDetail) {
+  if (typeof window === 'undefined') return;
+  queueMicrotask(() => {
+    window.dispatchEvent(new CustomEvent<AuthSessionChangeDetail>(AUTH_SESSION_EVENT, { detail }));
+  });
+}
+
 export function setAuthSession(token: string, user: AuthUser) {
   if (typeof window === 'undefined') return;
+  const previousUserId = getAuthUser()?.id ?? null;
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (previousUserId !== user.id) {
+    emitAuthSessionChange({ previousUserId, userId: user.id });
+  }
 }
 
 export function setRefreshToken(token: string) {
@@ -47,7 +64,12 @@ export function getRefreshToken(): string | null {
 
 export function clearAuthSession() {
   if (typeof window === 'undefined') return;
+  const previousUserId = getAuthUser()?.id ?? null;
+  const hadSession = Boolean(localStorage.getItem(TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY) || previousUserId);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  if (hadSession) {
+    emitAuthSessionChange({ previousUserId, userId: null });
+  }
 }

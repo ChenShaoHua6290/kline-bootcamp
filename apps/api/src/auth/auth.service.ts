@@ -29,52 +29,49 @@ export class AuthService {
     if (!nickname) throw new BadRequestException('昵称不能为空');
     if (nickname.length < 2 || nickname.length > 20) throw new BadRequestException('昵称长度需在2-20之间');
     if (!/^[\u4e00-\u9fa5A-Za-z0-9_]+$/.test(nickname)) throw new BadRequestException('昵称仅支持中文、英文、数字和下划线');
-    const code = dto.inviteCode?.trim();
-    if (!code) throw new BadRequestException('邀请码不能为空');
 
-    const invite = await prisma.inviteCode.findFirst({
-      where: { code, deletedAt: null },
-      select: {
-        id: true,
-        isActive: true,
-        maxUses: true,
-        usedCount: true,
-        expiresAt: true,
-        type: true,
-        trialDays: true,
-        dailyTrainingLimit: true,
-        paidPlan: true,
-        durationMonths: true,
-      },
-    });
-    if (!invite) throw new BadRequestException('邀请码错误');
-    if (!invite.isActive) throw new BadRequestException('邀请码已失效');
-    if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
-    if (invite.usedCount >= invite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
+    const code = dto.inviteCode?.trim();
+    const inviteSelect = {
+      id: true,
+      isActive: true,
+      maxUses: true,
+      usedCount: true,
+      expiresAt: true,
+      type: true,
+      trialDays: true,
+      dailyTrainingLimit: true,
+      paidPlan: true,
+      durationMonths: true,
+    };
+    const invite = code
+      ? await prisma.inviteCode.findFirst({
+          where: { code, deletedAt: null },
+          select: inviteSelect,
+        })
+      : null;
+    if (code) {
+      if (!invite) throw new BadRequestException('邀请码错误');
+      if (!invite.isActive) throw new BadRequestException('邀请码已失效');
+      if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
+      if (invite.usedCount >= invite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
+    }
 
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await prisma.$transaction(async (tx: any) => {
-      const latestInvite = await tx.inviteCode.findUnique({
-        where: { id: invite.id },
-        select: {
-          id: true,
-          isActive: true,
-          maxUses: true,
-          usedCount: true,
-          expiresAt: true,
-          type: true,
-          trialDays: true,
-          dailyTrainingLimit: true,
-          paidPlan: true,
-          durationMonths: true,
-        },
-      });
-      if (!latestInvite || !latestInvite.isActive) throw new BadRequestException('邀请码已失效');
-      if (latestInvite.expiresAt && latestInvite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
-      if (latestInvite.usedCount >= latestInvite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
+      const latestInvite = invite
+        ? await tx.inviteCode.findUnique({
+            where: { id: invite.id },
+            select: inviteSelect,
+          })
+        : null;
+      if (invite) {
+        if (!latestInvite || !latestInvite.isActive) throw new BadRequestException('邀请码已失效');
+        if (latestInvite.expiresAt && latestInvite.expiresAt.getTime() <= Date.now()) throw new BadRequestException('邀请码已过期');
+        if (latestInvite.usedCount >= latestInvite.maxUses) throw new BadRequestException('邀请码使用次数已达上限');
+      }
 
       const now = new Date();
-      let accessType: 'TRIAL' | 'PAID' | 'INTERNAL' = latestInvite.type as 'TRIAL' | 'PAID' | 'INTERNAL';
+      let accessType: 'TRIAL' | 'PAID' | 'INTERNAL' = latestInvite ? (latestInvite.type as 'TRIAL' | 'PAID' | 'INTERNAL') : 'TRIAL';
       let accessStartAt: Date | null = now;
       let accessExpiresAt: Date | null = null;
       let dailyTrainingLimit: number | null = null;
@@ -82,11 +79,11 @@ export class AuthService {
       let currentPlan: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' = 'NONE';
 
       if (accessType === 'TRIAL') {
-        const trialDays = latestInvite.trialDays ?? 7;
+        const trialDays = latestInvite?.trialDays ?? 7;
         accessExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-        dailyTrainingLimit = latestInvite.dailyTrainingLimit ?? 5;
+        dailyTrainingLimit = latestInvite?.dailyTrainingLimit ?? 5;
         isTrainingUnlimited = false;
-      } else if (accessType === 'PAID') {
+      } else if (accessType === 'PAID' && latestInvite) {
         const plan = (latestInvite.paidPlan as 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY') ?? 'MONTHLY';
         const months = latestInvite.durationMonths ?? (plan === 'QUARTERLY' ? 3 : plan === 'YEARLY' ? 12 : 1);
         const d = new Date(now);
@@ -107,11 +104,13 @@ export class AuthService {
           isTrainingUnlimited,
           accessStatus: 'ACTIVE',
           currentPlan,
-          accessInviteCodeId: latestInvite.id,
+          accessInviteCodeId: latestInvite?.id ?? null,
         },
       });
-      await tx.inviteCode.update({ where: { id: latestInvite.id }, data: { usedCount: { increment: 1 } } });
-      await tx.inviteCodeRedemption.create({ data: { inviteCodeId: latestInvite.id, userId: created.id } });
+      if (latestInvite) {
+        await tx.inviteCode.update({ where: { id: latestInvite.id }, data: { usedCount: { increment: 1 } } });
+        await tx.inviteCodeRedemption.create({ data: { inviteCodeId: latestInvite.id, userId: created.id } });
+      }
       return created;
     });
 

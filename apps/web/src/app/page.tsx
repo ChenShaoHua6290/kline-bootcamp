@@ -74,7 +74,7 @@ export default function HomePage() {
   const router = useRouter();
 
   const profileStatsQuery = useQuery({
-    queryKey: ['training-profile-stats'],
+    queryKey: ['training-profile-stats', user?.id],
     enabled: ready && Boolean(user),
     queryFn: async () => (await api.get<ProfileStats>('/training/profile')).data,
     staleTime: 60_000,
@@ -83,7 +83,7 @@ export default function HomePage() {
   });
 
   const dashboardQuery = useQuery({
-    queryKey: ['training-dashboard'],
+    queryKey: ['training-dashboard', user?.id],
     enabled: ready && Boolean(user),
     queryFn: async () => (await api.get<DashboardData>('/training/dashboard')).data,
     staleTime: 20_000,
@@ -130,7 +130,7 @@ export default function HomePage() {
   if (!ready) return <main className="app-shell p-6"><LoadingState message="正在检查登录状态..." /></main>;
 
   return (
-    <main className="flex min-h-screen flex-col overflow-x-hidden overflow-y-auto">
+    <main className="relative flex min-h-screen flex-col overflow-x-hidden overflow-y-auto bg-[linear-gradient(180deg,rgba(15,23,42,0.96)_0%,rgba(2,6,23,0.98)_42%,rgba(8,13,24,1)_100%)]">
       <TopNav
         onStart={() => router.push('/train?start=1')}
         onHistory={() => router.push('/history')}

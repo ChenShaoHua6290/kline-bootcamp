@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { KnowledgeSidebar } from './KnowledgeSidebar';
 import { useActiveAnchor } from './useActiveAnchor';
 import { faqNavGroups } from '@/data/official-content';
+import { MarkdownRenderer } from '@/components/markdown/MarkdownRenderer';
 
 const faqData = {
   'faq-system': [
@@ -50,7 +51,11 @@ function FaqSection({ id, title, items }: { id: string; title: string; items: re
                 <span>{q}</span>
                 <span className="text-cyan-300">{open ? '−' : '+'}</span>
               </button>
-              {open ? <p className="px-4 pb-4 text-sm leading-7 text-slate-300">{a}</p> : null}
+              {open ? (
+                <div className="px-4 pb-4 [&_p]:text-sm [&_p]:leading-7 [&_p]:text-slate-300">
+                  <MarkdownRenderer content={a} />
+                </div>
+              ) : null}
             </div>
           );
         })}

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { KnowledgeSidebar } from './KnowledgeSidebar';
 import { useActiveAnchor } from './useActiveAnchor';
 import { systemNavGroups, systemSectionMedia, type SectionMediaItem } from '@/data/official-content';
+import { MarkdownRenderer } from '@/components/markdown/MarkdownRenderer';
 
 const sectionIds = systemNavGroups.flatMap((g) => g.items.map((i) => i.id));
 
@@ -38,16 +39,14 @@ function MediaPanel({ media }: { media: SectionMediaItem[] }) {
 
 function StandardSection({ id, title, intro, points }: { id: string; title: string; intro: string; points: string[] }) {
   const media = systemSectionMedia[id] ?? [];
+  const markdown = [intro, '', ...points.map((point) => `- ${point}`)].join('\n');
   return (
     <section id={id} className="scroll-mt-28 rounded-2xl border border-cyan-400/20 bg-slate-900/55 p-5">
       <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
-      <p className="mt-2 text-sm leading-7 text-slate-300">{intro}</p>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-cyan-400/20 bg-slate-950/45 p-4">
           <p className="text-xs text-slate-400">内容要点</p>
-          <ul className="mt-2 space-y-2 text-sm text-slate-200">
-            {points.map((p) => <li key={p}>• {p}</li>)}
-          </ul>
+          <MarkdownRenderer content={markdown} className="mt-2 [&_li]:text-sm [&_li]:leading-7 [&_p]:text-sm [&_p]:leading-7" />
         </div>
         <MediaPanel media={media} />
       </div>
@@ -177,7 +176,11 @@ function FaqInlineSection({ id, title, qa }: { id: string; title: string; qa: Ar
                 <span>{q}</span>
                 <span className="text-cyan-300">{open ? '−' : '+'}</span>
               </button>
-              {open ? <p className="px-4 pb-4 text-sm leading-7 text-slate-300">{a}</p> : null}
+              {open ? (
+                <div className="px-4 pb-4 [&_p]:text-sm [&_p]:leading-7 [&_p]:text-slate-300">
+                  <MarkdownRenderer content={a} />
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -241,7 +244,10 @@ export function SystemCenter() {
         <div className="space-y-4">
           <section id="system-home" className="scroll-mt-28 rounded-2xl border border-cyan-400/20 bg-slate-900/55 p-5">
             <h2 className="text-2xl font-semibold">这不是课程页，也不是工具页</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-300">这里是「只做一种模式」体系中心，按“认知 → 理解 → 信任 → 转化”的节奏，完整展示学习内容、流程、训练、复盘与服务结构。</p>
+            <MarkdownRenderer
+              className="mt-3 [&_p]:text-sm [&_p]:leading-7"
+              content="这里是「只做一种模式」体系中心，按“认知 → 理解 → 信任 → 转化”的节奏，完整展示学习内容、流程、训练、复盘与服务结构。"
+            />
           </section>
 
           <StandardSection id="why-one-mode" title="为什么只做一种模式" intro="交易不稳定的核心问题通常不是信息不足，而是模式切换频繁、执行标准不统一。" points={['为什么大多数人交易不稳定', '为什么模式越多越乱', '为什么执行比技术更重要']} />
@@ -253,7 +259,7 @@ export function SystemCenter() {
           <FeedbackSection />
 
           <StandardSection id="kline-intro" title="K线训练系统 · 系统介绍" intro="K线训练系统是体系中的训练模块，用于把规则练成执行能力。" points={['随机历史行情训练', '下一根推进', '买入/部分平仓/全部平仓', '历史记录与复盘']} />
-          <StandardSection id="kline-start" title="如何开始训练" intro="从注册到开始训练，路径清晰。" points={['邀请码注册', '进入训练页', '选择市场/周期/根数', '开始训练']} />
+          <StandardSection id="kline-start" title="如何开始训练" intro="从注册到开始训练，路径清晰。" points={['注册账号', '进入训练页', '选择市场/周期/根数', '开始训练']} />
           <StandardSection id="kline-flow" title="训练流程" intro="以真实执行节奏推进训练。" points={['观察结构', '等待机会', '执行买入', '风险控制', '结束复盘']} />
           <StandardSection id="kline-actions" title="买入 / 平仓操作" intro="操作简洁，聚焦执行。" points={['买入', '部分平仓', '全部平仓', '结束训练']} />
           <StandardSection id="kline-review" title="历史记录与复盘" intro="用记录反推执行问题。" points={['操作记录', '错题复盘', '训练统计']} />

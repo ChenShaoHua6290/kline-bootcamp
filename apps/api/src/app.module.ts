@@ -11,10 +11,14 @@ import { ReplayModule } from './replay/replay.module';
 import { AccountModule } from './account/account.module';
 import { AdminModule } from './admin/admin.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CoursesModule } from './courses/courses.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['apps/api/.env', '.env', '.env.production.local', '.env.production'],
+    }),
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,
@@ -30,6 +34,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AccountModule,
     AdminModule,
     DashboardModule,
+    CoursesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

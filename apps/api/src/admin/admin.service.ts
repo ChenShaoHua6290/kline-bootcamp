@@ -286,6 +286,7 @@ export class AdminService {
             accessExpiresAt: Date | null;
             dailyTrainingLimit: number | null;
             isTrainingUnlimited: boolean | null;
+            learningAccessLevel: string | null;
             currentPlan: string | null;
             isBanned: boolean | null;
             bannedAt: Date | null;
@@ -293,7 +294,7 @@ export class AdminService {
             createdAt: Date;
           }>
         >`
-          SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
+          SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "learningAccessLevel", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
           WHERE email LIKE ${kw} OR nickname LIKE ${kw}
           ORDER BY "createdAt" DESC
@@ -310,6 +311,7 @@ export class AdminService {
             accessExpiresAt: Date | null;
             dailyTrainingLimit: number | null;
             isTrainingUnlimited: boolean | null;
+            learningAccessLevel: string | null;
             currentPlan: string | null;
             isBanned: boolean | null;
             bannedAt: Date | null;
@@ -317,7 +319,7 @@ export class AdminService {
             createdAt: Date;
           }>
         >`
-          SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
+          SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "learningAccessLevel", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
           ORDER BY "createdAt" DESC
         `;
@@ -356,6 +358,7 @@ export class AdminService {
         accessExpiresAt: u.accessExpiresAt?.toISOString() ?? null,
         dailyTrainingLimit: u.dailyTrainingLimit,
         isTrainingUnlimited: Boolean(u.isTrainingUnlimited ?? true),
+        learningAccessLevel: u.learningAccessLevel ?? (u.accessType === 'INTERNAL' ? 'FULL' : 'TRAINING'),
         currentPlan: u.currentPlan ?? 'NONE',
         todayTrainingCount: Number(usageRows[0]?.c ?? 0),
         trainingCount: Number(trainingRows[0]?.c ?? 0),
@@ -421,10 +424,11 @@ export class AdminService {
         accessType: string | null;
         accessStatus: string | null;
         currentPlan: string | null;
+        learningAccessLevel: string | null;
         accessExpiresAt: Date | null;
       }>
     >`
-      SELECT id, "accessType", "accessStatus", "currentPlan", "accessExpiresAt"
+      SELECT id, "accessType", "accessStatus", "currentPlan", "learningAccessLevel", "accessExpiresAt"
       FROM "User"
       WHERE id = ${userId}
       LIMIT 1
@@ -441,11 +445,13 @@ export class AdminService {
     let nextAccessStatus = dto.disabled === true ? 'DISABLED' : oldAccessStatus;
     let nextPlan = oldAccessPlan;
     let nextExpiresAt = oldExpiresAt;
+    let nextLearningAccessLevel = user.learningAccessLevel ?? 'TRAINING';
     let nextDailyLimit: number | null | undefined;
     let nextUnlimited: boolean | undefined;
 
     if (dto.accessType) nextAccessType = dto.accessType;
     if (dto.plan) nextPlan = dto.plan;
+    if (dto.learningAccessLevel) nextLearningAccessLevel = dto.learningAccessLevel;
     if (dto.accessExpiresAt) nextExpiresAt = new Date(dto.accessExpiresAt);
     if (dto.extendMonths && nextAccessType !== 'INTERNAL') {
       const base = nextExpiresAt && nextExpiresAt.getTime() > Date.now() ? new Date(nextExpiresAt) : new Date();
@@ -473,6 +479,7 @@ export class AdminService {
       }
     } else {
       nextPlan = 'NONE';
+      nextLearningAccessLevel = 'FULL';
       nextDailyLimit = null;
       nextUnlimited = true;
       nextExpiresAt = null;
@@ -487,6 +494,7 @@ export class AdminService {
         SET "accessType" = CAST(${nextAccessType} AS "AccessType"),
             "accessStatus" = CAST(${nextAccessStatus} AS "AccessStatus"),
             "currentPlan" = CAST(${nextPlan} AS "AccessPlan"),
+            "learningAccessLevel" = CAST(${nextLearningAccessLevel} AS "LearningAccessLevel"),
             "accessExpiresAt" = ${nextExpiresAt},
             "dailyTrainingLimit" = ${nextDailyLimit},
             "isTrainingUnlimited" = ${nextUnlimited ?? true},

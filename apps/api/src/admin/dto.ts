@@ -138,6 +138,10 @@ export class UpdateUserAccessDto {
   plan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
   @IsOptional()
+  @IsIn(['TRAINING', 'FULL'])
+  learningAccessLevel?: 'TRAINING' | 'FULL';
+
+  @IsOptional()
   @IsDateString()
   accessExpiresAt?: string;
 

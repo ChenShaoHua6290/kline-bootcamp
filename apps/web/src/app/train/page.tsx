@@ -118,7 +118,7 @@ export default function TrainPage() {
   };
 
   const profileStatsQuery = useQuery({
-    queryKey: ['training-profile-stats'],
+    queryKey: ['training-profile-stats', user?.id],
     enabled: ready && Boolean(user),
     queryFn: async () => (await api.get<ProfileStats>('/training/profile')).data,
   });

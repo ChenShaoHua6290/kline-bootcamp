@@ -23,6 +23,7 @@ model User {
   accessExpiresAt    DateTime?
   dailyTrainingLimit Int?
   isTrainingUnlimited Boolean               @default(true)
+  learningAccessLevel LearningAccessLevel   @default(TRAINING)
   accessStatus       AccessStatus            @default(ACTIVE)
   currentPlan        AccessPlan              @default(NONE)
   accessInviteCodeId String?
@@ -37,6 +38,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   securityLogs       SecurityLog[]
   reviews            TrainingReview[]
+  lessonProgress     UserLessonProgress[]
   sessions           TrainingSession[]
 }
 
@@ -414,6 +416,81 @@ model SymbolDataStats {
   @@index([market, symbol, timeframe])
 }
 
+model Course {
+  id          String          @id @default(cuid())
+  title       String
+  subtitle    String?
+  description String?
+  coverImage  String?         @map("cover_image")
+  sortOrder   Int             @default(0) @map("sort_order")
+  status      CourseStatus    @default(DRAFT)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  chapters    CourseChapter[]
+
+  @@index([status, sortOrder])
+  @@map("courses")
+}
+
+model CourseChapter {
+  id          String       @id @default(cuid())
+  courseId    String       @map("course_id")
+  title       String
+  description String?
+  sortOrder   Int          @default(0) @map("sort_order")
+  status      CourseStatus @default(DRAFT)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@index([courseId, status, sortOrder])
+  @@map("course_chapters")
+}
+
+model Lesson {
+  id             String              @id @default(cuid())
+  chapterId      String              @map("chapter_id")
+  title          String
+  type           LessonType
+  content        String?
+  videoProvider  String?             @map("video_provider")
+  videoFileId    String?             @map("video_file_id")
+  videoUrl       String?             @map("video_url")
+  attachmentUrl  String?             @map("attachment_url")
+  duration       Int?
+  isPreview      Boolean             @default(false) @map("is_preview")
+  accessLevel    CourseAccessLevel   @default(FULL) @map("access_level")
+  sortOrder      Int                 @default(0) @map("sort_order")
+  status         CourseStatus        @default(DRAFT)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  chapter        CourseChapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  progress       UserLessonProgress[]
+
+  @@index([chapterId, status, sortOrder])
+  @@map("lessons")
+}
+
+model UserLessonProgress {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  lessonId        String   @map("lesson_id")
+  progressSeconds Int      @default(0) @map("progress_seconds")
+  progressPercent Float    @default(0) @map("progress_percent")
+  isCompleted     Boolean  @default(false) @map("is_completed")
+  lastWatchedAt   DateTime? @map("last_watched_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson          Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, isCompleted])
+  @@index([lessonId])
+  @@map("user_lesson_progress")
+}
+
 enum Market {
   STOCK
   FOREX
@@ -488,4 +565,29 @@ enum AccessPlan {
   MONTHLY
   QUARTERLY
   YEARLY
+}
+
+enum LearningAccessLevel {
+  TRAINING
+  FULL
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseAccessLevel {
+  PREVIEW
+  TRAINING
+  FULL
+  INTERNAL
+}
+
+enum LessonType {
+  VIDEO
+  ARTICLE
+  PDF
+  MIXED
 }

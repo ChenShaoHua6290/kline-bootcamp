@@ -15,6 +15,7 @@ export type AdminUserRow = {
   accessExpiresAt?: string | null;
   dailyTrainingLimit?: number | null;
   isTrainingUnlimited?: boolean;
+  learningAccessLevel?: 'TRAINING' | 'FULL';
   currentPlan?: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
   todayTrainingCount?: number;
   isBanned: boolean;
@@ -38,6 +39,12 @@ function formatAccessPlan(plan?: AdminUserRow['currentPlan']) {
   return '无套餐';
 }
 
+function formatLearningAccess(level?: AdminUserRow['learningAccessLevel'], type?: AdminUserRow['accessType'], role?: AdminUserRow['role']) {
+  if (role === 'ADMIN' || type === 'INTERNAL') return '完整体系';
+  if (level === 'FULL') return '完整体系';
+  return '训练版';
+}
+
 export function UserManagementTable({
   rows,
   pendingBanId,
@@ -53,7 +60,7 @@ export function UserManagementTable({
   pendingUnbanId?: string | null;
   onBan: (row: AdminUserRow) => void;
   onUnban: (row: AdminUserRow) => void;
-  onAccessAction?: (row: AdminUserRow, action: 'renew_monthly' | 'renew_quarterly' | 'renew_yearly' | 'to_trial' | 'to_paid' | 'to_internal' | 'disable_access' | 'enable_access') => void;
+  onAccessAction?: (row: AdminUserRow, action: 'renew_monthly' | 'renew_quarterly' | 'renew_yearly' | 'to_trial' | 'to_paid' | 'to_internal' | 'grant_full' | 'disable_access' | 'enable_access') => void;
   onResetPassword?: (row: AdminUserRow) => void;
   onViewHistory?: (row: AdminUserRow) => void;
 }) {
@@ -70,7 +77,7 @@ export function UserManagementTable({
             <div className="mb-1 truncate text-xs text-slate-300">{row.email}</div>
             <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-400">
               <div>角色: <span className={row.role === 'ADMIN' ? 'font-semibold text-cyan-300' : 'text-slate-200'}>{row.role}</span></div>
-              <div>权限: <span className="text-slate-200">{row.accessType ?? 'INTERNAL'}</span></div>
+              <div>权限: <span className="text-slate-200">{formatAccessType(row.accessType)} / {formatLearningAccess(row.learningAccessLevel, row.accessType, row.role)}</span></div>
               <div>训练: <span className="text-slate-200">{row.trainingCount}</span></div>
               <div>爆仓: <span className="text-slate-200">{row.liquidationCount}</span></div>
               <div>封禁原因: <span className="text-slate-200">{row.banReason ?? '--'}</span></div>
@@ -126,6 +133,7 @@ export function UserManagementTable({
             </div>
             <div className="text-center text-xs">
               <div>{formatAccessType(row.accessType)} / {formatAccessPlan(row.currentPlan)}</div>
+              <div className="text-cyan-300/90">{formatLearningAccess(row.learningAccessLevel, row.accessType, row.role)}</div>
               <div className="text-slate-400">{row.accessExpiresAt ? new Date(row.accessExpiresAt).toLocaleDateString('zh-CN') : '长期'}</div>
             </div>
             <div className="truncate text-center text-xs text-slate-400" title={row.banReason ?? '--'}>{row.banReason ?? '--'}</div>
@@ -152,6 +160,11 @@ export function UserManagementTable({
                   {row.accessType !== 'INTERNAL' ? (
                     <Button size="sm" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 py-0 text-[10px]" onClick={() => onAccessAction?.(row, 'to_internal')}>
                       设内部
+                    </Button>
+                  ) : null}
+                  {row.accessType !== 'INTERNAL' && row.learningAccessLevel !== 'FULL' ? (
+                    <Button size="sm" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 py-0 text-[10px]" onClick={() => onAccessAction?.(row, 'grant_full')}>
+                      开完整
                     </Button>
                   ) : null}
                   <Button size="sm" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 py-0 text-[10px]" onClick={() => onResetPassword?.(row)}>

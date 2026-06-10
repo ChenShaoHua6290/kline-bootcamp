@@ -42,7 +42,7 @@ export default function AdminUsersPage() {
   const [accessActionModal, setAccessActionModal] = useState<{
     open: boolean;
     row: AdminUserRow | null;
-    action: 'renew_monthly' | 'to_internal' | null;
+    action: 'renew_monthly' | 'to_internal' | 'grant_full' | null;
     remark: string;
     extendMonths: number;
   }>({
@@ -145,12 +145,12 @@ export default function AdminUsersPage() {
     },
   });
 
-  const openAccessActionModal = (row: AdminUserRow, action: 'renew_monthly' | 'to_internal') => {
+  const openAccessActionModal = (row: AdminUserRow, action: 'renew_monthly' | 'to_internal' | 'grant_full') => {
     setAccessActionModal({
       open: true,
       row,
       action,
-      remark: action === 'renew_monthly' ? '后台手动月续费' : '后台设为内部用户',
+      remark: action === 'renew_monthly' ? '后台手动月续费' : action === 'grant_full' ? '后台开通完整课程权限' : '后台设为内部用户',
       extendMonths: 1,
     });
   };
@@ -162,6 +162,13 @@ export default function AdminUsersPage() {
       updateAccessMutation.mutate({
         userId: accessActionModal.row.id,
         body: { accessType: 'PAID', plan: 'MONTHLY', extendMonths: accessActionModal.extendMonths, disabled: false, remark },
+      });
+      return;
+    }
+    if (accessActionModal.action === 'grant_full') {
+      updateAccessMutation.mutate({
+        userId: accessActionModal.row.id,
+        body: { learningAccessLevel: 'FULL', disabled: false, remark },
       });
       return;
     }
@@ -229,6 +236,10 @@ export default function AdminUsersPage() {
               openAccessActionModal(row, 'to_internal');
               return;
             }
+            if (action === 'grant_full') {
+              openAccessActionModal(row, 'grant_full');
+              return;
+            }
           }}
           onResetPassword={(row) => setResetPasswordModal({ open: true, row, newPassword: '', confirmPassword: '', generatedPassword: '' })}
           onViewHistory={(row) => {
@@ -255,11 +266,13 @@ export default function AdminUsersPage() {
       />
       <NoticeModal
         open={accessActionModal.open}
-        title={accessActionModal.action === 'renew_monthly' ? '确认月续费' : '确认设为内部用户'}
+        title={accessActionModal.action === 'renew_monthly' ? '确认月续费' : accessActionModal.action === 'grant_full' ? '确认开通完整课程' : '确认设为内部用户'}
         message={
           accessActionModal.row
             ? accessActionModal.action === 'renew_monthly'
               ? `将为用户「${accessActionModal.row.nickname || accessActionModal.row.email}」续费 ${accessActionModal.extendMonths} 个月。`
+              : accessActionModal.action === 'grant_full'
+                ? `将为用户「${accessActionModal.row.nickname || accessActionModal.row.email}」开通完整课程、课件、指标说明和共振提醒权限。`
               : `将把用户「${accessActionModal.row.nickname || accessActionModal.row.email}」设为内部用户并解除到期限制。`
             : ''
         }
