@@ -130,7 +130,7 @@ export default function HomePage() {
   if (!ready) return <main className="app-shell p-6"><LoadingState message="正在检查登录状态..." /></main>;
 
   return (
-    <main className="relative flex min-h-screen flex-col overflow-x-hidden overflow-y-auto bg-[linear-gradient(180deg,rgba(15,23,42,0.96)_0%,rgba(2,6,23,0.98)_42%,rgba(8,13,24,1)_100%)]">
+    <main className="relative flex h-dvh min-h-screen flex-col overflow-x-hidden overflow-y-auto bg-[linear-gradient(180deg,rgba(15,23,42,0.96)_0%,rgba(2,6,23,0.98)_42%,rgba(8,13,24,1)_100%)]">
       <TopNav
         onStart={() => router.push('/train?start=1')}
         onHistory={() => router.push('/history')}
@@ -162,16 +162,18 @@ export default function HomePage() {
         />
       ) : null}
 
-      {user ? (
-        <DashboardPanel
-          data={dashboardQuery.data}
-          loading={dashboardQuery.isLoading}
-          error={dashboardQuery.isError}
-          currentUserId={user.id}
-        />
-      ) : (
-        <div className="p-4"><EmptyState title="请先登录" description="登录后即可查看首页统计与资金曲线。" /></div>
-      )}
+      <div className="flex min-h-0 flex-1">
+        {user ? (
+          <DashboardPanel
+            data={dashboardQuery.data}
+            loading={dashboardQuery.isLoading}
+            error={dashboardQuery.isError}
+            currentUserId={user.id}
+          />
+        ) : (
+          <div className="flex w-full items-center justify-center p-4"><EmptyState title="请先登录" description="登录后即可查看首页统计与资金曲线。" /></div>
+        )}
+      </div>
     </main>
   );
 }

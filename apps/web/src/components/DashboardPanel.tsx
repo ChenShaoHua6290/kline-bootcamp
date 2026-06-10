@@ -41,6 +41,9 @@ function fmtNum(v: number) {
 
 type CurveRange = 'day' | 'week' | 'month' | 'year';
 
+const leaderboardGridClass =
+  'grid-cols-[44px_minmax(120px,1.45fr)_minmax(74px,0.9fr)_minmax(64px,0.72fr)_minmax(72px,0.82fr)] sm:grid-cols-[50px_minmax(0,1.5fr)_minmax(80px,0.95fr)_minmax(72px,0.8fr)_minmax(78px,0.9fr)]';
+
 function selectCurveByRange(rows: Array<{ time: string; equity: number }>, range: CurveRange) {
   if (rows.length <= 1) return rows;
   const latestTs = Date.parse(rows[rows.length - 1].time);
@@ -103,12 +106,12 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
   }, [visibleCurve, hoverIdx]);
 
   return (
-    <section className="relative mx-auto w-full max-w-[1240px] space-y-2.5 px-3 pb-2.5 pt-1.5 sm:px-4">
+    <section className="relative mx-auto flex min-h-0 w-full max-w-[1760px] flex-1 flex-col gap-2 px-2.5 pb-2.5 pt-1.5 sm:px-4 lg:gap-2.5">
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/25 to-transparent" />
-      <Card className="relative overflow-hidden border-amber-300/24 bg-[linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,41,59,0.72)_48%,rgba(15,23,42,0.92))] shadow-[0_22px_60px_rgba(2,6,23,0.38)]">
+      <Card className="relative shrink-0 overflow-hidden border-amber-300/24 bg-[linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,41,59,0.72)_48%,rgba(15,23,42,0.92))] shadow-[0_22px_60px_rgba(2,6,23,0.38)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/45 to-transparent" />
-        <CardBody className="p-3 sm:p-3.5">
-          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <CardBody className="p-2.5 sm:p-3 xl:p-3.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 xl:mb-2.5">
             <div className="flex items-center gap-2.5">
               <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-amber-300/35 bg-amber-400/10 text-sm text-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.16)]">↗</div>
               <div className="text-[17px] font-semibold text-amber-200">我的战绩</div>
@@ -118,33 +121,33 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
               <span className="text-xs text-slate-400">/ {board.length || '--'} 人</span>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div className="relative overflow-hidden rounded-xl border border-slate-600/45 bg-[linear-gradient(145deg,rgba(15,23,42,0.72),rgba(30,41,59,0.5))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
+            <div className="relative overflow-hidden rounded-xl border border-slate-600/45 bg-[linear-gradient(145deg,rgba(15,23,42,0.72),rgba(30,41,59,0.5))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:p-3">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/30 to-transparent" />
               <div className="text-[11px] text-slate-400">训练场次</div>
-              <div className="mt-1 text-[22px] font-bold text-slate-50">{summary ? fmtNum(summary.trainingCount) : '--'}</div>
+              <div className="mt-0.5 text-[20px] font-bold text-slate-50 xl:mt-1 xl:text-[22px]">{summary ? fmtNum(summary.trainingCount) : '--'}</div>
               <div className="mt-1 text-[11px] leading-5 text-slate-500">累计完成训练局数</div>
             </div>
-            <div className="relative overflow-hidden rounded-xl border border-emerald-300/28 bg-[linear-gradient(145deg,rgba(6,78,59,0.22),rgba(15,23,42,0.72))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="relative overflow-hidden rounded-xl border border-emerald-300/28 bg-[linear-gradient(145deg,rgba(6,78,59,0.22),rgba(15,23,42,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:p-3">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent" />
               <div className="text-[11px] text-slate-400">总胜率</div>
-              <div className="mt-1 text-[22px] font-bold text-emerald-200">{summary ? fmtPct(summary.winRate) : '--'}</div>
+              <div className="mt-0.5 text-[20px] font-bold text-emerald-200 xl:mt-1 xl:text-[22px]">{summary ? fmtPct(summary.winRate) : '--'}</div>
               <div className="mt-1 text-[11px] leading-5 text-slate-500">已平仓盈利交易占比</div>
             </div>
-            <div className="relative overflow-hidden rounded-xl border border-cyan-300/28 bg-[linear-gradient(145deg,rgba(14,116,144,0.22),rgba(15,23,42,0.72))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="relative overflow-hidden rounded-xl border border-cyan-300/28 bg-[linear-gradient(145deg,rgba(14,116,144,0.22),rgba(15,23,42,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:p-3">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/40 to-transparent" />
               <div className="text-[11px] text-slate-400">账户积分</div>
-              <div className="mt-1 text-[22px] font-bold text-cyan-200">{summary ? fmtNum(summary.accountScore) : '--'}</div>
+              <div className="mt-0.5 text-[20px] font-bold text-cyan-200 xl:mt-1 xl:text-[22px]">{summary ? fmtNum(summary.accountScore) : '--'}</div>
               <div className="mt-1 text-[11px] leading-5 text-slate-500">账户当前积分</div>
             </div>
           </div>
         </CardBody>
       </Card>
 
-      <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.18fr)]">
-        <Card className="relative overflow-hidden border-cyan-300/22 bg-[linear-gradient(145deg,rgba(15,23,42,0.9),rgba(8,47,73,0.22),rgba(15,23,42,0.9))]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:gap-2.5 xl:h-[clamp(360px,calc(100dvh-270px),560px)] xl:flex-none xl:grid-cols-[minmax(360px,0.72fr)_minmax(0,1.28fr)] 2xl:grid-cols-[minmax(420px,0.7fr)_minmax(0,1.3fr)]">
+        <Card className="relative min-h-[240px] overflow-hidden border-cyan-300/22 bg-[linear-gradient(145deg,rgba(15,23,42,0.9),rgba(8,47,73,0.22),rgba(15,23,42,0.9))] xl:min-h-0">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/40 to-transparent" />
-          <CardBody className="p-3">
+          <CardBody className="flex h-full min-h-0 flex-col p-2.5 sm:p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <SectionTitle className="text-slate-100">资金曲线</SectionTitle>
               <div className="flex items-center gap-1 rounded-xl border border-slate-600/45 bg-slate-950/35 p-1">
@@ -154,15 +157,16 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
                 <Button size="sm" variant={curveRange === 'year' ? 'primary' : 'ghost'} className="h-7 rounded-lg px-2 py-1 text-[11px]" onClick={() => setCurveRange('year')}>年</Button>
               </div>
             </div>
-            <div className="relative overflow-hidden rounded-xl border border-slate-600/50 bg-[linear-gradient(180deg,rgba(2,6,23,0.54),rgba(15,23,42,0.78))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-600/50 bg-[linear-gradient(180deg,rgba(2,6,23,0.54),rgba(15,23,42,0.78))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.035)_1px,transparent_1px)] bg-[size:100%_48px,76px_100%]" />
-              {loading ? <LoadingState message="资金曲线加载中..." className="h-[190px] min-h-0" /> : null}
-              {error ? <ErrorState message="资金曲线加载失败" className="h-[190px] min-h-0" /> : null}
+              {loading ? <LoadingState message="资金曲线加载中..." className="h-[clamp(170px,28vh,320px)] min-h-0 xl:h-full" /> : null}
+              {error ? <ErrorState message="资金曲线加载失败" className="h-[clamp(170px,28vh,320px)] min-h-0 xl:h-full" /> : null}
               {!loading && !error && visibleCurve.length > 0 ? (
-                <div className="relative h-[200px] w-full overflow-hidden">
+                <div className="relative flex h-[clamp(180px,30vh,340px)] min-h-0 w-full flex-col overflow-hidden xl:h-full">
                   <svg
                     viewBox={`0 0 ${w} ${h}`}
-                    className="h-[154px] w-full"
+                    className="min-h-0 flex-1"
+                    preserveAspectRatio="none"
                     onMouseMove={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
                       const x = e.clientX - rect.left;
@@ -193,21 +197,21 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
                   </div>
                 </div>
               ) : null}
-              {!loading && !error && visibleCurve.length === 0 ? <EmptyState title="暂无资金曲线" description="完成训练后将展示资金走势。" className="h-[190px] min-h-0" /> : null}
+              {!loading && !error && visibleCurve.length === 0 ? <EmptyState title="暂无资金曲线" description="完成训练后将展示资金走势。" className="h-[clamp(170px,28vh,320px)] min-h-0 xl:h-full" /> : null}
             </div>
           </CardBody>
         </Card>
 
-        <Card className="relative overflow-hidden border-slate-600/42 bg-[linear-gradient(145deg,rgba(15,23,42,0.9),rgba(30,41,59,0.64),rgba(15,23,42,0.9))]">
+        <Card className="relative min-h-[280px] overflow-hidden border-slate-600/42 bg-[linear-gradient(145deg,rgba(15,23,42,0.9),rgba(30,41,59,0.64),rgba(15,23,42,0.9))] xl:min-h-0">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/35 to-transparent" />
-          <CardBody className="p-3">
+          <CardBody className="flex h-full min-h-0 flex-col p-2.5 sm:p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <SectionTitle className="text-slate-100">实时排行榜</SectionTitle>
               <span className="rounded-full border border-slate-600/50 bg-slate-950/35 px-2.5 py-1 text-xs text-slate-400">总参与 {board.length} 人</span>
             </div>
-            <div className="w-full overflow-x-hidden overflow-y-hidden rounded-xl border border-slate-600/55 bg-slate-950/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
-              <div className="max-h-[260px] overflow-y-auto">
-                <div className="sticky top-0 z-10 grid w-full grid-cols-[50px_minmax(0,1.5fr)_minmax(80px,0.95fr)_minmax(72px,0.8fr)_minmax(78px,0.9fr)] gap-1.5 border-b border-slate-700/70 bg-slate-950/92 px-2 py-1.5 text-xs text-slate-400 backdrop-blur sm:gap-2 sm:px-3">
+            <div className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-hidden rounded-xl border border-slate-600/55 bg-slate-950/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+              <div className="max-h-[clamp(210px,34vh,360px)] min-w-[430px] overflow-y-auto xl:h-full xl:max-h-none xl:min-w-0">
+                <div className={`sticky top-0 z-10 grid w-full ${leaderboardGridClass} gap-1.5 border-b border-slate-700/70 bg-slate-950/92 px-2 py-1.5 text-xs text-slate-400 backdrop-blur sm:gap-2 sm:px-3`}>
                   <div className="text-center font-medium">排名</div>
                   <div className="text-center font-medium">用户</div>
                   <div className="text-center font-medium">积分</div>
@@ -215,7 +219,7 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
                   <div className="text-center font-medium">训练次数</div>
                 </div>
                 {board.map((row) => (
-                  <div key={`${row.rank}-${row.userId}`} className={`grid w-full grid-cols-[50px_minmax(0,1.5fr)_minmax(80px,0.95fr)_minmax(72px,0.8fr)_minmax(78px,0.9fr)] gap-1.5 border-b border-slate-800/80 px-2 py-2 text-[13px] transition hover:bg-slate-800/55 sm:gap-2 sm:px-3 ${row.isMe ? 'bg-cyan-500/12 text-cyan-100 shadow-[inset_3px_0_0_rgba(34,211,238,0.5)]' : 'text-slate-200'}`}>
+                  <div key={`${row.rank}-${row.userId}`} className={`grid w-full ${leaderboardGridClass} gap-1.5 border-b border-slate-800/80 px-2 py-2 text-[12px] transition hover:bg-slate-800/55 sm:gap-2 sm:px-3 sm:text-[13px] ${row.isMe ? 'bg-cyan-500/12 text-cyan-100 shadow-[inset_3px_0_0_rgba(34,211,238,0.5)]' : 'text-slate-200'}`}>
                     <div className="flex items-center justify-center"><span className={`${row.rank <= 3 ? 'rounded-full border border-amber-300/35 bg-amber-400/10 px-2 py-0.5 text-base font-bold text-amber-200' : 'font-semibold'}`}>#{row.rank}</span></div>
                     <div className="flex items-center justify-center">
                       <span className="relative w-full min-w-0 max-w-[220px]">
