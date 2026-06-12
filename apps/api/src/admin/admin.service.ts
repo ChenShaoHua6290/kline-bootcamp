@@ -4,7 +4,15 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
 import { isPasswordStrong, passwordStrengthMessage } from '../auth/password-policy';
-import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, QuickCreateInviteCodeQueryDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
+import {
+  AdminResetUserPasswordDto,
+  BanUserDto,
+  CreateInviteCodeDto,
+  QuickCreateInviteCodeQueryDto,
+  UpdateInviteCodeDto,
+  UpdateUserAccessDto,
+  UpdateUserCourseAccessDto,
+} from './dto';
 
 @Injectable()
 export class AdminService {
@@ -15,9 +23,13 @@ export class AdminService {
 
   async summary() {
     const now = new Date();
-    const [totalUsers, bannedUsers, activeInvitationCodes, usedAgg] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { isBanned: true } }),
+    const [totalUserRows, bannedUserRows, activeInvitationCodes, usedAgg] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ c: number | string }>>`
+        SELECT COUNT(1) AS c FROM "User" WHERE "deletedAt" IS NULL
+      `,
+      this.prisma.$queryRaw<Array<{ c: number | string }>>`
+        SELECT COUNT(1) AS c FROM "User" WHERE "deletedAt" IS NULL AND "isBanned" = TRUE
+      `,
       this.prisma.inviteCode.count({
         where: {
           deletedAt: null,
@@ -33,8 +45,8 @@ export class AdminService {
     ]);
 
     return {
-      totalUsers,
-      bannedUsers,
+      totalUsers: Number(totalUserRows[0]?.c ?? 0),
+      bannedUsers: Number(bannedUserRows[0]?.c ?? 0),
       activeInvitationCodes,
       totalInvitationUsed: Number(usedAgg._sum.usedCount ?? 0),
     };
@@ -151,7 +163,7 @@ export class AdminService {
     const adminRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT id
       FROM "User"
-      WHERE role = CAST('ADMIN' AS "UserRole") AND "isBanned" = FALSE
+      WHERE role = CAST('ADMIN' AS "UserRole") AND "isBanned" = FALSE AND "deletedAt" IS NULL
       ORDER BY "createdAt" ASC
       LIMIT 1
     `;
@@ -296,7 +308,8 @@ export class AdminService {
         >`
           SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "learningAccessLevel", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
-          WHERE email LIKE ${kw} OR nickname LIKE ${kw}
+          WHERE "deletedAt" IS NULL
+            AND (email LIKE ${kw} OR nickname LIKE ${kw})
           ORDER BY "createdAt" DESC
         `
       : await this.prisma.$queryRaw<
@@ -321,6 +334,7 @@ export class AdminService {
         >`
           SELECT id, email, nickname, role, "accessType", "accessStatus", "accessStartAt", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "learningAccessLevel", "currentPlan", "isBanned", "bannedAt", "banReason", "createdAt"
           FROM "User"
+          WHERE "deletedAt" IS NULL
           ORDER BY "createdAt" DESC
         `;
 
@@ -368,9 +382,61 @@ export class AdminService {
     return out;
   }
 
+  async deleteUser(adminId: string, userId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; role: string | null; deletedAt: Date | null }>>`
+      SELECT id, role, "deletedAt"
+      FROM "User"
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+    const user = rows[0];
+    if (!user || user.deletedAt) throw new NotFoundException('用户不存在');
+    if ((user.role ?? 'USER') === 'ADMIN') throw new BadRequestException('管理员账号不可删除');
+
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE "User"
+        SET "deletedAt" = ${now},
+            "isBanned" = TRUE,
+            "bannedAt" = COALESCE("bannedAt", ${now}),
+            "banReason" = COALESCE("banReason", ${'后台删除用户'}),
+            "accessStatus" = CAST(${'DISABLED'} AS "AccessStatus")
+        WHERE id = ${userId}
+          AND "deletedAt" IS NULL
+      `;
+      await tx.$executeRaw`
+        UPDATE "RefreshToken"
+        SET "revokedAt" = ${now}
+        WHERE "userId" = ${userId}
+          AND "revokedAt" IS NULL
+      `;
+      await tx.$executeRaw`
+        UPDATE "password_reset_tokens"
+        SET "usedAt" = ${now}
+        WHERE "userId" = ${userId}
+          AND "usedAt" IS NULL
+      `;
+      await tx.$executeRaw`
+        DELETE FROM "user_course_access"
+        WHERE "user_id" = ${userId}
+      `;
+    });
+
+    await this.securityLogService.logAdminAction({
+      adminUserId: adminId,
+      action: 'USER_DELETE',
+      resourceType: 'User',
+      resourceId: userId,
+      targetUserId: userId,
+      detail: 'soft delete',
+    });
+    return { ok: true };
+  }
+
   async banUser(adminId: string, userId: string, dto: BanUserDto) {
     const rows = await this.prisma.$queryRaw<Array<{ id: string; role: string | null }>>`
-      SELECT id, role FROM "User" WHERE id = ${userId} LIMIT 1
+      SELECT id, role FROM "User" WHERE id = ${userId} AND "deletedAt" IS NULL LIMIT 1
     `;
     const user = rows[0];
     if (!user) throw new NotFoundException('用户不存在');
@@ -399,7 +465,7 @@ export class AdminService {
 
   async unbanUser(adminId: string, userId: string) {
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "User" WHERE id = ${userId} LIMIT 1
+      SELECT id FROM "User" WHERE id = ${userId} AND "deletedAt" IS NULL LIMIT 1
     `;
     if (!rows[0]) throw new NotFoundException('用户不存在');
     await this.prisma.$executeRaw`
@@ -431,6 +497,7 @@ export class AdminService {
       SELECT id, "accessType", "accessStatus", "currentPlan", "learningAccessLevel", "accessExpiresAt"
       FROM "User"
       WHERE id = ${userId}
+        AND "deletedAt" IS NULL
       LIMIT 1
     `;
     const user = users[0];
@@ -445,7 +512,7 @@ export class AdminService {
     let nextAccessStatus = dto.disabled === true ? 'DISABLED' : oldAccessStatus;
     let nextPlan = oldAccessPlan;
     let nextExpiresAt = oldExpiresAt;
-    let nextLearningAccessLevel = user.learningAccessLevel ?? 'TRAINING';
+    let nextLearningAccessLevel = user.learningAccessLevel ?? (oldAccessType === 'INTERNAL' ? 'FULL' : 'TRAINING');
     let nextDailyLimit: number | null | undefined;
     let nextUnlimited: boolean | undefined;
 
@@ -453,14 +520,28 @@ export class AdminService {
     if (dto.plan) nextPlan = dto.plan;
     if (dto.learningAccessLevel) nextLearningAccessLevel = dto.learningAccessLevel;
     if (dto.accessExpiresAt) nextExpiresAt = new Date(dto.accessExpiresAt);
+    if (!dto.accessType && dto.learningAccessLevel === 'FULL' && nextAccessType === 'TRIAL') {
+      nextAccessType = 'PAID';
+    }
+    if (nextAccessType === 'PAID' && nextPlan === 'NONE') {
+      nextPlan = 'MONTHLY';
+    }
+    if (nextAccessType !== oldAccessType && !dto.accessExpiresAt && !dto.extendMonths) {
+      nextExpiresAt = null;
+    }
     if (dto.extendMonths && nextAccessType !== 'INTERNAL') {
-      const base = nextExpiresAt && nextExpiresAt.getTime() > Date.now() ? new Date(nextExpiresAt) : new Date();
+      let base = new Date();
+      if (nextAccessType === oldAccessType && nextExpiresAt && nextExpiresAt.getTime() > Date.now()) {
+        base = new Date(nextExpiresAt);
+      }
       const n = new Date(base);
       n.setMonth(n.getMonth() + dto.extendMonths);
       nextExpiresAt = n;
       nextAccessStatus = 'ACTIVE';
     }
     if (nextAccessType === 'TRIAL') {
+      nextPlan = 'NONE';
+      nextLearningAccessLevel = 'TRAINING';
       nextDailyLimit = dto.dailyTrainingLimit ?? 5;
       nextUnlimited = false;
       if (!nextExpiresAt) {
@@ -469,6 +550,7 @@ export class AdminService {
         nextExpiresAt = d;
       }
     } else if (nextAccessType === 'PAID') {
+      if (nextPlan === 'NONE') nextPlan = 'MONTHLY';
       nextDailyLimit = null;
       nextUnlimited = true;
       if (!nextExpiresAt) {
@@ -533,7 +615,7 @@ export class AdminService {
     if (!isPasswordStrong(dto.newPassword)) throw new BadRequestException(passwordStrengthMessage());
 
     const users = await this.prisma.$queryRaw<Array<{ id: string; password: string | null }>>`
-      SELECT id, password FROM "User" WHERE id = ${userId} LIMIT 1
+      SELECT id, password FROM "User" WHERE id = ${userId} AND "deletedAt" IS NULL LIMIT 1
     `;
     const user = users[0];
     if (!user) throw new NotFoundException('用户不存在');
@@ -557,5 +639,94 @@ export class AdminService {
     });
 
     return { ok: true, message: '用户密码已重置' };
+  }
+
+  async getUserCourseAccess(userId: string) {
+    const users = await this.prisma.$queryRaw<Array<{ id: string; role: string | null; accessType: string | null }>>`
+      SELECT id, role, "accessType"
+      FROM "User"
+      WHERE id = ${userId}
+        AND "deletedAt" IS NULL
+      LIMIT 1
+    `;
+    const user = users[0];
+    if (!user) throw new NotFoundException('用户不存在');
+
+    const [courses, accessRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ id: string; title: string; subtitle: string | null; status: string; sortOrder: number }>>`
+        SELECT id, title, subtitle, status, "sort_order" as "sortOrder"
+        FROM "courses"
+        ORDER BY "sort_order" ASC, "created_at" ASC
+      `,
+      this.prisma.$queryRaw<Array<{ courseId: string; accessLevel: string }>>`
+        SELECT "course_id" as "courseId", "access_level" as "accessLevel"
+        FROM "user_course_access"
+        WHERE "user_id" = ${userId}
+      `,
+    ]);
+    const accessMap = new Map(accessRows.map((row) => [row.courseId, row.accessLevel]));
+    const isInternal = (user.role ?? 'USER') === 'ADMIN' || (user.accessType ?? 'TRIAL') === 'INTERNAL';
+    return {
+      userId,
+      isInternal,
+      courses: courses.map((course) => ({
+        ...course,
+        accessLevel: isInternal ? 'INTERNAL' : accessMap.get(course.id) ?? 'PREVIEW',
+      })),
+    };
+  }
+
+  async updateUserCourseAccess(adminId: string, userId: string, dto: UpdateUserCourseAccessDto) {
+    const users = await this.prisma.$queryRaw<Array<{ id: string; role: string | null; accessType: string | null }>>`
+      SELECT id, role, "accessType"
+      FROM "User"
+      WHERE id = ${userId}
+        AND "deletedAt" IS NULL
+      LIMIT 1
+    `;
+    const user = users[0];
+    if (!user) throw new NotFoundException('用户不存在');
+    if ((user.role ?? 'USER') === 'ADMIN' || (user.accessType ?? 'TRIAL') === 'INTERNAL') {
+      throw new BadRequestException('内部用户和管理员无需配置课程权限');
+    }
+
+    const courseRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "courses"
+    `;
+    const validCourseIds = new Set(courseRows.map((row) => row.id));
+    const normalized = new Map<string, 'TRAINING' | 'FULL' | 'INTERNAL'>();
+    for (const item of dto.items ?? []) {
+      if (!validCourseIds.has(item.courseId)) throw new BadRequestException('课程不存在');
+      if (item.accessLevel !== 'PREVIEW') normalized.set(item.courseId, item.accessLevel);
+    }
+
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.clearAll || normalized.size === 0) {
+        await tx.$executeRaw`DELETE FROM "user_course_access" WHERE "user_id" = ${userId}`;
+      } else {
+        await tx.$executeRaw`
+          DELETE FROM "user_course_access"
+          WHERE "user_id" = ${userId}
+        `;
+        for (const [courseId, accessLevel] of normalized.entries()) {
+          const id = `uca_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          await tx.$executeRaw`
+            INSERT INTO "user_course_access" (id, "user_id", "course_id", "access_level", "created_at", "updated_at")
+            VALUES (${id}, ${userId}, ${courseId}, CAST(${accessLevel} AS "CourseAccessLevel"), ${now}, ${now})
+          `;
+        }
+      }
+    });
+
+    await this.securityLogService.logAdminAction({
+      adminUserId: adminId,
+      action: 'USER_COURSE_ACCESS_UPDATE',
+      resourceType: 'UserCourseAccess',
+      resourceId: userId,
+      targetUserId: userId,
+      detail: JSON.stringify({ courses: Array.from(normalized.entries()).map(([courseId, accessLevel]) => ({ courseId, accessLevel })) }),
+    });
+    return { ok: true };
   }
 }

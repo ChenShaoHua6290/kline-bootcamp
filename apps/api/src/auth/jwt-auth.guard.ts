@@ -20,6 +20,7 @@ export class JwtAuthGuard implements CanActivate {
         SELECT id, email, role, "isBanned"
         FROM "User"
         WHERE id = ${payload.sub as string}
+          AND "deletedAt" IS NULL
         LIMIT 1
       `;
       const user = rows[0];

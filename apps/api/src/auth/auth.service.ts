@@ -21,7 +21,7 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const prisma = this.prisma as any;
-    const existing = await this.usersService.findByEmail(dto.email);
+    const existing = await this.usersService.findAnyByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already exists');
     if (!isPasswordStrong(dto.password)) throw new BadRequestException(passwordStrengthMessage());
 
@@ -115,7 +115,7 @@ export class AuthService {
     });
 
     const rows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
-      SELECT role FROM "User" WHERE id = ${user.id} LIMIT 1
+      SELECT role FROM "User" WHERE id = ${user.id} AND "deletedAt" IS NULL LIMIT 1
     `;
     return this.issueTokens(user.id, user.email, rows[0]?.role ?? 'USER', user.nickname ?? null);
   }
@@ -128,7 +128,11 @@ export class AuthService {
     }
 
     const userRows = await this.prisma.$queryRaw<Array<{ id: string; role: string | null; isBanned: boolean | null }>>`
-      SELECT id, role, "isBanned" FROM "User" WHERE id = ${user.id} LIMIT 1
+      SELECT id, role, "isBanned"
+      FROM "User"
+      WHERE id = ${user.id}
+        AND "deletedAt" IS NULL
+      LIMIT 1
     `;
     const userExtra = userRows[0];
     if (userExtra?.isBanned) throw new ForbiddenException('账号已被封禁，请联系管理员');
@@ -190,6 +194,7 @@ export class AuthService {
       WHERE prt."tokenHash" = ${tokenHash}
         AND prt."usedAt" IS NULL
         AND prt."expiresAt" > ${now}
+        AND u."deletedAt" IS NULL
       LIMIT 1
     `;
     const record = rows[0];
@@ -270,6 +275,7 @@ export class AuthService {
         AND rt."userId" = ${payload.sub as string}
         AND rt."revokedAt" IS NULL
         AND rt."expiresAt" > ${now}
+        AND u."deletedAt" IS NULL
       LIMIT 1
     `;
     const record = rows[0];

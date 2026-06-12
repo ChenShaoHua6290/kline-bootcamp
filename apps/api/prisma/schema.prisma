@@ -16,6 +16,7 @@ model User {
   isBanned           Boolean                @default(false)
   bannedAt           DateTime?
   banReason          String?
+  deletedAt          DateTime?
   createdAt          DateTime               @default(now())
   nickname           String?
   accessType         AccessType              @default(INTERNAL)
@@ -39,7 +40,10 @@ model User {
   securityLogs       SecurityLog[]
   reviews            TrainingReview[]
   lessonProgress     UserLessonProgress[]
+  courseAccess       UserCourseAccess[]
   sessions           TrainingSession[]
+
+  @@index([deletedAt])
 }
 
 model PasswordResetToken {
@@ -427,9 +431,25 @@ model Course {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   chapters    CourseChapter[]
+  userAccess  UserCourseAccess[]
 
   @@index([status, sortOrder])
   @@map("courses")
+}
+
+model UserCourseAccess {
+  id          String            @id @default(cuid())
+  userId      String            @map("user_id")
+  courseId    String            @map("course_id")
+  accessLevel CourseAccessLevel @map("access_level")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+  @@map("user_course_access")
 }
 
 model CourseChapter {
@@ -536,9 +556,11 @@ enum UserRole {
 enum AuditAction {
   USER_BAN
   USER_UNBAN
+  USER_DELETE
   INVITE_CREATE
   INVITE_UPDATE
   INVITE_DELETE
+  USER_COURSE_ACCESS_UPDATE
   LOGIN_FAILED
 }
 

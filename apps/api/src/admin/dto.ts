@@ -1,5 +1,5 @@
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 function sanitizeText(value: unknown) {
   if (typeof value !== 'string') return value;
@@ -173,4 +173,24 @@ export class AdminResetUserPasswordDto {
   @IsString()
   @MaxLength(128)
   confirmPassword!: string;
+}
+
+export class UpdateUserCourseAccessItemDto {
+  @IsString()
+  courseId!: string;
+
+  @IsIn(['PREVIEW', 'TRAINING', 'FULL', 'INTERNAL'])
+  accessLevel!: 'PREVIEW' | 'TRAINING' | 'FULL' | 'INTERNAL';
+}
+
+export class UpdateUserCourseAccessDto {
+  @IsOptional()
+  @IsBoolean()
+  clearAll?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateUserCourseAccessItemDto)
+  items?: UpdateUserCourseAccessItemDto[];
 }

@@ -32,6 +32,7 @@ export type CourseItem = {
   sortOrder: number;
   status: string;
   chapters: CourseChapter[];
+  userAccessLevel?: CourseAccessLevel | null;
 };
 
 export type CoursesResponse = {
@@ -73,10 +74,9 @@ export function formatDuration(seconds?: number | null) {
 
 export function formatTier(tier?: UserLearningTier) {
   if (tier === 'admin') return '管理员';
-  if (tier === 'internal') return '内部用户';
-  if (tier === 'paid_full') return '完整体系';
-  if (tier === 'paid_training') return '训练版';
-  return '试用';
+  if (tier === 'internal') return '内部';
+  if (tier === 'paid_full' || tier === 'paid_training') return '付费用户';
+  return '试看';
 }
 
 export function formatAccessLevel(level?: CourseAccessLevel) {
@@ -84,4 +84,9 @@ export function formatAccessLevel(level?: CourseAccessLevel) {
   if (level === 'TRAINING') return '训练权限';
   if (level === 'INTERNAL') return '内部';
   return '完整课程';
+}
+
+export function effectiveAccessLevel(level?: CourseAccessLevel, isPreview?: boolean): CourseAccessLevel {
+  if (isPreview || level === 'PREVIEW') return 'PREVIEW';
+  return level ?? 'FULL';
 }

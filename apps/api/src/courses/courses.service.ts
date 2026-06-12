@@ -18,6 +18,12 @@ type UploadedCourseAsset = {
 };
 
 const PUBLISHED = 'PUBLISHED';
+const ACCESS_ORDER: Record<CourseAccessLevel, number> = {
+  PREVIEW: 0,
+  TRAINING: 1,
+  FULL: 2,
+  INTERNAL: 3,
+};
 
 @Injectable()
 export class CoursesService {
@@ -28,7 +34,8 @@ export class CoursesService {
   }
 
   async listCourses(userId: string) {
-    const tier = await this.getUserLearningTier(userId);
+    const [tier, accessMap] = await Promise.all([this.getUserLearningTier(userId), this.getUserCourseAccessMap(userId)]);
+    const isInternal = tier === 'admin' || tier === 'internal';
     const rows = await this.db().course.findMany({
       where: { status: PUBLISHED as never },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -48,12 +55,16 @@ export class CoursesService {
     return {
       userTier: tier,
       learningPath: this.learningPath(),
-      courses: rows.map((course: any) => this.toCourseListItem(course, tier)),
+      courses: rows.map((course: any) => {
+        const accessLevel = this.effectiveCourseAccessLevel(accessMap[course.id] ?? 'PREVIEW', tier);
+        return this.toCourseListItem(course, accessLevel, isInternal);
+      }),
     };
   }
 
   async getCourse(userId: string, courseId: string) {
-    const tier = await this.getUserLearningTier(userId);
+    const [courseAccessLevel, tier] = await Promise.all([this.getCourseAccessLevel(userId, courseId), this.getUserLearningTier(userId)]);
+    const isInternal = tier === 'admin' || tier === 'internal';
     const course = await this.db().course.findFirst({
       where: { id: courseId, status: PUBLISHED as never },
       include: {
@@ -70,14 +81,16 @@ export class CoursesService {
       },
     });
     if (!course) throw new NotFoundException('课程不存在');
+    const effectiveAccessLevel = this.effectiveCourseAccessLevel(courseAccessLevel, tier);
     return {
-      ...this.toCourseListItem(course, tier),
+      ...this.toCourseListItem(course, effectiveAccessLevel, isInternal),
       description: course.description,
     };
   }
 
   async getLessonPlayback(userId: string, lessonId: string) {
     const tier = await this.getUserLearningTier(userId);
+    const isInternal = tier === 'admin' || tier === 'internal';
     const lesson = await this.db().lesson.findFirst({
       where: { id: lessonId, status: PUBLISHED as never },
       include: {
@@ -96,9 +109,11 @@ export class CoursesService {
     if (!lesson || lesson.chapter.status !== PUBLISHED || lesson.chapter.course.status !== PUBLISHED) {
       throw new NotFoundException('课时不存在');
     }
-    const lessonAccess = this.canAccess(tier, lesson.accessLevel as CourseAccessLevel, lesson.isPreview);
+    const courseAccessLevel = await this.getCourseAccessLevel(userId, lesson.chapter.courseId);
+    const effectiveAccessLevel = this.effectiveCourseAccessLevel(courseAccessLevel, tier);
+    const lessonAccess = this.canAccess(effectiveAccessLevel, lesson.accessLevel as CourseAccessLevel, lesson.isPreview, isInternal);
     if (!lessonAccess) {
-      throw new ForbiddenException(this.lockReason(tier, lesson.accessLevel as CourseAccessLevel));
+      throw new ForbiddenException(this.lockReason(effectiveAccessLevel, lesson.accessLevel as CourseAccessLevel));
     }
 
     const siblingIds = lesson.chapter.lessons.map((row: { id: string }) => row.id);
@@ -306,6 +321,7 @@ export class CoursesService {
       SELECT role, "accessType", "accessStatus", "accessExpiresAt", "learningAccessLevel"
       FROM "User"
       WHERE id = ${userId}
+        AND "deletedAt" IS NULL
       LIMIT 1
     `;
     const user = rows[0];
@@ -322,7 +338,13 @@ export class CoursesService {
     return 'trial';
   }
 
-  private toCourseListItem(course: any, tier: UserLearningTier) {
+  private effectiveCourseAccessLevel(accessLevel: CourseAccessLevel, tier: UserLearningTier): CourseAccessLevel {
+    if (tier === 'admin' || tier === 'internal') return 'INTERNAL';
+    if (tier === 'paid_full' || tier === 'paid_training') return accessLevel;
+    return 'PREVIEW';
+  }
+
+  private toCourseListItem(course: any, accessLevel: CourseAccessLevel, isInternal: boolean) {
     return {
       id: course.id,
       title: course.title,
@@ -331,6 +353,7 @@ export class CoursesService {
       coverImage: course.coverImage,
       sortOrder: course.sortOrder,
       status: course.status,
+      userAccessLevel: isInternal ? 'INTERNAL' : accessLevel,
       chapters: course.chapters.map((chapter: any) => ({
         id: chapter.id,
         title: chapter.title,
@@ -345,29 +368,62 @@ export class CoursesService {
           isPreview: lesson.isPreview,
           accessLevel: lesson.accessLevel,
           sortOrder: lesson.sortOrder,
-          locked: !this.canAccess(tier, lesson.accessLevel as CourseAccessLevel, lesson.isPreview),
-          lockReason: this.canAccess(tier, lesson.accessLevel as CourseAccessLevel, lesson.isPreview)
+          locked: !this.canAccess(accessLevel, lesson.accessLevel as CourseAccessLevel, lesson.isPreview, isInternal),
+          lockReason: this.canAccess(accessLevel, lesson.accessLevel as CourseAccessLevel, lesson.isPreview, isInternal)
             ? null
-            : this.lockReason(tier, lesson.accessLevel as CourseAccessLevel),
+            : this.lockReason(accessLevel, lesson.accessLevel as CourseAccessLevel),
         })),
       })),
     };
   }
 
-  private canAccess(tier: UserLearningTier, level: CourseAccessLevel, isPreview: boolean) {
-    if (tier === 'admin' || tier === 'internal') return true;
+  private canAccess(userAccessLevel: CourseAccessLevel, level: CourseAccessLevel, isPreview: boolean, isInternal: boolean) {
+    if (isInternal) return true;
     if (isPreview || level === 'PREVIEW') return true;
-    if (level === 'TRAINING') return tier === 'paid_training' || tier === 'paid_full';
-    if (level === 'FULL') return tier === 'paid_full';
-    if (level === 'INTERNAL') return false;
-    return false;
+    return ACCESS_ORDER[userAccessLevel] >= ACCESS_ORDER[level];
   }
 
-  private lockReason(tier: UserLearningTier, level: CourseAccessLevel) {
-    if (tier === 'trial') return '试用用户只能查看试看课时。';
-    if (tier === 'paid_training' && level === 'FULL') return '当前为训练系统权限，完整课程需开通完整体系权限。';
+  private lockReason(userAccessLevel: CourseAccessLevel, level: CourseAccessLevel) {
+    if (userAccessLevel === 'PREVIEW') return '当前课程仅可查看试看内容。';
+    if (userAccessLevel === 'TRAINING' && level === 'FULL') return '当前课程为训练权限，请开通完整课程权限后查看。';
     if (level === 'INTERNAL') return '该内容仅内部用户或管理员可见。';
     return '当前权限不可查看该内容。';
+  }
+
+  private async isInternalUser(userId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ role: string | null; accessType: string | null }>>`
+      SELECT role, "accessType"
+      FROM "User"
+      WHERE id = ${userId}
+        AND "deletedAt" IS NULL
+      LIMIT 1
+    `;
+    const user = rows[0];
+    return (user?.role ?? 'USER') === 'ADMIN' || (user?.accessType ?? 'TRIAL') === 'INTERNAL';
+  }
+
+  private async getUserCourseAccessMap(userId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ courseId: string; accessLevel: string }>>`
+      SELECT "course_id" AS "courseId", "access_level" AS "accessLevel"
+      FROM "user_course_access"
+      WHERE "user_id" = ${userId}
+    `;
+    const out: Record<string, CourseAccessLevel> = {};
+    for (const row of rows) out[row.courseId] = row.accessLevel as CourseAccessLevel;
+    return out;
+  }
+
+  private async getCourseAccessLevel(userId: string, courseId: string) {
+    const isInternal = await this.isInternalUser(userId);
+    if (isInternal) return 'INTERNAL' as CourseAccessLevel;
+    const rows = await this.prisma.$queryRaw<Array<{ accessLevel: string | null }>>`
+      SELECT "access_level" AS "accessLevel"
+      FROM "user_course_access"
+      WHERE "user_id" = ${userId}
+        AND "course_id" = ${courseId}
+      LIMIT 1
+    `;
+    return (rows[0]?.accessLevel as CourseAccessLevel | undefined) ?? 'PREVIEW';
   }
 
   private createVodPlayerSignature(appId: string, fileId: string) {
@@ -549,12 +605,12 @@ export class CoursesService {
       { id: 'lesson_alerts_logic', chapterId: 'chapter_alerts_usage', title: '共振逻辑', type: 'ARTICLE', content: '多周期共振提醒用于提示值得观察的结构状态。', duration: 720, isPreview: false, accessLevel: 'FULL', sortOrder: 10 },
       { id: 'lesson_alerts_intro', chapterId: 'chapter_alerts_usage', title: '提醒说明', type: 'ARTICLE', content: '提醒不是喊单，不代表必须交易，只是帮助减少盯盘成本。', duration: 600, isPreview: false, accessLevel: 'FULL', sortOrder: 20 },
       { id: 'lesson_alerts_execution', chapterId: 'chapter_alerts_usage', title: '如何辅助执行', type: 'ARTICLE', content: '收到提醒后仍需回到固定模式的入场、止损和仓位规则。', duration: 720, isPreview: false, accessLevel: 'FULL', sortOrder: 30 },
-      { id: 'lesson_training_start', chapterId: 'chapter_training_flow', title: '如何开始训练', type: 'ARTICLE', content: '选择市场、推进周期和训练数量，系统会随机抽取历史行情。', duration: 360, isPreview: true, accessLevel: 'TRAINING', sortOrder: 10 },
-      { id: 'lesson_training_buy', chapterId: 'chapter_training_flow', title: '如何买入', type: 'ARTICLE', content: '根据固定模式执行开多或开空，并设置仓位与风险参数。', duration: 360, isPreview: true, accessLevel: 'TRAINING', sortOrder: 20 },
-      { id: 'lesson_training_partial_close', chapterId: 'chapter_training_flow', title: '如何部分平仓', type: 'ARTICLE', content: '用部分平仓管理仓位暴露和执行节奏。', duration: 360, isPreview: true, accessLevel: 'TRAINING', sortOrder: 30 },
-      { id: 'lesson_training_full_close', chapterId: 'chapter_training_flow', title: '如何全部平仓', type: 'ARTICLE', content: '全部平仓会记录本次交易结果并释放持仓。', duration: 360, isPreview: true, accessLevel: 'TRAINING', sortOrder: 40 },
-      { id: 'lesson_training_history', chapterId: 'chapter_training_flow', title: '如何查看历史记录', type: 'ARTICLE', content: '历史记录用于查看每轮训练结果、交易动作和盈亏情况。', duration: 360, isPreview: true, accessLevel: 'TRAINING', sortOrder: 50 },
-      { id: 'lesson_training_review', chapterId: 'chapter_training_flow', title: '如何复盘总结', type: 'ARTICLE', content: '训练结束后记录问题标签和总结，把错误动作转化为下一轮训练目标。', duration: 480, isPreview: true, accessLevel: 'TRAINING', sortOrder: 60 },
+      { id: 'lesson_training_start', chapterId: 'chapter_training_flow', title: '如何开始训练', type: 'ARTICLE', content: '选择市场、推进周期和训练数量，系统会随机抽取历史行情。', duration: 360, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 10 },
+      { id: 'lesson_training_buy', chapterId: 'chapter_training_flow', title: '如何买入', type: 'ARTICLE', content: '根据固定模式执行开多或开空，并设置仓位与风险参数。', duration: 360, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 20 },
+      { id: 'lesson_training_partial_close', chapterId: 'chapter_training_flow', title: '如何部分平仓', type: 'ARTICLE', content: '用部分平仓管理仓位暴露和执行节奏。', duration: 360, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 30 },
+      { id: 'lesson_training_full_close', chapterId: 'chapter_training_flow', title: '如何全部平仓', type: 'ARTICLE', content: '全部平仓会记录本次交易结果并释放持仓。', duration: 360, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 40 },
+      { id: 'lesson_training_history', chapterId: 'chapter_training_flow', title: '如何查看历史记录', type: 'ARTICLE', content: '历史记录用于查看每轮训练结果、交易动作和盈亏情况。', duration: 360, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 50 },
+      { id: 'lesson_training_review', chapterId: 'chapter_training_flow', title: '如何复盘总结', type: 'ARTICLE', content: '训练结束后记录问题标签和总结，把错误动作转化为下一轮训练目标。', duration: 480, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 60 },
     ];
   }
 

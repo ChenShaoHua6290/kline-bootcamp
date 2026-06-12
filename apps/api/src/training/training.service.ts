@@ -381,6 +381,7 @@ export class TrainingService {
       SELECT id, "isBanned", "accessType", "accessStatus", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited"
       FROM "User"
       WHERE id = ${userId}
+        AND "deletedAt" IS NULL
       LIMIT 1
     `;
     const user = rows[0];
@@ -458,6 +459,7 @@ export class TrainingService {
       SELECT "accessType", "accessStatus", "accessExpiresAt", "dailyTrainingLimit", "isTrainingUnlimited", "currentPlan"
       FROM "User"
       WHERE id = ${userId}
+        AND "deletedAt" IS NULL
       LIMIT 1
     `;
     const u = userRows[0];
@@ -631,6 +633,7 @@ export class TrainingService {
         LEFT JOIN latest_session ls ON ls."userId" = u.id
         LEFT JOIN session_stats ss ON ss."userId" = u.id
         LEFT JOIN trade_stats ts2 ON ts2."userId" = u.id
+        WHERE u."deletedAt" IS NULL
       )
       SELECT rank, "userId", nickname, email, points, "trainingCount", "winRate", "liquidationCount"
       FROM ranked

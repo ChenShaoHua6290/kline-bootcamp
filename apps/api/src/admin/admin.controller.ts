@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { HistoryQueryDto } from '../training/dto';
 import { TrainingService } from '../training/training.service';
 import { AdminService } from './admin.service';
-import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto, UpdateUserAccessDto } from './dto';
+import { AdminResetUserPasswordDto, BanUserDto, CreateInviteCodeDto, UpdateInviteCodeDto, UpdateUserAccessDto, UpdateUserCourseAccessDto } from './dto';
 
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
@@ -45,6 +45,11 @@ export class AdminController {
     return this.adminService.listUsers(q);
   }
 
+  @Delete('users/:id')
+  deleteUser(@Req() req: { user: { sub: string } }, @Param('id') id: string) {
+    return this.adminService.deleteUser(req.user.sub, id);
+  }
+
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Patch('users/:id/ban')
   banUser(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: BanUserDto) {
@@ -59,6 +64,16 @@ export class AdminController {
   @Patch('users/:id/access')
   updateUserAccess(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: UpdateUserAccessDto) {
     return this.adminService.updateUserAccess(req.user.sub, id, dto);
+  }
+
+  @Get('users/:id/course-access')
+  userCourseAccess(@Param('id') id: string) {
+    return this.adminService.getUserCourseAccess(id);
+  }
+
+  @Patch('users/:id/course-access')
+  updateUserCourseAccess(@Req() req: { user: { sub: string } }, @Param('id') id: string, @Body() dto: UpdateUserCourseAccessDto) {
+    return this.adminService.updateUserCourseAccess(req.user.sub, id, dto);
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } })

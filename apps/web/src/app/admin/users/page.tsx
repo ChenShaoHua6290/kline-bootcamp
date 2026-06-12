@@ -14,9 +14,27 @@ import { AdminUserRow, UserManagementTable } from '@/components/admin/UserManage
 import { Toast } from '@/components/ui/Toast';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { PageDescription, PageHeader, PageTitle } from '@/components/ui/PageHeader';
 import { NoticeModal } from '@/components/NoticeModal';
 import { PASSWORD_STRENGTH_HINT, isPasswordStrong } from '@/lib/password';
+import { CourseAccessLevel, formatAccessLevel } from '@/lib/courses/types';
+
+type UserCourseAccessCourse = {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  status: string;
+  sortOrder: number;
+  accessLevel: CourseAccessLevel;
+};
+
+type UserCourseAccessResponse = {
+  userId: string;
+  isInternal: boolean;
+  courses: UserCourseAccessCourse[];
+};
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -32,8 +50,10 @@ export default function AdminUsersPage() {
   const [keyword, setKeyword] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [banTarget, setBanTarget] = useState<AdminUserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [pendingBanId, setPendingBanId] = useState<string | null>(null);
   const [pendingUnbanId, setPendingUnbanId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; tone: 'success' | 'error' | 'info' }>({
     open: false,
     message: '',
@@ -42,7 +62,7 @@ export default function AdminUsersPage() {
   const [accessActionModal, setAccessActionModal] = useState<{
     open: boolean;
     row: AdminUserRow | null;
-    action: 'renew_monthly' | 'to_internal' | 'grant_full' | null;
+    action: 'renew_monthly' | 'to_internal' | null;
     remark: string;
     extendMonths: number;
   }>({
@@ -65,6 +85,15 @@ export default function AdminUsersPage() {
     confirmPassword: '',
     generatedPassword: '',
   });
+  const [courseAccessModal, setCourseAccessModal] = useState<{
+    open: boolean;
+    row: AdminUserRow | null;
+    values: Record<string, CourseAccessLevel>;
+  }>({
+    open: false,
+    row: null,
+    values: {},
+  });
   const queryClient = useQueryClient();
   const token = getToken();
   const user = getAuthUser();
@@ -72,6 +101,12 @@ export default function AdminUsersPage() {
     queryKey: ['admin-users', searchKeyword],
     enabled: Boolean(token && user?.role === 'ADMIN'),
     queryFn: async () => (await api.get<AdminUserRow[]>('/admin/users', { params: searchKeyword.trim() ? { q: searchKeyword.trim() } : undefined })).data,
+    refetchOnWindowFocus: false,
+  });
+  const courseAccessQuery = useQuery({
+    queryKey: ['admin-user-course-access', courseAccessModal.row?.id],
+    enabled: Boolean(courseAccessModal.open && courseAccessModal.row?.id),
+    queryFn: async () => (await api.get<UserCourseAccessResponse>(`/admin/users/${courseAccessModal.row?.id}/course-access`)).data,
     refetchOnWindowFocus: false,
   });
 
@@ -117,6 +152,24 @@ export default function AdminUsersPage() {
     onSettled: () => setPendingUnbanId(null),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => (await api.delete(`/admin/users/${userId}`)).data,
+    onMutate: (userId) => setPendingDeleteId(userId),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-summary'] });
+      reload();
+      setToast({ open: true, message: '用户已删除', tone: 'success' });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+      const text = Array.isArray(msg) ? msg.join('，') : msg || '删除失败';
+      setToast({ open: true, message: text, tone: 'error' });
+    },
+    onSettled: () => setPendingDeleteId(null),
+  });
+
   const updateAccessMutation = useMutation({
     mutationFn: async (payload: { userId: string; body: Record<string, unknown> }) =>
       (await api.patch(`/admin/users/${payload.userId}/access`, payload.body)).data,
@@ -145,12 +198,26 @@ export default function AdminUsersPage() {
     },
   });
 
-  const openAccessActionModal = (row: AdminUserRow, action: 'renew_monthly' | 'to_internal' | 'grant_full') => {
+  const updateCourseAccessMutation = useMutation({
+    mutationFn: async (payload: { userId: string; items: Array<{ courseId: string; accessLevel: CourseAccessLevel }> }) =>
+      (await api.patch(`/admin/users/${payload.userId}/course-access`, { items: payload.items })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-user-course-access'] });
+      setToast({ open: true, message: '课程权限已更新', tone: 'success' });
+      setCourseAccessModal({ open: false, row: null, values: {} });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+      setToast({ open: true, message: Array.isArray(msg) ? msg.join('，') : msg || '课程权限更新失败', tone: 'error' });
+    },
+  });
+
+  const openAccessActionModal = (row: AdminUserRow, action: 'renew_monthly' | 'to_internal') => {
     setAccessActionModal({
       open: true,
       row,
       action,
-      remark: action === 'renew_monthly' ? '后台手动月续费' : action === 'grant_full' ? '后台开通完整课程权限' : '后台设为内部用户',
+      remark: action === 'renew_monthly' ? '后台手动月续费' : '后台设为内部用户',
       extendMonths: 1,
     });
   };
@@ -162,13 +229,6 @@ export default function AdminUsersPage() {
       updateAccessMutation.mutate({
         userId: accessActionModal.row.id,
         body: { accessType: 'PAID', plan: 'MONTHLY', extendMonths: accessActionModal.extendMonths, disabled: false, remark },
-      });
-      return;
-    }
-    if (accessActionModal.action === 'grant_full') {
-      updateAccessMutation.mutate({
-        userId: accessActionModal.row.id,
-        body: { learningAccessLevel: 'FULL', disabled: false, remark },
       });
       return;
     }
@@ -195,12 +255,38 @@ export default function AdminUsersPage() {
     });
   };
 
+  const openCourseAccessModal = (row: AdminUserRow) => {
+    setCourseAccessModal({ open: true, row, values: {} });
+  };
+
+  const closeCourseAccessModal = () => {
+    if (updateCourseAccessMutation.isPending) return;
+    setCourseAccessModal({ open: false, row: null, values: {} });
+  };
+
+  const setCourseAccessValue = (courseId: string, accessLevel: CourseAccessLevel) => {
+    setCourseAccessModal((prev) => ({ ...prev, values: { ...prev.values, [courseId]: accessLevel } }));
+  };
+
+  const courseAccessLevelFor = (course: UserCourseAccessCourse) => courseAccessModal.values[course.id] ?? course.accessLevel;
+
+  const confirmCourseAccess = () => {
+    if (!courseAccessModal.row || !courseAccessQuery.data) return;
+    updateCourseAccessMutation.mutate({
+      userId: courseAccessModal.row.id,
+      items: courseAccessQuery.data.courses.map((course) => ({
+        courseId: course.id,
+        accessLevel: courseAccessLevelFor(course),
+      })),
+    });
+  };
+
   return (
     <AdminLayout title="用户管理">
       <PageHeader>
         <div>
           <PageTitle>用户管理</PageTitle>
-          <PageDescription>可按昵称或邮箱检索用户并执行封禁/解封操作。</PageDescription>
+          <PageDescription>可按昵称或邮箱检索用户，并配置训练套餐、课程权限与账号状态。</PageDescription>
         </div>
       </PageHeader>
       <Card className="mb-3 p-4">
@@ -225,8 +311,10 @@ export default function AdminUsersPage() {
           rows={rows}
           pendingBanId={pendingBanId}
           pendingUnbanId={pendingUnbanId}
+          pendingDeleteId={pendingDeleteId}
           onBan={(row) => setBanTarget(row)}
           onUnban={(row) => unbanMutation.mutate(row.id)}
+          onDelete={(row) => setDeleteTarget(row)}
           onAccessAction={(row, action) => {
             if (action === 'renew_monthly') {
               openAccessActionModal(row, 'renew_monthly');
@@ -236,11 +324,8 @@ export default function AdminUsersPage() {
               openAccessActionModal(row, 'to_internal');
               return;
             }
-            if (action === 'grant_full') {
-              openAccessActionModal(row, 'grant_full');
-              return;
-            }
           }}
+          onCourseAccess={(row) => openCourseAccessModal(row)}
           onResetPassword={(row) => setResetPasswordModal({ open: true, row, newPassword: '', confirmPassword: '', generatedPassword: '' })}
           onViewHistory={(row) => {
             const label = (row.nickname || row.email || '').trim();
@@ -265,14 +350,29 @@ export default function AdminUsersPage() {
         }}
       />
       <NoticeModal
+        open={Boolean(deleteTarget)}
+        title="确认删除用户"
+        message={deleteTarget ? `将删除用户「${deleteTarget.nickname || deleteTarget.email}」。删除后该用户不会出现在用户列表，也不会参与实时排行榜统计。` : ''}
+        tone="error"
+        confirmText={deleteMutation.isPending ? '删除中...' : '确认删除'}
+        cancelText="取消"
+        onClose={() => {
+          if (deleteMutation.isPending) return;
+          setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTarget || deleteMutation.isPending) return;
+          deleteMutation.mutate(deleteTarget.id);
+        }}
+        maskClosable={!deleteMutation.isPending}
+      />
+      <NoticeModal
         open={accessActionModal.open}
-        title={accessActionModal.action === 'renew_monthly' ? '确认月续费' : accessActionModal.action === 'grant_full' ? '确认开通完整课程' : '确认设为内部用户'}
+        title={accessActionModal.action === 'renew_monthly' ? '确认月续费' : '确认设为内部用户'}
         message={
           accessActionModal.row
             ? accessActionModal.action === 'renew_monthly'
               ? `将为用户「${accessActionModal.row.nickname || accessActionModal.row.email}」续费 ${accessActionModal.extendMonths} 个月。`
-              : accessActionModal.action === 'grant_full'
-                ? `将为用户「${accessActionModal.row.nickname || accessActionModal.row.email}」开通完整课程、课件、指标说明和共振提醒权限。`
               : `将把用户「${accessActionModal.row.nickname || accessActionModal.row.email}」设为内部用户并解除到期限制。`
             : ''
         }
@@ -312,6 +412,53 @@ export default function AdminUsersPage() {
           />
         </div>
       </NoticeModal>
+      <Modal open={courseAccessModal.open} onClose={closeCourseAccessModal} className="max-w-3xl">
+        <div className="border-b border-slate-700/70 px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-semibold text-slate-100">课程权限</div>
+              <div className="mt-1 text-xs text-slate-400">{courseAccessModal.row ? courseAccessModal.row.nickname || courseAccessModal.row.email : ''}</div>
+            </div>
+            <Button size="sm" variant="ghost" className="h-8 w-8 px-0" onClick={closeCourseAccessModal}>×</Button>
+          </div>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+          {courseAccessQuery.isLoading ? <LoadingState message="课程权限加载中..." /> : null}
+          {courseAccessQuery.isError ? <ErrorState message="课程权限加载失败，请重试" /> : null}
+          {courseAccessQuery.data?.isInternal ? (
+            <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+              内部用户课程不限制，默认可查看所有课程和内部课时。
+            </div>
+          ) : null}
+          {courseAccessQuery.data && !courseAccessQuery.data.isInternal ? (
+            <div className="space-y-2">
+              {courseAccessQuery.data.courses.map((course) => (
+                <div key={course.id} className="grid gap-2 rounded-xl border border-slate-700/75 bg-slate-900/55 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-100">{course.title}</div>
+                    <div className="mt-1 text-xs text-slate-500">{course.subtitle || course.status}</div>
+                  </div>
+                  <Select value={courseAccessLevelFor(course)} onChange={(e) => setCourseAccessValue(course.id, e.target.value as CourseAccessLevel)} disabled={updateCourseAccessMutation.isPending}>
+                    <option value="PREVIEW">{formatAccessLevel('PREVIEW')}</option>
+                    <option value="TRAINING">{formatAccessLevel('TRAINING')}</option>
+                    <option value="FULL">{formatAccessLevel('FULL')}</option>
+                    <option value="INTERNAL">{formatAccessLevel('INTERNAL')}</option>
+                  </Select>
+                </div>
+              ))}
+              {courseAccessQuery.data.courses.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-400">暂无课程。</div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-700/70 px-5 py-4">
+          <Button variant="default" onClick={closeCourseAccessModal} disabled={updateCourseAccessMutation.isPending}>取消</Button>
+          <Button variant="primary" onClick={confirmCourseAccess} disabled={updateCourseAccessMutation.isPending || !courseAccessQuery.data || courseAccessQuery.data.isInternal}>
+            {updateCourseAccessMutation.isPending ? '保存中...' : '保存课程权限'}
+          </Button>
+        </div>
+      </Modal>
       <NoticeModal
         open={resetPasswordModal.open}
         title="重置用户密码"

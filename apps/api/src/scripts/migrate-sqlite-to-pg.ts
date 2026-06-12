@@ -64,8 +64,8 @@ async function main() {
   try {
     await migrateTable(pg, sqlitePath, 'User', 'SELECT * FROM "User"', async (r) => {
       await pg.$executeRaw(
-        Prisma.sql`INSERT INTO "User" ("id","email","password","role","isBanned","bannedAt","banReason","createdAt")
-                   VALUES (${String(r.id)}, ${String(r.email)}, ${String(r.password)}, CAST(${String(r.role ?? 'USER')} AS "UserRole"), ${Boolean(r.isBanned)}, ${asDate(r.bannedAt)}, ${r.banReason ? String(r.banReason) : null}, ${asDate(r.createdAt) ?? new Date()})
+        Prisma.sql`INSERT INTO "User" ("id","email","password","role","isBanned","bannedAt","banReason","deletedAt","createdAt")
+                   VALUES (${String(r.id)}, ${String(r.email)}, ${String(r.password)}, CAST(${String(r.role ?? 'USER')} AS "UserRole"), ${Boolean(r.isBanned)}, ${asDate(r.bannedAt)}, ${r.banReason ? String(r.banReason) : null}, ${asDate(r.deletedAt)}, ${asDate(r.createdAt) ?? new Date()})
                    ON CONFLICT ("id") DO NOTHING`,
       );
     });
@@ -184,4 +184,3 @@ main().catch((err) => {
   console.error('[migrate] failed:', err);
   process.exit(1);
 });
-

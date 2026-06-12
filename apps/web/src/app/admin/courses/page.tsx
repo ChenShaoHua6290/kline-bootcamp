@@ -16,7 +16,7 @@ import { Select } from '@/components/ui/Select';
 import { Toast } from '@/components/ui/Toast';
 import { PageDescription, PageHeader, PageTitle } from '@/components/ui/PageHeader';
 import { MarkdownEditor } from '@/components/markdown/MarkdownEditor';
-import { CourseAccessLevel, LessonType, formatAccessLevel, formatDuration } from '@/lib/courses/types';
+import { CourseAccessLevel, LessonType, effectiveAccessLevel, formatAccessLevel, formatDuration } from '@/lib/courses/types';
 
 type AdminLesson = {
   id: string;
@@ -432,7 +432,7 @@ export default function AdminCoursesPage() {
       videoFileId: lesson.videoFileId ?? '',
       attachmentUrl: lesson.attachmentUrl ?? '',
       duration: lesson.duration ?? 0,
-      accessLevel: lesson.accessLevel,
+      accessLevel: effectiveAccessLevel(lesson.accessLevel, lesson.isPreview),
       sortOrder: lesson.sortOrder,
       status: lesson.status,
     });
@@ -593,7 +593,7 @@ export default function AdminCoursesPage() {
                               {lesson.isPreview ? <Badge tone="success">试看</Badge> : null}
                               {lesson.status !== 'PUBLISHED' ? statusBadge(lesson.status) : null}
                             </div>
-                            <div className="mt-1.5 text-xs text-slate-500">{formatAccessLevel(lesson.accessLevel)} · {formatDuration(lesson.duration)} · 排序 {lesson.sortOrder}</div>
+                            <div className="mt-1.5 text-xs text-slate-500">{formatAccessLevel(effectiveAccessLevel(lesson.accessLevel, lesson.isPreview))} · {formatDuration(lesson.duration)} · 排序 {lesson.sortOrder}</div>
                             <div className="mt-1 text-xs text-slate-600">
                               {lesson.videoFileId ? `fileId: ${lesson.videoFileId}` : lesson.videoUrl ? '已填写 videoUrl' : lesson.attachmentUrl ? '已填写附件' : '未绑定媒体'}
                             </div>
