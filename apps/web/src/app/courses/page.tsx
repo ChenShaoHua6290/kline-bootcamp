@@ -105,13 +105,15 @@ export default function CoursesPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.13),transparent_32%),radial-gradient(circle_at_top_right,rgba(245,158,11,0.1),transparent_28%),#020617] text-slate-100">
-      <header className="app-nav flex flex-wrap items-center justify-between gap-2 sm:gap-2">
-        <h1 className="app-title">课程中心</h1>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          {query.data?.userTier ? <Badge tone="info">{formatTier(query.data.userTier)}</Badge> : null}
-          <Link href="/">
-            <Button size="sm" variant="ghost" className="h-8 sm:px-3 sm:text-[15px]">返回首页</Button>
-          </Link>
+      <header className="app-nav">
+        <div className="app-nav-row">
+          <h1 className="app-title">课程中心</h1>
+          <div className="app-nav-actions">
+            {query.data?.userTier ? <Badge tone="info">{formatTier(query.data.userTier)}</Badge> : null}
+            <Link href="/">
+              <Button size="sm" variant="ghost" className="h-8 sm:px-3 sm:text-[15px]">返回首页</Button>
+            </Link>
+          </div>
         </div>
       </header>
 

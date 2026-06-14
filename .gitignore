@@ -27,7 +27,6 @@ logs/
 storage/
 *.csv
 *.zip
-*.sqlite
 *.db
 .vscode/
 .DS_Store

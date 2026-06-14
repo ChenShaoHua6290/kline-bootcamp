@@ -15,12 +15,16 @@ export function SessionEndModal({
   session,
   onClose,
   onRestart,
+  onContinueAssignment,
+  onStartFreePractice,
   onBackHome,
   restarting = false,
 }: {
   session: Session;
   onClose: () => void;
   onRestart: () => void;
+  onContinueAssignment?: () => void;
+  onStartFreePractice?: () => void;
   onBackHome: () => void;
   restarting?: boolean;
 }) {
@@ -33,6 +37,11 @@ export function SessionEndModal({
   const roundScore = session.finalBalance - session.initialBalance;
   const realizedPnl = session.actions.reduce((sum, action) => sum + (action.pnl ?? 0), 0);
   const ratio = session.initialBalance > 0 ? (roundScore / session.initialBalance) * 100 : 0;
+  const assignmentSource = session.assignmentId ? session.assignmentSource : 'freePractice';
+  const isTrial = assignmentSource === 'trial';
+  const isCourseAssignment = assignmentSource === 'courseAssignment';
+  const primaryText = isTrial ? '继续试用训练' : isCourseAssignment ? '继续当前作业' : '开始新训练';
+  const secondaryText = isTrial || isCourseAssignment ? '开启自由练习' : '返回首页';
 
   useLayoutEffect(() => {
     const fitModal = () => {
@@ -59,10 +68,16 @@ export function SessionEndModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.14),transparent_40%),rgba(2,6,23,0.84)] p-4"
+      className="fixed inset-0 z-[520] flex items-center justify-center bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.14),transparent_40%),rgba(2,6,23,0.84)] p-4"
+      role="presentation"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <div
         ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="session-end-title"
         className="w-full max-w-[380px] rounded-2xl border border-slate-700/70 bg-gradient-to-b from-slate-900/95 via-slate-900/95 to-slate-950/95 font-['SF_Pro_Display','PingFang_SC','Hiragino_Sans_GB','Microsoft_YaHei',sans-serif] shadow-[0_0_0_1px_rgba(16,185,129,0.16),0_18px_60px_rgba(0,0,0,0.58)]"
         style={{ transform: `scale(${modalScale})`, transformOrigin: 'center center', willChange: 'transform' }}
         onClick={(e) => e.stopPropagation()}
@@ -70,7 +85,7 @@ export function SessionEndModal({
         <div className="flex items-start justify-between border-b border-slate-700/70 px-4 py-3.5 sm:px-5 sm:py-4">
           <div>
             <div className="text-[clamp(9px,1.2vw,10px)] font-semibold tracking-[0.2em] text-emerald-400/90">结算面板</div>
-            <h3 className="mt-1 text-[clamp(20px,3.3vw,24px)] font-semibold leading-tight text-slate-100">训练完成</h3>
+            <h3 id="session-end-title" className="mt-1 text-[clamp(20px,3.3vw,24px)] font-semibold leading-tight text-slate-100">训练完成</h3>
             <p className="mt-1 text-[clamp(11px,1.8vw,13px)] font-medium text-slate-400">
               训练时间：{range}
             </p>
@@ -116,20 +131,20 @@ export function SessionEndModal({
 
           <div className="grid grid-cols-2 gap-2.5">
             <Button
-              onClick={onBackHome}
+              onClick={isTrial || isCourseAssignment ? onStartFreePractice ?? onRestart : onBackHome}
               variant="default"
               className="w-full py-2.5 text-[clamp(14px,2.4vw,16px)]"
               disabled={restarting}
             >
-              返回首页
+              {secondaryText}
             </Button>
             <Button
-              onClick={onRestart}
+              onClick={isTrial || isCourseAssignment ? onContinueAssignment ?? onRestart : onRestart}
               variant="success"
               className="w-full py-2.5 text-[clamp(15px,2.6vw,17px)]"
               disabled={restarting}
             >
-              {restarting ? '正在开始...' : '开始新训练'}
+              {restarting ? '正在开始...' : primaryText}
             </Button>
           </div>
         </div>

@@ -63,13 +63,13 @@ export default function AlertsPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_30%),radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_32%),#020617] text-slate-100">
-      <header className="border-b border-slate-800/90 bg-slate-950/75 px-4 py-4 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-3">
-          <div>
-            <PageTitle>多周期共振提醒</PageTitle>
-            <PageDescription>提醒是辅助观察，不是喊单，也不是预测。</PageDescription>
+      <header className="app-nav">
+        <div className="app-nav-row max-w-[1120px]">
+          <div className="app-nav-heading">
+            <PageTitle className="!text-lg sm:!text-xl">多周期共振提醒</PageTitle>
+            <PageDescription className="app-nav-description">提醒是辅助观察，不是喊单，也不是预测。</PageDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="app-nav-actions">
             <Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>
             <Link href="/indicators"><Button size="sm" variant="primary">查看指标说明</Button></Link>
           </div>

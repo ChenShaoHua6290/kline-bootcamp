@@ -13,7 +13,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MarkdownRenderer, MarkdownToc, getMarkdownHeadings } from '@/components/markdown/MarkdownRenderer';
 import { TencentVodPlayer } from '@/components/courses/TencentVodPlayer';
-import { LessonPlayback, formatAccessLevel, formatDuration } from '@/lib/courses/types';
+import { LessonPlayback, buildTrainingAssignmentHref, formatAccessLevel, formatDuration } from '@/lib/courses/types';
 
 function responseStatus(error: unknown) {
   return (error as { response?: { status?: number } })?.response?.status;
@@ -61,13 +61,13 @@ export default function LessonPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_30%),#020617] text-slate-100">
-      <header className="border-b border-slate-800/90 bg-slate-950/75 px-4 py-4 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs text-slate-400">{lesson.courseTitle} / {lesson.chapterTitle}</div>
-            <h1 className="mt-1 text-xl font-semibold text-slate-100">{lesson.title}</h1>
+      <header className="app-nav">
+        <div className="app-nav-row max-w-[1180px]">
+          <div className="app-nav-heading">
+            <div className="truncate text-xs text-slate-400">{lesson.courseTitle} / {lesson.chapterTitle}</div>
+            <h1 className="app-nav-title">{lesson.title}</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="app-nav-actions">
             <Badge tone={lesson.isPreview ? 'success' : 'info'}>{lesson.isPreview ? '试看' : formatAccessLevel(lesson.accessLevel)}</Badge>
             <Badge>{formatDuration(lesson.duration)}</Badge>
             <Link href={`/courses/${lesson.courseId}`}><Button size="sm" variant="ghost">返回课程</Button></Link>
@@ -126,6 +126,21 @@ export default function LessonPage() {
             ) : null}
             <MarkdownRenderer content={lesson.content} emptyText="课时图文内容待后台补充。" />
           </Card>
+          {lesson.trainingAssignment ? (
+            <Card className="border-cyan-400/25 bg-cyan-500/10 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-cyan-100">{lesson.trainingAssignment.assignmentTitle}</div>
+                  <div className="mt-1 text-xs text-cyan-100/70">{lesson.trainingAssignment.assignmentId}</div>
+                </div>
+                <Link href={buildTrainingAssignmentHref(lesson)}>
+                  <Button className="border-cyan-300/50 bg-cyan-500/20 text-cyan-50 shadow-[0_10px_22px_rgba(6,182,212,0.14)] hover:border-cyan-200/70 hover:bg-cyan-500/30" variant="primary">
+                    开始训练
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          ) : null}
         </div>
 
         {headings.length > 0 ? (

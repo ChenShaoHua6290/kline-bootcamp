@@ -20,7 +20,6 @@ kline-bootcamp/
 │   │   ├── package.json
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma
-│   │   │   ├── schema.sqlite.prisma
 │   │   │   ├── seed.ts
 │   │   │   └── migrations/
 │   │   └── src/
@@ -39,7 +38,6 @@ kline-bootcamp/
 │   ├── server-init.sh
 │   ├── dev-up.sh
 │   ├── dev-up-local.sh
-│   ├── dev-up-lite.sh
 │   ├── dev-down.sh
 │   └── data/
 ├── docker-compose.yml
@@ -161,12 +159,9 @@ kline-bootcamp/
 | NEXT_PUBLIC_ADMIN_WECHAT_QR | 可选 | /images/wechat-qr.png | 前端展示二维码 | 可使用站内路径或 https 链接 |
 | ADMIN_EMAIL | 可选 | admin@example.com | seed 管理员账号 | 仅执行 seed 时需要 |
 | ADMIN_PASSWORD | 可选 | 强密码 | seed 管理员密码 | 仅执行 seed 时需要 |
-| SQLITE_URL | 非生产必填 | file:... | 仅 Lite 模式（SQLite） | 生产不用 |
 | OFFLINE_CSV_PATH | 可选 | /path/a.csv | 离线导入脚本使用 | 非部署必填 |
 | AGGREGATE_MARKETS | 可选 | STOCK | 聚合脚本参数 | 非部署必填 |
 | AGGREGATE_SYMBOLS | 可选 | 000001.SZ | 聚合脚本参数 | 非部署必填 |
-| SQLITE_BATCH_SIZE | 可选 | 200 | sqlite 迁移脚本参数 | 非部署必填 |
-| SQLITE_MIGRATE_PATH | 可选 | /path/old.db | sqlite 迁移脚本参数 | 非部署必填 |
 
 你提到的变量中，当前项目**未发现使用**：
 

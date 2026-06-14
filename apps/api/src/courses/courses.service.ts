@@ -10,6 +10,18 @@ type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 type CourseAccessLevel = 'PREVIEW' | 'TRAINING' | 'FULL' | 'INTERNAL';
 type LessonType = 'VIDEO' | 'ARTICLE' | 'PDF' | 'MIXED';
 type UserLearningTier = 'trial' | 'paid_training' | 'paid_full' | 'internal' | 'admin';
+type TrainingAssignment = {
+  assignmentSource: 'trial' | 'courseAssignment';
+  assignmentId: string;
+  assignmentTitle: string;
+  trainingMode: 'mixed' | 'zeroAxis' | 'divergence' | 'synthesis' | 'trend' | 'pullback';
+  assignmentVersion: number;
+};
+type CourseRelatedLink = {
+  label: string;
+  href: string;
+  sortOrder: number;
+};
 type UploadedCourseAsset = {
   originalname?: string;
   mimetype?: string;
@@ -143,13 +155,14 @@ export class CoursesService {
       duration: lesson.duration,
       isPreview: lesson.isPreview,
       accessLevel: lesson.accessLevel,
+      trainingAssignment: this.normalizeTrainingAssignment(lesson.trainingAssignment),
       prevLessonId,
       nextLessonId,
     };
   }
 
   async adminListCourses() {
-    return this.db().course.findMany({
+    const rows = await this.db().course.findMany({
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       include: {
         chapters: {
@@ -160,6 +173,17 @@ export class CoursesService {
         },
       },
     });
+    return rows.map((course: any) => ({
+      ...course,
+      relatedLinks: this.normalizeCourseRelatedLinks(course.relatedLinks),
+      chapters: course.chapters.map((chapter: any) => ({
+        ...chapter,
+        lessons: chapter.lessons.map((lesson: any) => ({
+          ...lesson,
+          trainingAssignment: this.normalizeTrainingAssignment(lesson.trainingAssignment),
+        })),
+      })),
+    }));
   }
 
   async adminCreateCourse(dto: CourseDto) {
@@ -169,6 +193,7 @@ export class CoursesService {
         subtitle: dto.subtitle || null,
         description: dto.description || null,
         coverImage: dto.coverImage || null,
+        relatedLinks: dto.relatedLinks !== undefined ? this.courseRelatedLinksData(dto.relatedLinks, true) : null,
         sortOrder: dto.sortOrder ?? 0,
         status: (dto.status ?? 'DRAFT') as never,
         chapters: {
@@ -192,6 +217,7 @@ export class CoursesService {
         ...(dto.subtitle !== undefined ? { subtitle: dto.subtitle || null } : {}),
         ...(dto.description !== undefined ? { description: dto.description || null } : {}),
         ...(dto.coverImage !== undefined ? { coverImage: dto.coverImage || null } : {}),
+        ...(dto.relatedLinks !== undefined ? { relatedLinks: this.courseRelatedLinksData(dto.relatedLinks, true) } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(dto.status !== undefined ? { status: dto.status as never } : {}),
       },
@@ -351,6 +377,7 @@ export class CoursesService {
       subtitle: course.subtitle,
       description: course.description,
       coverImage: course.coverImage,
+      relatedLinks: this.normalizeCourseRelatedLinks(course.relatedLinks),
       sortOrder: course.sortOrder,
       status: course.status,
       userAccessLevel: isInternal ? 'INTERNAL' : accessLevel,
@@ -368,6 +395,7 @@ export class CoursesService {
           isPreview: lesson.isPreview,
           accessLevel: lesson.accessLevel,
           sortOrder: lesson.sortOrder,
+          trainingAssignment: this.normalizeTrainingAssignment(lesson.trainingAssignment),
           locked: !this.canAccess(accessLevel, lesson.accessLevel as CourseAccessLevel, lesson.isPreview, isInternal),
           lockReason: this.canAccess(accessLevel, lesson.accessLevel as CourseAccessLevel, lesson.isPreview, isInternal)
             ? null
@@ -518,6 +546,7 @@ export class CoursesService {
             title: '体系入门',
             subtitle: '先建立认知，再进入规则训练',
             description: '理解只做一种模式的学习边界、训练闭环和风险约束。',
+            relatedLinks: JSON.stringify(this.defaultCourseRelatedLinks()),
             sortOrder: 10,
             status: 'PUBLISHED' as never,
           },
@@ -526,6 +555,7 @@ export class CoursesService {
             title: '系统课件',
             subtitle: '固定模式的结构化规则库',
             description: '围绕市场结构、趋势判断、入场逻辑、风险控制和多周期分析建立规则框架。',
+            relatedLinks: JSON.stringify(this.defaultCourseRelatedLinks()),
             sortOrder: 20,
             status: 'PUBLISHED' as never,
           },
@@ -534,6 +564,7 @@ export class CoursesService {
             title: '视频教学',
             subtitle: '从讲解到案例拆解',
             description: '通过模式讲解、实战案例、结构拆解和复盘思路，把规则落到具体场景。',
+            relatedLinks: JSON.stringify(this.defaultCourseRelatedLinks()),
             sortOrder: 30,
             status: 'PUBLISHED' as never,
           },
@@ -542,6 +573,7 @@ export class CoursesService {
             title: '指标系统',
             subtitle: '指标只做执行辅助',
             description: '学习指标安装、指标逻辑和常见错误用法，避免把指标当预测工具。',
+            relatedLinks: JSON.stringify(this.defaultCourseRelatedLinks()),
             sortOrder: 40,
             status: 'PUBLISHED' as never,
           },
@@ -550,6 +582,7 @@ export class CoursesService {
             title: '多周期共振提醒',
             subtitle: '提醒是观察辅助，不是喊单',
             description: '理解共振触发逻辑，以及如何与固定模式结合使用。',
+            relatedLinks: JSON.stringify(this.defaultCourseRelatedLinks()),
             sortOrder: 50,
             status: 'PUBLISHED' as never,
           },
@@ -558,6 +591,7 @@ export class CoursesService {
             title: 'K线训练系统',
             subtitle: '从练习到复盘闭环',
             description: '学习如何开始训练、开仓、部分平仓、全部平仓、查看历史和写复盘。',
+            relatedLinks: JSON.stringify(this.defaultCourseRelatedLinks()),
             sortOrder: 60,
             status: 'PUBLISHED' as never,
           },
@@ -586,7 +620,24 @@ export class CoursesService {
 
   private defaultLessons() {
     return [
-      { id: 'lesson_intro_why_one_mode', chapterId: 'chapter_intro_main', title: '为什么只做一种模式', type: 'MIXED', content: '这一课用于说明为什么减少模式数量，反而更容易建立稳定执行。核心不是追求更多信号，而是让每一次交易都能被复盘、比较和修正。', duration: 600, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 10 },
+      {
+        id: 'lesson_intro_why_one_mode',
+        chapterId: 'chapter_intro_main',
+        title: '为什么只做一种模式',
+        type: 'MIXED',
+        content: '这一课用于说明为什么减少模式数量，反而更容易建立稳定执行。核心不是追求更多信号，而是让每一次交易都能被复盘、比较和修正。',
+        duration: 600,
+        isPreview: true,
+        accessLevel: 'PREVIEW',
+        sortOrder: 10,
+        trainingAssignment: JSON.stringify({
+          assignmentSource: 'trial',
+          assignmentId: 'TRIAL-01',
+          assignmentTitle: '免费试学：固定模式识别训练',
+          trainingMode: 'mixed',
+          assignmentVersion: 1,
+        }),
+      },
       { id: 'lesson_intro_learning_guide', chapterId: 'chapter_intro_main', title: '完整体系学习说明', type: 'ARTICLE', content: '建议按 学 → 用 → 练 → 复盘 的顺序推进：先学习规则，再理解指标和提醒的使用边界，然后进入K线训练，最后用历史记录和总结修正执行偏差。', duration: 480, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 20 },
       { id: 'lesson_intro_risk_notice', chapterId: 'chapter_intro_main', title: '风险声明', type: 'ARTICLE', content: '本体系用于交易学习和训练，不提供喊单、带单或收益承诺。任何交易决策都需要自行判断并承担风险。', duration: 360, isPreview: true, accessLevel: 'PREVIEW', sortOrder: 30 },
       { id: 'lesson_system_market_structure', chapterId: 'chapter_system_structure', title: '市场结构', type: 'MIXED', content: '理解市场结构是固定模式的前提。后续可在后台补充课件PDF和视频讲解。', duration: 900, isPreview: false, accessLevel: 'FULL', sortOrder: 10 },
@@ -673,6 +724,97 @@ export class CoursesService {
       ...(dto.accessLevel !== undefined ? { accessLevel: dto.accessLevel as never } : !partial ? { accessLevel: 'FULL' as never } : {}),
       ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : !partial ? { sortOrder: 0 } : {}),
       ...(dto.status !== undefined ? { status: dto.status as CourseStatus as never } : !partial ? { status: 'DRAFT' as never } : {}),
+      ...(dto.trainingAssignment !== undefined ? { trainingAssignment: this.trainingAssignmentData(dto.trainingAssignment) } : {}),
+    };
+  }
+
+  private trainingAssignmentData(value: TrainingAssignment | null | undefined) {
+    const normalized = this.normalizeTrainingAssignment(value);
+    return normalized ? JSON.stringify(normalized) : null;
+  }
+
+  private defaultCourseRelatedLinks(): CourseRelatedLink[] {
+    return [
+      { label: '指标系统说明', href: '/indicators', sortOrder: 10 },
+      { label: '多周期共振提醒', href: '/alerts', sortOrder: 20 },
+    ];
+  }
+
+  private courseRelatedLinksData(value: unknown, strict = false) {
+    const normalized = this.normalizeCourseRelatedLinks(value, strict);
+    return normalized.length > 0 ? JSON.stringify(normalized) : null;
+  }
+
+  private normalizeCourseRelatedLinks(raw: unknown, strict = false): CourseRelatedLink[] {
+    if (raw === null || raw === undefined || raw === '') return [];
+    let value = raw;
+    if (typeof raw === 'string') {
+      try {
+        value = JSON.parse(raw);
+      } catch {
+        if (strict) throw new BadRequestException('相关入口配置不是有效 JSON');
+        return [];
+      }
+    }
+    if (!Array.isArray(value)) {
+      if (strict) throw new BadRequestException('相关入口配置必须是数组');
+      return [];
+    }
+    const links: CourseRelatedLink[] = [];
+    for (const row of value) {
+      if (!row || typeof row !== 'object') continue;
+      const item = row as Record<string, unknown>;
+      const label = typeof item.label === 'string' ? item.label.trim() : '';
+      const href = typeof item.href === 'string' ? item.href.trim() : '';
+      const sortOrderRaw = Number(item.sortOrder ?? links.length * 10 + 10);
+      if (!label || !href) continue;
+      if (!href.startsWith('/') && !href.startsWith('http://') && !href.startsWith('https://')) continue;
+      links.push({
+        label: label.slice(0, 40),
+        href: href.slice(0, 500),
+        sortOrder: Number.isFinite(sortOrderRaw) ? Math.trunc(sortOrderRaw) : links.length * 10 + 10,
+      });
+    }
+    if (strict && value.length > 0 && links.length === 0) {
+      throw new BadRequestException('相关入口配置缺少有效的 label 或 href');
+    }
+    return links.sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 8);
+  }
+
+  private normalizeTrainingAssignment(raw: unknown): TrainingAssignment | null {
+    if (!raw) return null;
+    let value = raw;
+    if (typeof raw === 'string') {
+      try {
+        value = JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    if (!value || typeof value !== 'object') return null;
+    const row = value as Record<string, unknown>;
+    const assignmentSource = row.assignmentSource === 'trial' || row.assignmentSource === 'courseAssignment' ? row.assignmentSource : null;
+    const trainingMode =
+      row.trainingMode === 'mixed' ||
+      row.trainingMode === 'zeroAxis' ||
+      row.trainingMode === 'divergence' ||
+      row.trainingMode === 'synthesis' ||
+      row.trainingMode === 'trend' ||
+      row.trainingMode === 'pullback'
+        ? row.trainingMode
+        : null;
+    const assignmentId = typeof row.assignmentId === 'string' ? row.assignmentId.trim() : '';
+    const assignmentTitle = typeof row.assignmentTitle === 'string' ? row.assignmentTitle.trim() : '';
+    const assignmentVersion = Number(row.assignmentVersion ?? 1);
+    if (!assignmentSource || !trainingMode || !assignmentId || !assignmentTitle || !Number.isInteger(assignmentVersion) || assignmentVersion < 1) {
+      return null;
+    }
+    return {
+      assignmentSource,
+      assignmentId,
+      assignmentTitle,
+      trainingMode,
+      assignmentVersion,
     };
   }
 }

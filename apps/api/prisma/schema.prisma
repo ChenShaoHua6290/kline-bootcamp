@@ -213,6 +213,15 @@ model TrainingSession {
   terminatedAt       DateTime?
   liquidatedAt       DateTime?
   lastActiveAt       DateTime          @default(now())
+  assignmentSource   String?           @map("assignment_source")
+  assignmentId       String?           @map("assignment_id")
+  assignmentTitleSnapshot String?      @map("assignment_title_snapshot")
+  assignmentVersion  Int?              @map("assignment_version")
+  lessonId           String?           @map("lesson_id")
+  lessonTitleSnapshot String?          @map("lesson_title_snapshot")
+  trainingMode       String?           @map("training_mode")
+  attemptNo          Int?              @map("attempt_no")
+  isAssignmentContinuation Boolean?    @map("is_assignment_continuation")
   snapshots          AccountSnapshot[]
   position           Position?
   actions            TrainingAction[]
@@ -222,6 +231,7 @@ model TrainingSession {
   @@index([userId, createdAt])
   @@index([userId, endedAt])
   @@index([userId, status])
+  @@index([userId, assignmentSource])
 }
 
 model TrainingReview {
@@ -426,6 +436,7 @@ model Course {
   subtitle    String?
   description String?
   coverImage  String?         @map("cover_image")
+  relatedLinks Json?           @map("related_links")
   sortOrder   Int             @default(0) @map("sort_order")
   status      CourseStatus    @default(DRAFT)
   createdAt   DateTime        @default(now()) @map("created_at")
@@ -483,6 +494,7 @@ model Lesson {
   accessLevel    CourseAccessLevel   @default(FULL) @map("access_level")
   sortOrder      Int                 @default(0) @map("sort_order")
   status         CourseStatus        @default(DRAFT)
+  trainingAssignment Json?           @map("training_assignment")
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
   chapter        CourseChapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)

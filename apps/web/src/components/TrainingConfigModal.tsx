@@ -48,11 +48,16 @@ export function TrainingConfigModal({
 
   return (
     <div
-        className="fixed inset-0 z-[220] flex items-center justify-center bg-[radial-gradient(circle_at_50%_8%,rgba(6,182,212,0.08),transparent_42%),rgba(2,6,23,0.86)] px-3 py-3"
-      onClick={onClose}
+      className="fixed inset-0 z-[520] flex items-center justify-center bg-[radial-gradient(circle_at_50%_8%,rgba(6,182,212,0.08),transparent_42%),rgba(2,6,23,0.86)] px-3 py-3"
+      role="presentation"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <div
         ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="training-config-title"
         className="relative flex w-[calc(100vw-32px)] max-w-[430px] flex-col rounded-[24px] border border-cyan-500/18 bg-[linear-gradient(145deg,rgba(20,29,45,0.96)_0%,rgba(14,22,38,0.98)_55%,rgba(10,16,29,0.99)_100%)] font-['SF_Pro_Display','PingFang_SC','Hiragino_Sans_GB','Microsoft_YaHei',sans-serif] shadow-[0_0_0_1px_rgba(6,182,212,0.10),0_20px_64px_rgba(0,0,0,0.60)]"
         style={{ transform: `scale(${modalScale})`, transformOrigin: 'center center' }}
         onClick={(e) => e.stopPropagation()}
@@ -67,7 +72,7 @@ export function TrainingConfigModal({
         </button>
 
         <div className="border-b border-slate-700/70 px-5 pb-3.5 pt-4.5 text-center sm:px-6 sm:pb-4 sm:pt-5">
-          <h2 className="mt-2 text-[clamp(1.05rem,1.6vw,1.45rem)] font-semibold leading-tight tracking-[0.01em] text-slate-100">开始训练</h2>
+          <h2 id="training-config-title" className="mt-2 text-[clamp(1.05rem,1.6vw,1.45rem)] font-semibold leading-tight tracking-[0.01em] text-slate-100">开始训练</h2>
           <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-slate-400">选择市场、推进周期和训练长度</p>
         </div>
 

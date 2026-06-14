@@ -19,6 +19,7 @@ import { clearAuthSession, getAuthUser, getToken, type AuthUser } from '@/lib/au
 import type { Session } from '@/types/training';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import type { LessonPlayback } from '@/lib/courses/types';
 
 function translateErrorMessage(raw: string) {
   const text = raw.trim();
@@ -76,8 +77,56 @@ type ProfileStats = {
   };
 };
 
+type PendingAssignment = {
+  assignmentSource: 'trial' | 'courseAssignment';
+  assignmentId: string;
+  assignmentTitle: string;
+  assignmentVersion: number;
+  lessonId: string;
+  lessonTitle: string;
+  trainingMode: string;
+  attemptNo?: number;
+  isAssignmentContinuation?: boolean;
+};
+
+function parsePendingAssignment(params: URLSearchParams): PendingAssignment | null {
+  const assignmentId = params.get('assignmentId')?.trim();
+  const assignmentSource = params.get('assignmentSource')?.trim();
+  if (!assignmentId || (assignmentSource !== 'trial' && assignmentSource !== 'courseAssignment')) return null;
+  const version = Number(params.get('assignmentVersion') ?? 1);
+  const attemptNo = Number(params.get('attemptNo') ?? 1);
+  return {
+    assignmentSource,
+    assignmentId,
+    assignmentTitle: params.get('assignmentTitle')?.trim() || assignmentId,
+    assignmentVersion: Number.isInteger(version) && version > 0 ? version : 1,
+    lessonId: params.get('lessonId')?.trim() || '',
+    lessonTitle: params.get('lessonTitle')?.trim() || '',
+    trainingMode: params.get('trainingMode')?.trim() || 'mixed',
+    attemptNo: Number.isInteger(attemptNo) && attemptNo > 0 ? attemptNo : 1,
+    isAssignmentContinuation: params.get('isAssignmentContinuation') === 'true',
+  };
+}
+
+function pendingAssignmentFromLesson(lesson: LessonPlayback): PendingAssignment | null {
+  const assignment = lesson.trainingAssignment;
+  if (!assignment) return null;
+  return {
+    assignmentSource: assignment.assignmentSource,
+    assignmentId: assignment.assignmentId,
+    assignmentTitle: assignment.assignmentTitle,
+    assignmentVersion: assignment.assignmentVersion,
+    lessonId: lesson.id,
+    lessonTitle: lesson.title,
+    trainingMode: assignment.trainingMode,
+    attemptNo: 1,
+    isAssignmentContinuation: false,
+  };
+}
+
 export default function TrainPage() {
   const [showConfig, setShowConfig] = useState(false);
+  const [pendingAssignment, setPendingAssignment] = useState<PendingAssignment | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message: string; tone?: 'error' | 'warning' | 'info' } | null>(null);
@@ -109,11 +158,24 @@ export default function TrainPage() {
   const pendingLeaveActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const { session, setSession, clearTrainingState, viewTimeframe, setViewTimeframe } = useTrainingStore();
   const router = useRouter();
+
+  const clearAssignmentLaunchContext = () => {
+    setPendingAssignment(null);
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', '/train?start=1');
+  };
+
+  const openFreePracticeConfig = () => {
+    clearAssignmentLaunchContext();
+    setShowConfig(true);
+  };
+
   const continueCurrentTraining = async () => {
     if (startConflictSessionId) {
       const res = await api.get(`/training/${startConflictSessionId}`);
       setSession(normalizeSession(res.data));
     }
+    setPendingAssignment(null);
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', '/train');
     setStartConflictOpen(false);
   };
 
@@ -152,6 +214,40 @@ export default function TrainPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
+    const assignment = parsePendingAssignment(params);
+    if (assignment) {
+      setPendingAssignment(assignment);
+      if (params.get('start') === '1') setShowConfig(true);
+      return;
+    }
+    const lessonId = params.get('lessonId')?.trim();
+    if (lessonId) {
+      api
+        .get<LessonPlayback>(`/lessons/${lessonId}`)
+        .then((res) => {
+          const nextAssignment = pendingAssignmentFromLesson(res.data);
+          if (!nextAssignment) {
+            setNotice({
+              title: '无法开始课程训练',
+              message: '当前课时没有配置训练作业，请从普通训练入口开始。',
+              tone: 'warning',
+            });
+            return;
+          }
+          setPendingAssignment(nextAssignment);
+          if (params.get('start') === '1') setShowConfig(true);
+        })
+        .catch((error: unknown) => {
+          const msg = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+          setNotice({
+            title: '课程训练加载失败',
+            message: normalizeErrorMessage(msg, '课时训练配置加载失败，请返回课程中心重试'),
+            tone: 'warning',
+          });
+        });
+      return;
+    }
+    setPendingAssignment(null);
     if (params.get('start') === '1') setShowConfig(true);
   }, []);
 
@@ -169,6 +265,8 @@ export default function TrainPage() {
     onSuccess: (data) => {
       const normalized = normalizeSession(data);
       setSession(normalized);
+      setPendingAssignment(null);
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', '/train');
       profileStatsQuery.refetch();
     },
     onError: (error: unknown) => {
@@ -190,6 +288,12 @@ export default function TrainPage() {
     onSuccess: (data) => {
       const normalized = normalizeSession(data);
       if (typeof normalized?.pointer === 'number' && normalized.pointer < latestPointerRef.current) {
+        return;
+      }
+      if (normalized?.status && normalized.status !== 'ACTIVE') {
+        setEndSummarySession(normalized);
+        clearClientTrainingState();
+        profileStatsQuery.refetch();
         return;
       }
       setSession(normalized);
@@ -330,6 +434,21 @@ export default function TrainPage() {
     }
     holdBatchActiveRef.current = true;
     actionMutation.mutate(safePayload);
+  };
+
+  const assignmentFromSession = (sourceSession: Session): PendingAssignment | null => {
+    if (!sourceSession.assignmentId || (sourceSession.assignmentSource !== 'trial' && sourceSession.assignmentSource !== 'courseAssignment')) return null;
+    return {
+      assignmentSource: sourceSession.assignmentSource,
+      assignmentId: sourceSession.assignmentId,
+      assignmentTitle: sourceSession.assignmentTitleSnapshot || sourceSession.assignmentId,
+      assignmentVersion: sourceSession.assignmentVersion ?? 1,
+      lessonId: sourceSession.lessonId ?? '',
+      lessonTitle: sourceSession.lessonTitleSnapshot ?? '',
+      trainingMode: sourceSession.trainingMode ?? 'mixed',
+      attemptNo: (sourceSession.attemptNo ?? 1) + 1,
+      isAssignmentContinuation: true,
+    };
   };
 
   useEffect(() => {
@@ -533,9 +652,10 @@ export default function TrainPage() {
         onStart={async () => {
           const active = (await api.get('/training/active')).data as { hasActive: boolean; sessionId: string | null };
           if (!active?.hasActive || !active.sessionId) {
-            setShowConfig(true);
+            openFreePracticeConfig();
             return;
           }
+          clearAssignmentLaunchContext();
           setStartConflictSessionId(active.sessionId);
           setStartConflictOpen(true);
         }}
@@ -572,6 +692,19 @@ export default function TrainPage() {
               trainingBars,
               totalBars: 500 + trainingBars,
               initialVisibleBars: 500,
+              assignmentSource: pendingAssignment ? pendingAssignment.assignmentSource : 'freePractice',
+              ...(pendingAssignment
+                ? {
+                    assignmentId: pendingAssignment.assignmentId,
+                    assignmentTitle: pendingAssignment.assignmentTitle,
+                    assignmentVersion: pendingAssignment.assignmentVersion,
+                    lessonId: pendingAssignment.lessonId,
+                    lessonTitle: pendingAssignment.lessonTitle,
+                    trainingMode: pendingAssignment.trainingMode,
+                    attemptNo: pendingAssignment.attemptNo,
+                    isAssignmentContinuation: pendingAssignment.isAssignmentContinuation,
+                  }
+                : {}),
             });
           }}
         />
@@ -583,7 +716,19 @@ export default function TrainPage() {
           onRestart={() => {
             setNotice(null);
             setEndSummarySession(null);
+            openFreePracticeConfig();
+          }}
+          onContinueAssignment={() => {
+            setNotice(null);
+            setPendingAssignment(assignmentFromSession(endSummarySession));
+            setEndSummarySession(null);
             setShowConfig(true);
+          }}
+          onStartFreePractice={() => {
+            setNotice(null);
+            setPendingAssignment(null);
+            setEndSummarySession(null);
+            openFreePracticeConfig();
           }}
           restarting={startMutation.isPending}
           onBackHome={() => {
@@ -663,7 +808,11 @@ export default function TrainPage() {
             if (startConflictSessionId) await api.post(`/training/${startConflictSessionId}/finish`, { reason: 'terminated' });
             clearClientTrainingState();
             setStartConflictOpen(false);
-            setShowConfig(true);
+            if (pendingAssignment) {
+              setShowConfig(true);
+            } else {
+              openFreePracticeConfig();
+            }
           }}
           maskClosable={false}
         />

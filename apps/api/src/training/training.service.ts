@@ -24,6 +24,7 @@ type BarsPayload = {
 };
 
 type FinalReason = 'completed' | 'terminated' | 'liquidated';
+type AssignmentSource = 'trial' | 'courseAssignment' | 'freePractice';
 
 const CLOSED_SESSION_STATUSES = ['COMPLETED', 'TERMINATED', 'LIQUIDATED', 'ENDED'];
 
@@ -46,6 +47,7 @@ export class TrainingService {
 
   async start(userId: string, dto: StartTrainingDto) {
     await this.canUserTrain(userId);
+    const assignment = this.normalizeAssignmentSnapshot(dto);
     const fixedInitialVisibleBars = 500;
     const trainingBarsRaw = dto.trainingBars ?? dto.totalBars;
     const trainingBars = Math.max(50, Math.min(500, Math.floor(trainingBarsRaw)));
@@ -106,6 +108,15 @@ export class TrainingService {
         completedAt: null,
         terminatedAt: null,
         liquidatedAt: null,
+        assignmentSource: assignment.assignmentSource,
+        assignmentId: assignment.assignmentId,
+        assignmentTitleSnapshot: assignment.assignmentTitleSnapshot,
+        assignmentVersion: assignment.assignmentVersion,
+        lessonId: assignment.lessonId,
+        lessonTitleSnapshot: assignment.lessonTitleSnapshot,
+        trainingMode: assignment.trainingMode,
+        attemptNo: assignment.attemptNo,
+        isAssignmentContinuation: assignment.isAssignmentContinuation,
       },
     });
     await this.increaseDailyTrainingUsage(userId);
@@ -222,11 +233,31 @@ export class TrainingService {
     const skip = (page - 1) * pageSize;
     const from = query.from ? new Date(query.from) : undefined;
     const to = query.to ? new Date(query.to) : undefined;
+    const search = typeof query.q === 'string' ? query.q.trim() : '';
+    const sourceFilter: Prisma.TrainingSessionWhereInput | null =
+      query.assignmentSource === 'freePractice'
+        ? { OR: [{ assignmentSource: 'freePractice' }, { assignmentSource: null }] }
+        : query.assignmentSource
+          ? { assignmentSource: query.assignmentSource }
+          : null;
+    const searchFilter: Prisma.TrainingSessionWhereInput | null = search
+      ? {
+          OR: [
+            { id: { contains: search, mode: 'insensitive' } },
+            { symbol: { contains: search, mode: 'insensitive' } },
+            { assignmentId: { contains: search, mode: 'insensitive' } },
+            { assignmentTitleSnapshot: { contains: search, mode: 'insensitive' } },
+            { lessonId: { contains: search, mode: 'insensitive' } },
+            { lessonTitleSnapshot: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : null;
     const where: Prisma.TrainingSessionWhereInput = {
       userId,
       ...(query.market ? { market: query.market } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(typeof query.isLiquidated === 'boolean' ? { isLiquidated: query.isLiquidated } : {}),
+      ...((sourceFilter || searchFilter) ? { AND: [sourceFilter, searchFilter].filter(Boolean) as Prisma.TrainingSessionWhereInput[] } : {}),
       ...((from || to)
         ? {
             createdAt: {
@@ -263,6 +294,15 @@ export class TrainingService {
           status: true,
           pointer: true,
           viewTimeframe: true,
+          assignmentSource: true,
+          assignmentId: true,
+          assignmentTitleSnapshot: true,
+          assignmentVersion: true,
+          lessonId: true,
+          lessonTitleSnapshot: true,
+          trainingMode: true,
+          attemptNo: true,
+          isAssignmentContinuation: true,
           createdAt: true,
           endedAt: true,
           review: { select: { id: true } },
@@ -300,6 +340,15 @@ export class TrainingService {
         status: s.status,
         pointer: s.pointer,
         viewTimeframe: s.viewTimeframe,
+        assignmentSource: this.assignmentSourceOrDefault(s.assignmentSource),
+        assignmentId: s.assignmentId,
+        assignmentTitleSnapshot: s.assignmentTitleSnapshot,
+        assignmentVersion: s.assignmentVersion,
+        lessonId: s.lessonId,
+        lessonTitleSnapshot: s.lessonTitleSnapshot,
+        trainingMode: s.trainingMode,
+        attemptNo: s.attemptNo,
+        isAssignmentContinuation: Boolean(s.isAssignmentContinuation),
         createdAt: s.createdAt,
         endedAt: s.endedAt,
         hasReview: Boolean(s.review?.id),
@@ -1274,6 +1323,15 @@ export class TrainingService {
       position?: unknown;
       actions?: Array<Record<string, unknown>>;
       snapshots?: Array<Record<string, unknown>>;
+      assignmentSource?: string | null;
+      assignmentId?: string | null;
+      assignmentTitleSnapshot?: string | null;
+      assignmentVersion?: number | null;
+      lessonId?: string | null;
+      lessonTitleSnapshot?: string | null;
+      trainingMode?: string | null;
+      attemptNo?: number | null;
+      isAssignmentContinuation?: boolean | null;
     },
   ) {
     const meta = this.parseBarsPayload(session.barsData, session.drivingTimeframe, session.totalBars);
@@ -1294,6 +1352,8 @@ export class TrainingService {
 
     return {
       ...session,
+      assignmentSource: this.assignmentSourceOrDefault(session.assignmentSource),
+      isAssignmentContinuation: Boolean(session.isAssignmentContinuation),
       pointer: pointerVisible,
       trainPointer: progressPointer,
       contextStartTime: meta.bars[meta.contextStartIndex]?.time ?? null,
@@ -1304,6 +1364,37 @@ export class TrainingService {
       actions: mappedActions,
       snapshots: mappedSnapshots,
     };
+  }
+
+  private normalizeAssignmentSnapshot(dto: StartTrainingDto) {
+    const hasAssignmentId = typeof dto.assignmentId === 'string' && dto.assignmentId.trim().length > 0;
+    const requestedSource = dto.assignmentSource === 'trial' || dto.assignmentSource === 'courseAssignment' || dto.assignmentSource === 'freePractice' ? dto.assignmentSource : undefined;
+    const assignmentSource: AssignmentSource = hasAssignmentId && requestedSource !== 'freePractice' ? requestedSource ?? 'courseAssignment' : 'freePractice';
+    const clean = (value?: string | null) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+    const assignmentId = assignmentSource === 'freePractice' ? null : clean(dto.assignmentId);
+    const lessonId = assignmentSource === 'freePractice' ? null : clean(dto.lessonId);
+    const assignmentTitleSnapshot = assignmentSource === 'freePractice' ? null : clean(dto.assignmentTitleSnapshot) ?? clean(dto.assignmentTitle);
+    const lessonTitleSnapshot = assignmentSource === 'freePractice' ? null : clean(dto.lessonTitleSnapshot) ?? clean(dto.lessonTitle);
+    const assignmentVersion =
+      assignmentSource === 'freePractice' || !Number.isInteger(dto.assignmentVersion) || Number(dto.assignmentVersion) < 1 ? null : Number(dto.assignmentVersion);
+    const trainingMode = assignmentSource === 'freePractice' ? null : clean(dto.trainingMode);
+    const attemptNo = Number.isInteger(dto.attemptNo) && Number(dto.attemptNo) > 0 ? Number(dto.attemptNo) : null;
+    return {
+      assignmentSource,
+      assignmentId,
+      assignmentTitleSnapshot,
+      assignmentVersion,
+      lessonId,
+      lessonTitleSnapshot,
+      trainingMode,
+      attemptNo,
+      isAssignmentContinuation: assignmentSource !== 'freePractice' ? Boolean(dto.isAssignmentContinuation) : false,
+    };
+  }
+
+  private assignmentSourceOrDefault(source?: string | null): AssignmentSource {
+    if (source === 'trial' || source === 'courseAssignment' || source === 'freePractice') return source;
+    return 'freePractice';
   }
 
   private getBarTimestamp(bars: Bar[], index: number) {

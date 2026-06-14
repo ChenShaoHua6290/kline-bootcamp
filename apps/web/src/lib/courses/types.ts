@@ -1,6 +1,22 @@
 export type UserLearningTier = 'trial' | 'paid_training' | 'paid_full' | 'internal' | 'admin';
 export type CourseAccessLevel = 'PREVIEW' | 'TRAINING' | 'FULL' | 'INTERNAL';
 export type LessonType = 'VIDEO' | 'ARTICLE' | 'PDF' | 'MIXED';
+export type AssignmentSource = 'trial' | 'courseAssignment' | 'freePractice';
+export type TrainingMode = 'mixed' | 'zeroAxis' | 'divergence' | 'synthesis' | 'trend' | 'pullback';
+
+export type TrainingAssignment = {
+  assignmentSource: Extract<AssignmentSource, 'trial' | 'courseAssignment'>;
+  assignmentId: string;
+  assignmentTitle: string;
+  trainingMode: TrainingMode;
+  assignmentVersion: number;
+};
+
+export type CourseRelatedLink = {
+  label: string;
+  href: string;
+  sortOrder: number;
+};
 
 export type LessonSummary = {
   id: string;
@@ -12,6 +28,7 @@ export type LessonSummary = {
   sortOrder: number;
   locked: boolean;
   lockReason?: string | null;
+  trainingAssignment?: TrainingAssignment | null;
 };
 
 export type CourseChapter = {
@@ -29,6 +46,7 @@ export type CourseItem = {
   subtitle?: string | null;
   description?: string | null;
   coverImage?: string | null;
+  relatedLinks?: CourseRelatedLink[];
   sortOrder: number;
   status: string;
   chapters: CourseChapter[];
@@ -60,9 +78,25 @@ export type LessonPlayback = {
   duration?: number | null;
   isPreview: boolean;
   accessLevel: CourseAccessLevel;
+  trainingAssignment?: TrainingAssignment | null;
   prevLessonId?: string | null;
   nextLessonId?: string | null;
 };
+
+export function buildTrainingAssignmentHref(lesson: {
+  id: string;
+  title: string;
+  courseTitle?: string | null;
+  trainingAssignment?: TrainingAssignment | null;
+}) {
+  const assignment = lesson.trainingAssignment;
+  if (!assignment) return '/train?start=1';
+  const params = new URLSearchParams({
+    start: '1',
+    lessonId: lesson.id,
+  });
+  return `/train?${params.toString()}`;
+}
 
 export function formatDuration(seconds?: number | null) {
   if (!seconds || seconds <= 0) return '--';

@@ -3,6 +3,9 @@ import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, Is
 import { MARKET_VALUES, type Market } from '../common/domain-enums';
 import { REAL_MARKET_TIMEFRAMES } from '../market-data/timeframes';
 
+const ASSIGNMENT_SOURCE_VALUES = ['trial', 'courseAssignment', 'freePractice'] as const;
+const TRAINING_MODE_VALUES = ['mixed', 'zeroAxis', 'divergence', 'synthesis', 'trend', 'pullback'] as const;
+
 export class StartTrainingDto {
   @IsIn(MARKET_VALUES)
   market!: Market;
@@ -31,6 +34,67 @@ export class StartTrainingDto {
   @IsNumber()
   @Min(0.01)
   initialBalance?: number;
+
+  @IsOptional()
+  @IsIn(ASSIGNMENT_SOURCE_VALUES)
+  assignmentSource?: 'trial' | 'courseAssignment' | 'freePractice';
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(80)
+  assignmentId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(160)
+  assignmentTitle?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(160)
+  assignmentTitleSnapshot?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  assignmentVersion?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(120)
+  lessonId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(160)
+  lessonTitle?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(160)
+  lessonTitleSnapshot?: string;
+
+  @IsOptional()
+  @IsIn(TRAINING_MODE_VALUES)
+  trainingMode?: 'mixed' | 'zeroAxis' | 'divergence' | 'synthesis' | 'trend' | 'pullback';
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  attemptNo?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  isAssignmentContinuation?: boolean;
 }
 
 export class TrainingActionDto {
@@ -142,4 +206,14 @@ export class HistoryQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @IsOptional()
+  @IsIn(ASSIGNMENT_SOURCE_VALUES)
+  assignmentSource?: 'trial' | 'courseAssignment' | 'freePractice';
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(120)
+  q?: string;
 }

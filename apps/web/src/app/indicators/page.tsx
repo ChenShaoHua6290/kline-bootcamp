@@ -66,13 +66,13 @@ export default function IndicatorsPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_34%),#020617] text-slate-100">
-      <header className="border-b border-slate-800/90 bg-slate-950/75 px-4 py-4 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-3">
-          <div>
-            <PageTitle>指标系统说明</PageTitle>
-            <PageDescription>指标不是预测工具，而是固定模式的执行辅助工具。</PageDescription>
+      <header className="app-nav">
+        <div className="app-nav-row max-w-[1120px]">
+          <div className="app-nav-heading">
+            <PageTitle className="!text-lg sm:!text-xl">指标系统说明</PageTitle>
+            <PageDescription className="app-nav-description">指标不是预测工具，而是固定模式的执行辅助工具。</PageDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="app-nav-actions">
             <Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>
             <Link href="/alerts"><Button size="sm" variant="primary">查看共振提醒</Button></Link>
           </div>

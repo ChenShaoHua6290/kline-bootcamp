@@ -41,8 +41,8 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
   return (
     <main className="min-h-screen p-3 sm:p-4">
       <header className="app-nav mb-4">
-        <div className="flex items-center justify-between gap-3">
-          <PageTitle className="text-lg sm:text-xl">{title}</PageTitle>
+        <div className="app-nav-row">
+          <PageTitle className="!text-lg sm:!text-xl">{title}</PageTitle>
           <Link href="/" className="shrink-0">
             <Button variant="ghost" size='sm' className="hover:shadow-[0_8px_20px_rgba(2,132,199,0.22)]">返回首页</Button>
           </Link>

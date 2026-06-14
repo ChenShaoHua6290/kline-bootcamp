@@ -31,21 +31,6 @@ npm run dev:down
 ---
 
 
-## 零依赖一键启动（无 Docker / 无 PostgreSQL / 无 Redis）
-
-如果你本机没有 Docker、PostgreSQL、Redis，可以使用 Lite 模式（SQLite 本地文件）：
-
-```bash
-npm run dev:up:lite
-```
-
-Lite 模式说明：
-- 使用 `apps/api/prisma/schema.sqlite.prisma`
-- 本地数据库文件：`apps/api/prisma/dev.db`
-- Redis 不强依赖（服务内已做降级）
-
----
-
 ## 无 Docker 一键启动
 
 如果你本机没有 Docker，请先安装并启动：
@@ -84,14 +69,9 @@ SMTP_PASS=""
 SMTP_FROM=""
 ```
 
-3. Prisma（按环境选择）
+3. Prisma
 ```bash
-# Lite / SQLite（本地开发默认）
-npm run prisma:generate:sqlite -w @kline/api
-npm run prisma:push:sqlite -w @kline/api
-
-# PostgreSQL（联调/部署）
-npm run prisma:generate:pg -w @kline/api
+npm run prisma:generate -w @kline/api
 npm run prisma:migrate:dev:pg -w @kline/api
 ```
 

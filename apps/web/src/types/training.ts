@@ -1,5 +1,14 @@
 export type Session = {
   id: string;
+  assignmentSource?: 'trial' | 'courseAssignment' | 'freePractice';
+  assignmentId?: string | null;
+  assignmentTitleSnapshot?: string | null;
+  assignmentVersion?: number | null;
+  lessonId?: string | null;
+  lessonTitleSnapshot?: string | null;
+  trainingMode?: string | null;
+  attemptNo?: number | null;
+  isAssignmentContinuation?: boolean;
   market: string;
   symbol: string;
   symbolDisplayName?: string | null;

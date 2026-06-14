@@ -92,6 +92,7 @@ export default function HistoryReviewPage() {
   const adminUserId = searchParams.get('adminUserId')?.trim() ?? '';
   const from = searchParams.get('from')?.trim() ?? '';
   const label = searchParams.get('label')?.trim() ?? '';
+  const backQueryString = searchParams.toString();
   const isAdminView = Boolean(adminUserId);
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<{ open: boolean; message: string; tone: 'success' | 'error' | 'info' }>({
@@ -193,17 +194,19 @@ export default function HistoryReviewPage() {
   const highlightedActionId = activeTradeId ? tradeActionMap.get(activeTradeId)?.closeId ?? tradeActionMap.get(activeTradeId)?.openId : null;
 
   return (
-    <main className="min-h-screen overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] p-3 text-slate-100 xl:h-screen xl:overflow-hidden sm:p-3">
-      <div className="mx-auto flex w-full min-h-0 flex-col gap-3 xl:h-full">
-        <div className="flex min-h-8 shrink-0 items-center justify-between">
-          <PageTitle className="text-sm sm:text-base">训练复盘详情</PageTitle>
-          <Link href={isAdminView ? `/history?adminUserId=${encodeURIComponent(adminUserId)}&from=${encodeURIComponent(from)}&label=${encodeURIComponent(label)}` : '/history'}>
+    <main className="flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_38%),#020617] text-slate-100 xl:h-dvh xl:overflow-hidden">
+      <header className="app-nav shrink-0">
+        <div className="app-nav-row">
+          <PageTitle className="!text-lg sm:!text-xl">训练复盘详情</PageTitle>
+          <Link href={backQueryString ? `/history?${backQueryString}` : '/history'}>
             <Button variant="default" size="sm">返回历史记录</Button>
           </Link>
         </div>
+      </header>
 
+      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 p-3 sm:p-3">
         <div className="grid min-h-0 min-w-0 grid-cols-1 gap-3 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(380px,32vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,30vw)]">
-          <Card className="h-full min-h-0 min-w-0 p-2">
+          <Card className="h-[clamp(340px,calc(100dvh-76px),680px)] min-h-0 min-w-0 overflow-hidden p-2 xl:h-full">
             <ReplayChart
               data={visibleBars}
               actions={chartActions}

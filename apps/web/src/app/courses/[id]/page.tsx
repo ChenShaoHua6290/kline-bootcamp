@@ -13,7 +13,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { PageDescription, PageTitle } from '@/components/ui/PageHeader';
 import { MarkdownRenderer } from '@/components/markdown/MarkdownRenderer';
-import { CourseItem, formatDuration } from '@/lib/courses/types';
+import { CourseItem, buildTrainingAssignmentHref, formatDuration } from '@/lib/courses/types';
 
 function typeLabel(type: string) {
   if (type === 'VIDEO') return '视频';
@@ -69,16 +69,17 @@ export default function CourseDetailPage() {
   }
 
   const hasCourseDescription = Boolean(course.description?.trim());
+  const relatedLinks = (course.relatedLinks ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder).filter((item) => item.label.trim() && item.href.trim());
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_34%),#020617] text-slate-100">
-      <header className="border-b border-slate-800/90 bg-slate-950/75 px-4 py-4 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-3">
-          <div>
-            <PageTitle>{course.title}</PageTitle>
-            <PageDescription>{course.subtitle || '课程详情'}</PageDescription>
+      <header className="app-nav">
+        <div className="app-nav-row max-w-[1120px]">
+          <div className="app-nav-heading">
+            <PageTitle className="!text-lg sm:!text-xl">{course.title}</PageTitle>
+            <PageDescription className="app-nav-description">{course.subtitle || '课程详情'}</PageDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="app-nav-actions">
             <Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>
           </div>
         </div>
@@ -104,7 +105,7 @@ export default function CourseDetailPage() {
               {courseMeta.lessons.length > 0 ? (
                 <div className="divide-y divide-slate-800/80">
                   {courseMeta.lessons.map((lesson, index) => (
-                    <div key={lesson.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[44px_minmax(0,1fr)_96px] sm:items-center">
+                    <div key={lesson.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center">
                       <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-950/45 text-xs text-slate-400">
                         {String(index + 1).padStart(2, '0')}
                       </div>
@@ -115,11 +116,27 @@ export default function CourseDetailPage() {
                         </div>
                         <div className="mt-1 text-xs text-slate-500">{typeLabel(lesson.type)} · {formatDuration(lesson.duration)}</div>
                       </div>
-                      {lesson.locked ? (
-                        <Button className="w-full" size="sm" variant="ghost" disabled title={lesson.lockReason ?? undefined}>权限不足</Button>
-                      ) : (
-                        <Link href={`/lessons/${lesson.id}`}><Button className="w-full" size="sm" variant="primary">学习</Button></Link>
-                      )}
+                      <div className="flex flex-wrap gap-2 sm:justify-end">
+                        {lesson.locked ? (
+                          <Button className="w-full sm:w-auto" size="sm" variant="ghost" disabled title={lesson.lockReason ?? undefined}>权限不足</Button>
+                        ) : (
+                          <>
+                            <Link href={`/lessons/${lesson.id}`}><Button className="w-full sm:w-auto" size="sm" variant="primary">学习</Button></Link>
+                            {lesson.trainingAssignment ? (
+                              <Link href={buildTrainingAssignmentHref(lesson)}>
+                                <Button
+                                  className="w-full border-cyan-400/55 bg-cyan-500/15 text-cyan-100 shadow-[0_10px_22px_rgba(6,182,212,0.12)] hover:border-cyan-300/80 hover:bg-cyan-500/25 hover:text-white sm:w-auto"
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+                                  {lesson.trainingAssignment.assignmentTitle}
+                                </Button>
+                              </Link>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -136,14 +153,24 @@ export default function CourseDetailPage() {
             <p className="mt-2 text-sm leading-6 text-cyan-100/80">先按课时顺序理解规则，再进入训练系统验证执行。课程内容只负责建立判断框架，真正的掌握来自训练和复盘。</p>
           </Card>
 
-          <Card className="border-slate-700/80 bg-slate-900/70 p-4">
-            <div className="text-sm font-semibold text-slate-100">相关入口</div>
-            <div className="mt-3 grid gap-2">
-              <Link href="/indicators"><Button className="w-full justify-start" variant="ghost">指标系统说明</Button></Link>
-              <Link href="/alerts"><Button className="w-full justify-start" variant="ghost">多周期共振提醒</Button></Link>
-              <Link href="/train?start=1"><Button className="w-full justify-start" variant="ghost">开始K线训练</Button></Link>
-            </div>
-          </Card>
+          {relatedLinks.length > 0 ? (
+            <Card className="border-slate-700/80 bg-slate-900/70 p-4">
+              <div className="text-sm font-semibold text-slate-100">相关入口</div>
+              <div className="mt-3 grid gap-2">
+                {relatedLinks.map((item) => (
+                  item.href.startsWith('http') ? (
+                    <a key={`${item.label}-${item.href}`} href={item.href} target="_blank" rel="noreferrer">
+                      <Button className="w-full justify-start" variant="ghost">{item.label}</Button>
+                    </a>
+                  ) : (
+                    <Link key={`${item.label}-${item.href}`} href={item.href}>
+                      <Button className="w-full justify-start" variant="ghost">{item.label}</Button>
+                    </Link>
+                  )
+                ))}
+              </div>
+            </Card>
+          ) : null}
         </aside>
       </section>
     </main>

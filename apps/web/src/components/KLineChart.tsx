@@ -1840,7 +1840,7 @@ export function KLineChart({
   }, [focusDataIndex, data]);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-0">
+    <div className={`flex h-full min-w-0 flex-col gap-0 ${fitContainerHeight ? 'min-h-[320px] sm:min-h-[360px] xl:min-h-0' : 'min-h-0'}`}>
       <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-xl border border-slate-700/60 bg-slate-900/65 p-1 text-[11px]">
         <span className="mr-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-[11px] font-semibold text-slate-900">TRAIN</span>
         {periods.map((p) => (

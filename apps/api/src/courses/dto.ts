@@ -1,9 +1,11 @@
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 
 const COURSE_STATUS_VALUES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
 const COURSE_ACCESS_VALUES = ['PREVIEW', 'TRAINING', 'FULL', 'INTERNAL'] as const;
 const LESSON_TYPE_VALUES = ['VIDEO', 'ARTICLE', 'PDF', 'MIXED'] as const;
+const ASSIGNMENT_SOURCE_VALUES = ['trial', 'courseAssignment'] as const;
+const TRAINING_MODE_VALUES = ['mixed', 'zeroAxis', 'divergence', 'synthesis', 'trend', 'pullback'] as const;
 
 function trimText(value: unknown) {
   return typeof value === 'string' ? value.trim() : value;
@@ -32,6 +34,9 @@ export class CourseDto {
   @IsString()
   @MaxLength(500)
   coverImage?: string;
+
+  @IsOptional()
+  relatedLinks?: unknown;
 
   @IsOptional()
   @IsInt()
@@ -66,6 +71,9 @@ export class UpdateCourseDto {
   @IsString()
   @MaxLength(500)
   coverImage?: string;
+
+  @IsOptional()
+  relatedLinks?: unknown;
 
   @IsOptional()
   @IsInt()
@@ -117,6 +125,28 @@ export class UpdateChapterDto {
   @IsOptional()
   @IsIn(COURSE_STATUS_VALUES)
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+}
+
+export class TrainingAssignmentDto {
+  @IsIn(ASSIGNMENT_SOURCE_VALUES)
+  assignmentSource!: 'trial' | 'courseAssignment';
+
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(80)
+  assignmentId!: string;
+
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(160)
+  assignmentTitle!: string;
+
+  @IsIn(TRAINING_MODE_VALUES)
+  trainingMode!: 'mixed' | 'zeroAxis' | 'divergence' | 'synthesis' | 'trend' | 'pullback';
+
+  @IsInt()
+  @Min(1)
+  assignmentVersion!: number;
 }
 
 export class LessonDto {
@@ -183,6 +213,11 @@ export class LessonDto {
   @IsOptional()
   @IsIn(COURSE_STATUS_VALUES)
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TrainingAssignmentDto)
+  trainingAssignment?: TrainingAssignmentDto | null;
 }
 
 export class UpdateLessonDto {
@@ -251,4 +286,9 @@ export class UpdateLessonDto {
   @IsOptional()
   @IsIn(COURSE_STATUS_VALUES)
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TrainingAssignmentDto)
+  trainingAssignment?: TrainingAssignmentDto | null;
 }

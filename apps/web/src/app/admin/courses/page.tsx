@@ -16,7 +16,7 @@ import { Select } from '@/components/ui/Select';
 import { Toast } from '@/components/ui/Toast';
 import { PageDescription, PageHeader, PageTitle } from '@/components/ui/PageHeader';
 import { MarkdownEditor } from '@/components/markdown/MarkdownEditor';
-import { CourseAccessLevel, LessonType, effectiveAccessLevel, formatAccessLevel, formatDuration } from '@/lib/courses/types';
+import { CourseAccessLevel, CourseRelatedLink, LessonType, TrainingAssignment, effectiveAccessLevel, formatAccessLevel, formatDuration } from '@/lib/courses/types';
 
 type AdminLesson = {
   id: string;
@@ -32,6 +32,7 @@ type AdminLesson = {
   accessLevel: CourseAccessLevel;
   sortOrder: number;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  trainingAssignment?: TrainingAssignment | null;
 };
 type AdminChapter = {
   id: string;
@@ -47,6 +48,7 @@ type AdminCourse = {
   subtitle?: string | null;
   description?: string | null;
   coverImage?: string | null;
+  relatedLinks?: CourseRelatedLink[];
   sortOrder: number;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   chapters: AdminChapter[];
@@ -56,6 +58,7 @@ type CourseForm = {
   subtitle: string;
   description: string;
   coverImage: string;
+  relatedLinks: CourseRelatedLink[];
   sortOrder: number;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 };
@@ -69,6 +72,7 @@ type LessonForm = {
   accessLevel: CourseAccessLevel;
   sortOrder: number;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  trainingAssignment: string;
 };
 type EditorTarget = 'course' | 'lesson';
 type DeleteTarget =
@@ -81,8 +85,51 @@ type UploadedCourseAsset = {
   originalName: string;
   size: number;
 };
+type RelatedLinkOption = {
+  label: string;
+  href: string;
+  optionLabel?: string;
+};
+type RelatedLinkOptionSection = {
+  title: string;
+  options: RelatedLinkOption[];
+};
 
-const emptyCourse: CourseForm = { title: '', subtitle: '', description: '', coverImage: '', sortOrder: 0, status: 'DRAFT' };
+const defaultRelatedLinks: CourseRelatedLink[] = [
+  { label: '指标系统说明', href: '/indicators', sortOrder: 10 },
+  { label: '多周期共振提醒', href: '/alerts', sortOrder: 20 },
+];
+
+const commonRelatedLinkOptions: RelatedLinkOption[] = [
+  { label: '课程中心', href: '/courses' },
+  { label: '开始训练', href: '/train' },
+  { label: '历史训练记录', href: '/history' },
+  { label: '指标系统说明', href: '/indicators' },
+  { label: '多周期共振提醒', href: '/alerts' },
+  { label: '常见问题', href: '/faq' },
+  { label: '官方公告', href: '/official' },
+];
+
+function cloneRelatedLinks(value?: CourseRelatedLink[] | null) {
+  return (value ?? []).map((item, index) => ({
+    label: item.label,
+    href: item.href,
+    sortOrder: Number.isFinite(Number(item.sortOrder)) ? Math.trunc(Number(item.sortOrder)) : index * 10 + 10,
+  }));
+}
+
+function createEmptyCourse(): CourseForm {
+  return {
+    title: '',
+    subtitle: '',
+    description: '',
+    coverImage: '',
+    relatedLinks: cloneRelatedLinks(defaultRelatedLinks),
+    sortOrder: 0,
+    status: 'DRAFT',
+  };
+}
+
 const emptyLesson: LessonForm = {
   title: '',
   type: 'MIXED',
@@ -93,6 +140,7 @@ const emptyLesson: LessonForm = {
   accessLevel: 'FULL',
   sortOrder: 0,
   status: 'DRAFT',
+  trainingAssignment: '',
 };
 
 function statusBadge(status: string) {
@@ -145,6 +193,63 @@ function deleteTargetDescription(target: DeleteTarget | null) {
     return `这会同时删除 ${courseLessonCount(target.row)} 个课时，以及这些课时对应的用户学习进度。`;
   }
   return '这会同时删除该课时对应的用户学习进度。';
+}
+
+function formatTrainingAssignment(value?: TrainingAssignment | null) {
+  return value ? JSON.stringify(value, null, 2) : '';
+}
+
+function normalizeRelatedLinks(value: CourseRelatedLink[]) {
+  return value
+    .map((item, index) => ({
+      label: item.label.trim(),
+      href: item.href.trim(),
+      sortOrder: Number.isFinite(Number(item.sortOrder)) ? Math.trunc(Number(item.sortOrder)) : index * 10 + 10,
+    }))
+    .filter((item) => item.label && item.href);
+}
+
+function nextRelatedLinkSortOrder(value: CourseRelatedLink[]) {
+  const maxSortOrder = value.reduce((max, item) => (Number.isFinite(Number(item.sortOrder)) ? Math.max(max, Number(item.sortOrder)) : max), 0);
+  return Math.max(10, Math.trunc(maxSortOrder / 10) * 10 + 10);
+}
+
+function buildRelatedLinkSections(courses: AdminCourse[]): RelatedLinkOptionSection[] {
+  const courseOptions = courses.map((course) => ({
+    label: course.title,
+    href: `/courses/${course.id}`,
+    optionLabel: `${course.title} · 课程详情`,
+  }));
+  const lessonOptions = courses.flatMap((course) =>
+    course.chapters.flatMap((chapter) =>
+      chapter.lessons.map((lesson) => ({
+        label: lesson.title,
+        href: `/lessons/${lesson.id}`,
+        optionLabel: `${course.title} / ${lesson.title}`,
+      })),
+    ),
+  );
+  return [
+    { title: '常用页面', options: commonRelatedLinkOptions },
+    { title: '课程详情', options: courseOptions },
+    { title: '课时详情', options: lessonOptions },
+  ].filter((section) => section.options.length > 0);
+}
+
+function parseTrainingAssignmentText(value: string) {
+  const text = value.trim();
+  if (!text) return null;
+  const parsed = JSON.parse(text) as Partial<TrainingAssignment>;
+  if (
+    (parsed.assignmentSource !== 'trial' && parsed.assignmentSource !== 'courseAssignment') ||
+    !parsed.assignmentId ||
+    !parsed.assignmentTitle ||
+    !parsed.trainingMode ||
+    !Number.isInteger(parsed.assignmentVersion)
+  ) {
+    throw new Error('训练作业配置格式不完整');
+  }
+  return parsed;
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -254,7 +359,7 @@ export default function AdminCoursesPage() {
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [editingCourse, setEditingCourse] = useState<CourseForm>(emptyCourse);
+  const [editingCourse, setEditingCourse] = useState<CourseForm>(() => createEmptyCourse());
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<LessonForm>(emptyLesson);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
@@ -276,6 +381,7 @@ export default function AdminCoursesPage() {
   const allLessons = useMemo(() => courses.flatMap((course) => course.chapters.flatMap((chapter) => chapter.lessons)), [courses]);
   const editingCourseRow = useMemo(() => courses.find((course) => course.id === editingCourseId) ?? null, [courses, editingCourseId]);
   const editingLessonRow = useMemo(() => allLessons.find((lesson) => lesson.id === editingLessonId) ?? null, [allLessons, editingLessonId]);
+  const relatedLinkSections = useMemo(() => buildRelatedLinkSections(courses), [courses]);
 
   const reload = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
@@ -334,13 +440,14 @@ export default function AdminCoursesPage() {
 
   const saveCourseMutation = useMutation({
     mutationFn: async () => {
-      const body = { ...editingCourse, sortOrder: Number(editingCourse.sortOrder) || 0 };
+      const relatedLinks = normalizeRelatedLinks(editingCourse.relatedLinks);
+      const body = { ...editingCourse, relatedLinks, sortOrder: Number(editingCourse.sortOrder) || 0 };
       if (editingCourseId) return (await api.patch(`/admin/courses/${editingCourseId}`, body)).data;
       return (await api.post('/admin/courses', body)).data;
     },
     onSuccess: () => {
       setToast({ open: true, message: editingCourseId ? '课程已更新' : '课程已创建', tone: 'success' });
-      setEditingCourse(emptyCourse);
+      setEditingCourse(createEmptyCourse());
       setEditingCourseId(null);
       setActiveEditor('course');
       reload();
@@ -352,6 +459,12 @@ export default function AdminCoursesPage() {
     mutationFn: async () => {
       if (!selectedCourse) throw new Error('请选择课程');
       const isVideoLesson = editingLesson.type === 'VIDEO' || editingLesson.type === 'MIXED';
+      let trainingAssignment: ReturnType<typeof parseTrainingAssignmentText>;
+      try {
+        trainingAssignment = parseTrainingAssignmentText(editingLesson.trainingAssignment);
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : '训练作业配置格式错误');
+      }
       const body = {
         ...editingLesson,
         videoProvider: isVideoLesson && editingLesson.videoFileId ? 'tencent-vod' : '',
@@ -361,6 +474,7 @@ export default function AdminCoursesPage() {
         duration: Number(editingLesson.duration) || 0,
         isPreview: editingLesson.accessLevel === 'PREVIEW',
         sortOrder: Number(editingLesson.sortOrder) || 0,
+        trainingAssignment,
       };
       if (editingLessonId) return (await api.patch(`/admin/lessons/${editingLessonId}`, body)).data;
       return (await api.post(`/admin/courses/${selectedCourse.id}/lessons`, body)).data;
@@ -386,7 +500,7 @@ export default function AdminCoursesPage() {
           setSelectedCourseId(null);
         }
         if (editingCourseId === target.row.id) {
-          setEditingCourse(emptyCourse);
+          setEditingCourse(createEmptyCourse());
           setEditingCourseId(null);
         }
         setEditingLesson(emptyLesson);
@@ -418,6 +532,7 @@ export default function AdminCoursesPage() {
       subtitle: course.subtitle ?? '',
       description: course.description ?? '',
       coverImage: course.coverImage ?? '',
+      relatedLinks: cloneRelatedLinks(course.relatedLinks),
       sortOrder: course.sortOrder,
       status: course.status as CourseForm['status'],
     });
@@ -435,11 +550,12 @@ export default function AdminCoursesPage() {
       accessLevel: effectiveAccessLevel(lesson.accessLevel, lesson.isPreview),
       sortOrder: lesson.sortOrder,
       status: lesson.status,
+      trainingAssignment: formatTrainingAssignment(lesson.trainingAssignment),
     });
   };
 
   const startCreateCourse = () => {
-    setEditingCourse(emptyCourse);
+    setEditingCourse(createEmptyCourse());
     setEditingCourseId(null);
     setActiveEditor('course');
   };
@@ -447,6 +563,45 @@ export default function AdminCoursesPage() {
     setEditingLesson(emptyLesson);
     setEditingLessonId(null);
     setActiveEditor('lesson');
+  };
+
+  const resolveRelatedLinkOption = (value: string) => {
+    const [sectionIndexText, optionIndexText] = value.split(':');
+    const sectionIndex = Number(sectionIndexText);
+    const optionIndex = Number(optionIndexText);
+    if (!Number.isInteger(sectionIndex) || !Number.isInteger(optionIndex)) return null;
+    return relatedLinkSections[sectionIndex]?.options[optionIndex] ?? null;
+  };
+  const addRelatedLink = (option?: RelatedLinkOption) => {
+    setEditingCourse((prev) => ({
+      ...prev,
+      relatedLinks: [
+        ...prev.relatedLinks,
+        {
+          label: option?.label ?? '',
+          href: option?.href ?? '',
+          sortOrder: nextRelatedLinkSortOrder(prev.relatedLinks),
+        },
+      ],
+    }));
+  };
+  const updateRelatedLink = (index: number, patch: Partial<CourseRelatedLink>) => {
+    setEditingCourse((prev) => ({
+      ...prev,
+      relatedLinks: prev.relatedLinks.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    }));
+  };
+  const removeRelatedLink = (index: number) => {
+    setEditingCourse((prev) => ({
+      ...prev,
+      relatedLinks: prev.relatedLinks.filter((_item, itemIndex) => itemIndex !== index),
+    }));
+  };
+  const applyDefaultRelatedLinks = () => {
+    setEditingCourse((prev) => ({ ...prev, relatedLinks: cloneRelatedLinks(defaultRelatedLinks) }));
+  };
+  const clearRelatedLinks = () => {
+    setEditingCourse((prev) => ({ ...prev, relatedLinks: [] }));
   };
 
   const submitCourse = (e: FormEvent) => {
@@ -591,6 +746,7 @@ export default function AdminCoursesPage() {
                               <span className="truncate text-sm font-medium text-slate-100">{lesson.title}</span>
                               <Badge>{lessonTypeLabel(lesson.type)}</Badge>
                               {lesson.isPreview ? <Badge tone="success">试看</Badge> : null}
+                              {lesson.trainingAssignment ? <Badge tone={lesson.trainingAssignment.assignmentSource === 'trial' ? 'success' : 'info'}>训练作业</Badge> : null}
                               {lesson.status !== 'PUBLISHED' ? statusBadge(lesson.status) : null}
                             </div>
                             <div className="mt-1.5 text-xs text-slate-500">{formatAccessLevel(effectiveAccessLevel(lesson.accessLevel, lesson.isPreview))} · {formatDuration(lesson.duration)} · 排序 {lesson.sortOrder}</div>
@@ -648,6 +804,78 @@ export default function AdminCoursesPage() {
                     ) : null}
                   </Field>
                   <Field label="课程简介"><textarea className="app-input min-h-[86px] w-full rounded-xl px-3 py-2 text-sm" value={editingCourse.description} onChange={(e) => setEditingCourse((p) => ({ ...p, description: e.target.value }))} placeholder="课程简介" /></Field>
+                  <Field label="相关入口" hint="可选择常用页面、课程或课时">
+                    <div className="space-y-2 rounded-xl border border-slate-700/70 bg-slate-950/35 p-2.5">
+                      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                        <Select
+                          value=""
+                          onChange={(event) => {
+                            const option = resolveRelatedLinkOption(event.target.value);
+                            if (option) addRelatedLink(option);
+                          }}
+                        >
+                          <option value="">选择入口并添加</option>
+                          {relatedLinkSections.map((section, sectionIndex) => (
+                            <optgroup key={section.title} label={section.title}>
+                              {section.options.map((option, optionIndex) => (
+                                <option key={`${section.title}-${option.href}-${optionIndex}`} value={`${sectionIndex}:${optionIndex}`}>
+                                  {option.optionLabel ?? `${option.label} · ${option.href}`}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </Select>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => addRelatedLink()}>
+                            自定义
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={applyDefaultRelatedLinks}>
+                            默认
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={clearRelatedLinks}>
+                            清空
+                          </Button>
+                        </div>
+                      </div>
+
+                      {editingCourse.relatedLinks.length > 0 ? (
+                        <div className="space-y-2">
+                          {editingCourse.relatedLinks.map((item, index) => (
+                            <div key={`${item.href}-${index}`} className="rounded-xl border border-slate-800 bg-slate-900/65 p-2">
+                              <div className="grid gap-2 lg:grid-cols-[minmax(110px,0.8fr)_minmax(180px,1.2fr)_84px_auto]">
+                                <Input
+                                  value={item.label}
+                                  onChange={(event) => updateRelatedLink(index, { label: event.target.value })}
+                                  placeholder="展示名称"
+                                  aria-label="相关入口名称"
+                                />
+                                <Input
+                                  value={item.href}
+                                  onChange={(event) => updateRelatedLink(index, { href: event.target.value })}
+                                  placeholder="/history 或 https://..."
+                                  aria-label="相关入口路径"
+                                />
+                                <Input
+                                  type="number"
+                                  value={item.sortOrder}
+                                  onChange={(event) => updateRelatedLink(index, { sortOrder: Number(event.target.value) || 0 })}
+                                  placeholder="排序"
+                                  aria-label="相关入口排序"
+                                />
+                                <ActionIconButton label="删除入口" tone="danger" onClick={() => removeRelatedLink(index)}>
+                                  <TrashIcon />
+                                </ActionIconButton>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-slate-700/80 px-3 py-3 text-center text-xs text-slate-500">
+                          当前课程不会展示相关入口。
+                        </div>
+                      )}
+                    </div>
+                  </Field>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Field label="排序"><Input type="number" value={editingCourse.sortOrder} onChange={(e) => setEditingCourse((p) => ({ ...p, sortOrder: Number(e.target.value) || 0 }))} /></Field>
                     <Field label="状态">
@@ -719,6 +947,22 @@ export default function AdminCoursesPage() {
                         {uploadingPdf ? '上传中...' : '上传PDF'}
                       </Button>
                     </div>
+                  </Field>
+                  <Field label="训练作业配置 JSON" hint="留空则不显示开始训练">
+                    <textarea
+                      value={editingLesson.trainingAssignment}
+                      onChange={(e) => setEditingLesson((p) => ({ ...p, trainingAssignment: e.target.value }))}
+                      className="min-h-[132px] w-full rounded-xl border border-slate-700 bg-slate-950/65 px-3 py-2 font-mono text-xs leading-5 text-slate-100 outline-none transition focus:border-cyan-400"
+                      placeholder={[
+                        '{',
+                        '  "assignmentSource": "trial",',
+                        '  "assignmentId": "TRIAL-01",',
+                        '  "assignmentTitle": "免费试学：固定模式识别训练",',
+                        '  "trainingMode": "mixed",',
+                        '  "assignmentVersion": 1',
+                        '}',
+                      ].join('\n')}
+                    />
                   </Field>
                   <div className="grid gap-2 sm:grid-cols-3">
                     <Field label="时长秒"><Input type="number" value={editingLesson.duration} onChange={(e) => setEditingLesson((p) => ({ ...p, duration: Number(e.target.value) || 0 }))} /></Field>

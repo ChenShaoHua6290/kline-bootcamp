@@ -84,10 +84,30 @@
   }
 
   .app-nav {
-    @apply relative z-[120] overflow-visible border-b px-4 py-2 sm:px-5;
+    @apply relative z-[120] min-h-[60px] overflow-visible border-b px-4 py-2 sm:px-5;
     border-color: var(--line-soft);
     background: linear-gradient(180deg, rgba(16, 31, 58, 0.9) 0%, rgba(10, 21, 41, 0.84) 100%);
     backdrop-filter: blur(10px);
+  }
+
+  .app-nav-row {
+    @apply mx-auto flex min-h-11 w-full flex-wrap items-center justify-between gap-3;
+  }
+
+  .app-nav-heading {
+    @apply min-w-0;
+  }
+
+  .app-nav-title {
+    @apply truncate text-lg font-semibold tracking-[0.01em] text-slate-50 sm:text-xl;
+  }
+
+  .app-nav-description {
+    @apply mt-0.5 truncate text-xs text-slate-400 sm:text-sm;
+  }
+
+  .app-nav-actions {
+    @apply flex shrink-0 flex-wrap items-center justify-end gap-2;
   }
 
   .app-title {
