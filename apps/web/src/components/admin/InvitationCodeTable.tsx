@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { DEFAULT_TRIAL_DAILY_TRAINING_LIMIT, DEFAULT_TRIAL_DAYS } from '@/lib/trial-access';
 import { Table, TableWrap } from '@/components/ui/Table';
 
 export type InvitationRow = {
@@ -102,7 +103,7 @@ export function InvitationCodeTable({
               {row.type === 'PAID'
                 ? formatPaidPlan(row.paidPlan)
                 : row.type === 'TRIAL'
-                  ? `${row.trialDays ?? 7}天/${row.dailyTrainingLimit ?? 5}次`
+                  ? `${row.trialDays ?? DEFAULT_TRIAL_DAYS}天/${row.dailyTrainingLimit ?? DEFAULT_TRIAL_DAILY_TRAINING_LIMIT}次`
                   : '--'}
             </div>
             <div className="text-center tabular-nums">{row.maxUses}</div>

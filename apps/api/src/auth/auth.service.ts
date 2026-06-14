@@ -5,6 +5,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { EmailService } from '../common/email.service';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
+import { DEFAULT_TRIAL_DAILY_TRAINING_LIMIT, DEFAULT_TRIAL_DAYS } from '../common/trial-access';
 import { UsersService } from '../users/users.service';
 import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RefreshTokenDto, RegisterDto, ResetPasswordDto } from './dto';
 import { isPasswordStrong, passwordStrengthMessage } from './password-policy';
@@ -79,9 +80,9 @@ export class AuthService {
       let currentPlan: 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' = 'NONE';
 
       if (accessType === 'TRIAL') {
-        const trialDays = latestInvite?.trialDays ?? 7;
+        const trialDays = latestInvite?.trialDays ?? DEFAULT_TRIAL_DAYS;
         accessExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-        dailyTrainingLimit = latestInvite?.dailyTrainingLimit ?? 5;
+        dailyTrainingLimit = latestInvite?.dailyTrainingLimit ?? DEFAULT_TRIAL_DAILY_TRAINING_LIMIT;
         isTrainingUnlimited = false;
       } else if (accessType === 'PAID' && latestInvite) {
         const plan = (latestInvite.paidPlan as 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY') ?? 'MONTHLY';

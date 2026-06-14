@@ -16,7 +16,7 @@ import { Select } from '@/components/ui/Select';
 import { Toast } from '@/components/ui/Toast';
 import { PageDescription, PageHeader, PageTitle } from '@/components/ui/PageHeader';
 import { MarkdownEditor } from '@/components/markdown/MarkdownEditor';
-import { CourseAccessLevel, CourseRelatedLink, LessonType, TrainingAssignment, effectiveAccessLevel, formatAccessLevel, formatDuration } from '@/lib/courses/types';
+import { CourseAccessLevel, CourseRelatedLink, LessonType, TrainingAssignment, effectiveAccessLevel, formatAccessLevel } from '@/lib/courses/types';
 
 type AdminLesson = {
   id: string;
@@ -749,7 +749,7 @@ export default function AdminCoursesPage() {
                               {lesson.trainingAssignment ? <Badge tone={lesson.trainingAssignment.assignmentSource === 'trial' ? 'success' : 'info'}>训练作业</Badge> : null}
                               {lesson.status !== 'PUBLISHED' ? statusBadge(lesson.status) : null}
                             </div>
-                            <div className="mt-1.5 text-xs text-slate-500">{formatAccessLevel(effectiveAccessLevel(lesson.accessLevel, lesson.isPreview))} · {formatDuration(lesson.duration)} · 排序 {lesson.sortOrder}</div>
+                            <div className="mt-1.5 text-xs text-slate-500">{formatAccessLevel(effectiveAccessLevel(lesson.accessLevel, lesson.isPreview))} · 排序 {lesson.sortOrder}</div>
                             <div className="mt-1 text-xs text-slate-600">
                               {lesson.videoFileId ? `fileId: ${lesson.videoFileId}` : lesson.videoUrl ? '已填写 videoUrl' : lesson.attachmentUrl ? '已填写附件' : '未绑定媒体'}
                             </div>
@@ -964,8 +964,7 @@ export default function AdminCoursesPage() {
                       ].join('\n')}
                     />
                   </Field>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <Field label="时长秒"><Input type="number" value={editingLesson.duration} onChange={(e) => setEditingLesson((p) => ({ ...p, duration: Number(e.target.value) || 0 }))} /></Field>
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <Field label="排序"><Input type="number" value={editingLesson.sortOrder} onChange={(e) => setEditingLesson((p) => ({ ...p, sortOrder: Number(e.target.value) || 0 }))} /></Field>
                     <Field label="状态">
                       <Select value={editingLesson.status} onChange={(e) => setEditingLesson((p) => ({ ...p, status: e.target.value as LessonForm['status'] }))}>

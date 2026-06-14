@@ -13,7 +13,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MarkdownRenderer, MarkdownToc, getMarkdownHeadings } from '@/components/markdown/MarkdownRenderer';
 import { TencentVodPlayer } from '@/components/courses/TencentVodPlayer';
-import { LessonPlayback, buildTrainingAssignmentHref, formatAccessLevel, formatDuration } from '@/lib/courses/types';
+import { LessonPlayback, buildTrainingAssignmentHref, formatAccessLevel } from '@/lib/courses/types';
 
 function responseStatus(error: unknown) {
   return (error as { response?: { status?: number } })?.response?.status;
@@ -69,7 +69,6 @@ export default function LessonPage() {
           </div>
           <div className="app-nav-actions">
             <Badge tone={lesson.isPreview ? 'success' : 'info'}>{lesson.isPreview ? '试看' : formatAccessLevel(lesson.accessLevel)}</Badge>
-            <Badge>{formatDuration(lesson.duration)}</Badge>
             <Link href={`/courses/${lesson.courseId}`}><Button size="sm" variant="ghost">返回课程</Button></Link>
           </div>
         </div>
@@ -128,11 +127,7 @@ export default function LessonPage() {
           </Card>
           {lesson.trainingAssignment ? (
             <Card className="border-cyan-400/25 bg-cyan-500/10 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-cyan-100">{lesson.trainingAssignment.assignmentTitle}</div>
-                  <div className="mt-1 text-xs text-cyan-100/70">{lesson.trainingAssignment.assignmentId}</div>
-                </div>
+              <div className="flex items-center justify-center">
                 <Link href={buildTrainingAssignmentHref(lesson)}>
                   <Button className="border-cyan-300/50 bg-cyan-500/20 text-cyan-50 shadow-[0_10px_22px_rgba(6,182,212,0.14)] hover:border-cyan-200/70 hover:bg-cyan-500/30" variant="primary">
                     开始训练

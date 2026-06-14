@@ -1,0 +1,2 @@
+export const DEFAULT_TRIAL_DAYS = 3;
+export const DEFAULT_TRIAL_DAILY_TRAINING_LIMIT = 20;

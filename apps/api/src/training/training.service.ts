@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
+import { DEFAULT_TRIAL_DAILY_TRAINING_LIMIT } from '../common/trial-access';
 import {
   ActionType,
   CloseReason,
@@ -461,7 +462,7 @@ export class TrainingService {
         WHERE "userId" = ${userId} AND "usageDate" = ${todayUtc}
         LIMIT 1
       `;
-      const limit = Number(user.dailyTrainingLimit ?? 5);
+      const limit = Number(user.dailyTrainingLimit ?? DEFAULT_TRIAL_DAILY_TRAINING_LIMIT);
       const used = Number(usageRows[0]?.trainingCount ?? 0);
       if (used >= limit) {
         throw new BadRequestException('今日试用训练次数已用完。为保障服务稳定与友好体验，请明日再试或联系管理员升级正式版本。');

@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
+import { DEFAULT_TRIAL_DAILY_TRAINING_LIMIT, DEFAULT_TRIAL_DAYS } from '../common/trial-access';
 import { isPasswordStrong, passwordStrengthMessage } from '../auth/password-policy';
 import {
   AdminResetUserPasswordDto,
@@ -95,8 +96,8 @@ export class AdminService {
     const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
     const isActive = dto.isActive ?? true;
     const inviteType = dto.type ?? 'INTERNAL';
-    const trialDays = inviteType === 'TRIAL' ? dto.trialDays ?? 7 : null;
-    const dailyTrainingLimit = inviteType === 'TRIAL' ? dto.dailyTrainingLimit ?? 5 : null;
+    const trialDays = inviteType === 'TRIAL' ? dto.trialDays ?? DEFAULT_TRIAL_DAYS : null;
+    const dailyTrainingLimit = inviteType === 'TRIAL' ? dto.dailyTrainingLimit ?? DEFAULT_TRIAL_DAILY_TRAINING_LIMIT : null;
     const paidPlan = inviteType === 'PAID' ? dto.paidPlan ?? 'MONTHLY' : 'NONE';
     const durationMonths = paidPlan === 'MONTHLY' ? 1 : paidPlan === 'QUARTERLY' ? 3 : paidPlan === 'YEARLY' ? 12 : null;
 
@@ -182,8 +183,8 @@ export class AdminService {
       expiresAt,
       isActive: true,
       type: inviteType,
-      trialDays: inviteType === 'TRIAL' ? dto.trialDays ?? 3 : dto.trialDays,
-      dailyTrainingLimit: inviteType === 'TRIAL' ? dto.dailyTrainingLimit ?? 5 : dto.dailyTrainingLimit,
+      trialDays: inviteType === 'TRIAL' ? dto.trialDays ?? DEFAULT_TRIAL_DAYS : dto.trialDays,
+      dailyTrainingLimit: inviteType === 'TRIAL' ? dto.dailyTrainingLimit ?? DEFAULT_TRIAL_DAILY_TRAINING_LIMIT : dto.dailyTrainingLimit,
       paidPlan: dto.paidPlan,
     });
 
@@ -542,11 +543,11 @@ export class AdminService {
     if (nextAccessType === 'TRIAL') {
       nextPlan = 'NONE';
       nextLearningAccessLevel = 'TRAINING';
-      nextDailyLimit = dto.dailyTrainingLimit ?? 5;
+      nextDailyLimit = dto.dailyTrainingLimit ?? DEFAULT_TRIAL_DAILY_TRAINING_LIMIT;
       nextUnlimited = false;
       if (!nextExpiresAt) {
         const d = new Date();
-        d.setDate(d.getDate() + 7);
+        d.setDate(d.getDate() + DEFAULT_TRIAL_DAYS);
         nextExpiresAt = d;
       }
     } else if (nextAccessType === 'PAID') {

@@ -13,7 +13,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { PageDescription, PageTitle } from '@/components/ui/PageHeader';
 import { MarkdownRenderer } from '@/components/markdown/MarkdownRenderer';
-import { CourseItem, buildTrainingAssignmentHref, formatDuration } from '@/lib/courses/types';
+import { CourseItem, buildTrainingAssignmentHref } from '@/lib/courses/types';
 
 function typeLabel(type: string) {
   if (type === 'VIDEO') return '视频';
@@ -114,7 +114,7 @@ export default function CourseDetailPage() {
                           <span className="font-medium text-slate-100">{lesson.title}</span>
                           <Badge tone={lesson.isPreview ? 'success' : lesson.locked ? 'warning' : 'default'}>{lesson.isPreview ? '试看' : lesson.locked ? '锁定' : typeLabel(lesson.type)}</Badge>
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">{typeLabel(lesson.type)} · {formatDuration(lesson.duration)}</div>
+                        <div className="mt-1 text-xs text-slate-500">{typeLabel(lesson.type)}</div>
                       </div>
                       <div className="flex flex-wrap gap-2 sm:justify-end">
                         {lesson.locked ? (

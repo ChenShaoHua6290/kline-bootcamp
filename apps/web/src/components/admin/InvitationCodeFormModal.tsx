@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { DEFAULT_TRIAL_DAILY_TRAINING_LIMIT, DEFAULT_TRIAL_DAYS } from '@/lib/trial-access';
 
 type FormValue = {
   code: string;
@@ -69,8 +70,8 @@ export function InvitationCodeFormModal({
   const [expiresAt, setExpiresAt] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [type, setType] = useState<'TRIAL' | 'PAID' | 'INTERNAL'>('INTERNAL');
-  const [trialDays, setTrialDays] = useState(7);
-  const [dailyTrainingLimit, setDailyTrainingLimit] = useState(5);
+  const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
+  const [dailyTrainingLimit, setDailyTrainingLimit] = useState(DEFAULT_TRIAL_DAILY_TRAINING_LIMIT);
   const [paidPlan, setPaidPlan] = useState<'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'>('MONTHLY');
 
   useEffect(() => {
@@ -80,8 +81,8 @@ export function InvitationCodeFormModal({
       setExpiresAt(defaultExpiresAtValue());
       setIsActive(true);
       setType('INTERNAL');
-      setTrialDays(7);
-      setDailyTrainingLimit(5);
+      setTrialDays(DEFAULT_TRIAL_DAYS);
+      setDailyTrainingLimit(DEFAULT_TRIAL_DAILY_TRAINING_LIMIT);
       setPaidPlan('MONTHLY');
     }
   }, [open]);
