@@ -320,7 +320,7 @@ export function TradePanel({
           <Button variant="outline" size="sm" className="h-6 px-0.5 text-[10px] md:col-span-2 md:h-7 md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(1)} disabled={busy}>100%</Button>
         </div>
         {hasPosition && showClosePercent ? (
-          <>
+          <div className="hidden md:block">
             <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300 md:text-[12px]">
               <span className="text-[11px] font-medium tracking-normal text-slate-300 md:text-[12px]">平仓比例</span>
               <span className="text-[13px] font-semibold text-cyan-200">{closePercent}%</span>
@@ -332,7 +332,7 @@ export function TradePanel({
                 </Button>
               ))}
             </div>
-          </>
+          </div>
         ) : null}
         <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/35 px-2 py-1 text-[10px] md:mt-2 md:py-1.5 md:text-[11px]">
           <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-slate-500">
@@ -355,6 +355,51 @@ export function TradePanel({
           </Button>
         </div>
       </Card>
+
+      <div className="mb-2 grid shrink-0 grid-cols-[minmax(0,1fr)_86px] gap-2 border-b border-slate-700/60 pb-2 md:hidden">
+        <Button
+          size="sm"
+          variant="primary"
+          className="h-11 w-full !bg-blue-700/85 !shadow-none !text-[13px] font-semibold disabled:opacity-40"
+          onClick={() => onAction({ action: 'HOLD', ...buildCommittedRiskPayload(committedRiskSide) })}
+          disabled={!canHold}
+        >
+          下一条
+        </Button>
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-11 w-full !text-[12px] font-semibold disabled:opacity-40"
+          onClick={onEnd}
+          disabled={!canEnd}
+        >
+          结束
+        </Button>
+      </div>
+
+      {hasPosition && showClosePercent ? (
+        <div className="mb-2 rounded-xl border border-slate-700/70 bg-slate-950/35 p-1.5 md:hidden">
+          <div className="mb-1 flex items-center justify-between px-0.5 text-[11px] text-slate-300">
+            <span className="font-medium">平仓比例</span>
+            <span className="text-[13px] font-semibold text-cyan-200">{closePercent}%</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {[25, 50, 75, 100].map((n) => (
+              <Button
+                key={n}
+                variant={closePercent === n ? 'primary' : 'outline'}
+                size="sm"
+                className="h-9 !text-[11px] font-semibold"
+                onClick={() => setClosePercent(n)}
+                disabled={busy}
+              >
+                {n}%
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-1 grid shrink-0 grid-cols-4 gap-1 md:mb-1.5 md:grid-cols-2 md:gap-1.5">
         <Button
@@ -418,7 +463,7 @@ export function TradePanel({
         </Button>
       </div>
 
-      <div className="grid shrink-0 grid-cols-[minmax(0,2fr)_minmax(82px,0.75fr)] gap-1 md:block">
+      <div className="hidden shrink-0 md:block">
         <Button
           size="sm"
           variant="primary"
