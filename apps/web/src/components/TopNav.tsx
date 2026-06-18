@@ -116,6 +116,7 @@ export function TopNav({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const logout = async () => {
@@ -127,6 +128,32 @@ export function TopNav({
     router.push('/auth');
   };
 
+  const goAdmin = () => {
+    if (onAdmin) onAdmin();
+    else router.push('/admin');
+  };
+
+  const goHistory = () => {
+    if (onHistory) onHistory();
+    else router.push('/history');
+  };
+
+  const goSettings = () => {
+    if (onSettings) onSettings();
+    else router.push('/settings');
+  };
+
+  const runMobileAction = (action: () => void | Promise<void>) => {
+    setMobileMenuOpen(false);
+    void action();
+  };
+
+  const requestReset = () => {
+    onRequestReset?.();
+    setMenuOpen(false);
+    setMobileMenuOpen(false);
+  };
+
   useEffect(() => {
     const onDocMouseDown = (e: MouseEvent) => {
       const el = menuRef.current;
@@ -136,6 +163,11 @@ export function TopNav({
     document.addEventListener('mousedown', onDocMouseDown);
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, []);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setMenuOpen(false);
+  }, [pathname]);
 
   const displayName = user ? (user.nickname?.trim() || user.email.split('@')[0] || user.email) : '';
   const accessTypeLabel = accessInfo?.accessType === 'TRIAL' ? '试用用户' : accessInfo?.accessType === 'PAID' ? '付费用户' : '内部用户';
@@ -152,7 +184,7 @@ export function TopNav({
 
   return (
     <div className="app-nav flex flex-wrap items-center justify-between gap-3 sm:gap-2">
-      <Link href="/" className="group flex min-w-0 items-center gap-2.5">
+      <Link href="/" className="group flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none">
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-300/35 bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(37,99,235,0.14))] text-sm font-black text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.22)]">
           1
         </span>
@@ -161,9 +193,40 @@ export function TopNav({
           <span className="hidden text-[11px] font-medium text-slate-400 sm:block">训练 · 答疑 · 复盘</span>
         </span>
       </Link>
-      <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+      <div className="flex shrink-0 items-center gap-2 lg:hidden">
         {user ? (
-          <div ref={menuRef} className="relative hidden lg:block">
+          <>
+            <Button
+              variant="primary"
+              size="sm"
+              className="h-9 rounded-xl border border-blue-300/25 bg-[linear-gradient(135deg,#60a5fa,#2563eb,#4f46e5)] px-3 text-white shadow-[0_10px_22px_rgba(37,99,235,0.36)]"
+              onClick={() => runMobileAction(onStart)}
+            >
+              开始
+            </Button>
+            <button
+              type="button"
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? '关闭导航菜单' : '打开导航菜单'}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-600/60 bg-slate-950/35 text-slate-200 transition hover:border-cyan-300/55 hover:bg-cyan-500/10"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+            >
+              <span className="flex flex-col gap-1">
+                <span className="block h-0.5 w-4 rounded-full bg-current" />
+                <span className="block h-0.5 w-4 rounded-full bg-current" />
+                <span className="block h-0.5 w-4 rounded-full bg-current" />
+              </span>
+            </button>
+          </>
+        ) : (
+          <Link className="inline-flex h-9 items-center justify-center rounded-xl bg-[linear-gradient(135deg,var(--brand),var(--brand-strong))] px-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,0.35)]" href="/auth">
+            登录
+          </Link>
+        )}
+      </div>
+      <div className="hidden w-full flex-wrap items-center justify-end gap-2 lg:flex lg:w-auto">
+        {user ? (
+          <div ref={menuRef} className="relative">
             <button
               className="group flex max-w-[230px] cursor-pointer items-center gap-2.5 rounded-xl border border-cyan-400/18 bg-slate-950/36 px-2.5 py-1.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-cyan-300/42 hover:bg-slate-900/60 xl:max-w-[280px]"
               onClick={() => setMenuOpen((v) => !v)}
@@ -217,10 +280,7 @@ export function TopNav({
                     <Button
                       variant="primary"
                       className="h-7 whitespace-nowrap rounded-lg px-3 !text-[12px] !font-medium"
-                      onClick={() => {
-                        onRequestReset?.();
-                        setMenuOpen(false);
-                      }}
+                      onClick={requestReset}
                       disabled={resetBalanceBusy}
                     >
                       {resetBalanceBusy ? '重置中...' : '重置金额'}
@@ -235,17 +295,17 @@ export function TopNav({
           <>
             <nav className="flex flex-wrap items-center gap-1 rounded-2xl border border-slate-600/45 bg-[linear-gradient(135deg,rgba(15,23,42,0.62),rgba(30,41,59,0.5),rgba(15,23,42,0.62))] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_12px_30px_rgba(2,6,23,0.24)]">
               {user.role === 'ADMIN' ? (
-                <NavButton active={pathname.startsWith('/admin')} tone="admin" onClick={onAdmin}>
+                <NavButton active={pathname.startsWith('/admin')} tone="admin" onClick={goAdmin}>
                   管理后台
                 </NavButton>
               ) : null}
               <NavLink active={pathname.startsWith('/courses') || pathname.startsWith('/lessons')} tone="courses" href="/courses">
                 课程中心
               </NavLink>
-              <NavButton active={pathname.startsWith('/history')} tone="history" onClick={onHistory}>
+              <NavButton active={pathname.startsWith('/history')} tone="history" onClick={goHistory}>
                 历史记录
               </NavButton>
-              <NavButton active={pathname.startsWith('/settings')} tone="settings" onClick={onSettings}>
+              <NavButton active={pathname.startsWith('/settings')} tone="settings" onClick={goSettings}>
                 修改密码
               </NavButton>
             </nav>
@@ -272,6 +332,99 @@ export function TopNav({
           </Link>
         )}
       </div>
+      {user && mobileMenuOpen ? (
+        <div className="w-full lg:hidden">
+          <Panel className="border-cyan-500/22 bg-slate-950/95 p-2.5 shadow-[0_16px_36px_rgba(2,6,23,0.5)]">
+            <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-cyan-400/20 bg-slate-900/55 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-500/10 text-xs font-bold text-cyan-100">
+                  {userInitial}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[14px] font-semibold text-slate-100">{displayName}</span>
+                  <span className="block truncate text-[11px] text-slate-500">{accessTypeLabel}</span>
+                </span>
+              </div>
+              <span className="shrink-0 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-200">
+                重置 {totalResetCount}
+              </span>
+            </div>
+
+            {accessInfo ? (
+              <div className="mb-2 rounded-xl border border-cyan-400/25 bg-[linear-gradient(135deg,rgba(8,47,105,0.58),rgba(14,116,144,0.24))] px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-semibold text-cyan-100">{accessTypeLabel}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {accessInfo.accessExpiresAt ? `到期 ${new Date(accessInfo.accessExpiresAt).toLocaleDateString('zh-CN')}` : '长期有效'}
+                  </span>
+                </div>
+                <div className="mt-1 text-[12px] leading-5 text-cyan-100/85">{accessHint}</div>
+              </div>
+            ) : null}
+
+            <div className={needResetAfterLiquidation ? 'mb-2 rounded-xl border border-amber-300/30 bg-amber-500/12 px-3 py-2' : 'mb-2 rounded-xl border border-slate-700/70 bg-slate-900/50 px-3 py-2'}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={needResetAfterLiquidation ? 'text-[12px] font-semibold text-amber-100' : 'text-[12px] font-semibold text-slate-200'}>
+                  资金重置
+                </span>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="h-8 rounded-lg px-3 text-xs"
+                  onClick={requestReset}
+                  disabled={resetBalanceBusy}
+                >
+                  {resetBalanceBusy ? '重置中...' : '重置金额'}
+                </Button>
+              </div>
+              <div className={needResetAfterLiquidation ? 'mt-1 text-[12px] leading-5 text-amber-100/85' : 'mt-1 text-[12px] leading-5 text-slate-400'}>
+                {needResetAfterLiquidation ? '账户已触发爆仓，请先重置资金后继续训练。' : '爆仓后可恢复初始资金继续训练。'}
+              </div>
+            </div>
+
+            <nav className="grid grid-cols-2 gap-2">
+              {user.role === 'ADMIN' ? (
+                <button type="button" className={cn(navBaseClass(pathname.startsWith('/admin'), 'admin'), 'w-full')} onClick={() => runMobileAction(goAdmin)}>
+                  <NavChrome active={pathname.startsWith('/admin')} tone="admin">管理后台</NavChrome>
+                </button>
+              ) : null}
+              <Link
+                href="/courses"
+                aria-current={pathname.startsWith('/courses') || pathname.startsWith('/lessons') ? 'page' : undefined}
+                className={cn(navBaseClass(pathname.startsWith('/courses') || pathname.startsWith('/lessons'), 'courses'), 'w-full')}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <NavChrome active={pathname.startsWith('/courses') || pathname.startsWith('/lessons')} tone="courses">课程中心</NavChrome>
+              </Link>
+              <button type="button" className={cn(navBaseClass(pathname.startsWith('/history'), 'history'), 'w-full')} onClick={() => runMobileAction(goHistory)}>
+                <NavChrome active={pathname.startsWith('/history')} tone="history">历史记录</NavChrome>
+              </button>
+              <button type="button" className={cn(navBaseClass(pathname.startsWith('/settings'), 'settings'), 'w-full')} onClick={() => runMobileAction(goSettings)}>
+                <NavChrome active={pathname.startsWith('/settings')} tone="settings">修改密码</NavChrome>
+              </button>
+            </nav>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                className="h-9 rounded-xl border border-blue-300/25 bg-[linear-gradient(135deg,#60a5fa,#2563eb,#4f46e5)] text-white"
+                onClick={() => runMobileAction(onStart)}
+              >
+                开始训练
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 rounded-xl border-slate-600/55 bg-slate-950/25 text-slate-300 hover:border-rose-300/45 hover:bg-rose-500/10 hover:text-rose-100"
+                onClick={() => runMobileAction(logout)}
+              >
+                退出登录
+              </Button>
+            </div>
+          </Panel>
+        </div>
+      ) : null}
     </div>
   );
 }

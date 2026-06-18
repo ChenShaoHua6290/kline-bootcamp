@@ -81,7 +81,7 @@ export function NoticeModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-[radial-gradient(circle_at_50%_15%,rgba(56,189,248,0.12),transparent_44%),rgba(2,6,23,0.82)] p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-[radial-gradient(circle_at_50%_15%,rgba(56,189,248,0.12),transparent_44%),rgba(2,6,23,0.82)] p-2 sm:p-4"
       onClick={maskClosable ? onClose : undefined}
     >
       <div
@@ -90,9 +90,9 @@ export function NoticeModal({
         style={{ transform: `scale(${modalScale})`, transformOrigin: 'center center', willChange: 'transform' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-700/70 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-slate-700/70 px-4 py-3.5 sm:px-5 sm:py-4">
           <div>
-            <div className={`inline-flex rounded-lg border px-2.5 py-1 text-[18px] font-semibold ${toneStyle.badge}`}>系统提示</div>
+            <div className={`inline-flex rounded-lg border px-2.5 py-1 text-[14px] font-semibold sm:text-[18px] ${toneStyle.badge}`}>系统提示</div>
             <div className="mt-1 text-[11px] text-slate-400">请确认后继续操作</div>
           </div>
           <Button
@@ -106,23 +106,23 @@ export function NoticeModal({
           </Button>
         </div>
 
-        <div className="space-y-3 px-5 py-5">
-          <h3 className={`text-[22px] font-semibold leading-tight ${toneStyle.title}`}>{title}</h3>
-          <p className="text-[15px] leading-7 text-slate-300">{message}</p>
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          <h3 className={`text-[19px] font-semibold leading-tight sm:text-[22px] ${toneStyle.title}`}>{title}</h3>
+          <p className="text-[14px] leading-6 text-slate-300 sm:text-[15px] sm:leading-7">{message}</p>
           {children}
           {onConfirm ? (
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               <Button
                 onClick={onClose}
                 variant="default"
-                className="h-10 min-w-[88px] px-4 text-sm"
+                className="h-10 w-full px-4 text-sm sm:min-w-[88px] sm:w-auto"
               >
                 {cancelText}
               </Button>
               <Button
                 onClick={onConfirm}
                 variant="primary"
-                className={`h-10 min-w-[104px] border-0 bg-gradient-to-r px-5 text-sm ${toneStyle.button}`}
+                className={`h-10 w-full border-0 bg-gradient-to-r px-5 text-sm sm:min-w-[104px] sm:w-auto ${toneStyle.button}`}
               >
                 {confirmText}
               </Button>

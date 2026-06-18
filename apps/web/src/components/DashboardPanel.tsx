@@ -121,24 +121,24 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
               <span className="text-xs text-slate-400">/ {board.length || '--'} 人</span>
             </div>
           </div>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
-            <div className="relative overflow-hidden rounded-xl border border-slate-600/45 bg-[linear-gradient(145deg,rgba(15,23,42,0.72),rgba(30,41,59,0.5))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:p-3">
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] sm:gap-2">
+            <div className="relative min-w-0 overflow-hidden rounded-xl border border-slate-600/45 bg-[linear-gradient(145deg,rgba(15,23,42,0.72),rgba(30,41,59,0.5))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-2.5 xl:p-3">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/30 to-transparent" />
-              <div className="text-[11px] text-slate-400">训练场次</div>
-              <div className="mt-0.5 text-[20px] font-bold text-slate-50 xl:mt-1 xl:text-[22px]">{summary ? fmtNum(summary.trainingCount) : '--'}</div>
-              <div className="mt-1 text-[11px] leading-5 text-slate-500">累计完成训练局数</div>
+              <div className="truncate text-[10px] text-slate-400 sm:text-[11px]">训练场次</div>
+              <div className="mt-1 truncate text-[16px] font-bold leading-tight text-slate-50 sm:text-[20px] xl:mt-1 xl:text-[22px]">{summary ? fmtNum(summary.trainingCount) : '--'}</div>
+              <div className="mt-1 hidden text-[11px] leading-5 text-slate-500 sm:block">累计完成训练局数</div>
             </div>
-            <div className="relative overflow-hidden rounded-xl border border-emerald-300/28 bg-[linear-gradient(145deg,rgba(6,78,59,0.22),rgba(15,23,42,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:p-3">
+            <div className="relative min-w-0 overflow-hidden rounded-xl border border-emerald-300/28 bg-[linear-gradient(145deg,rgba(6,78,59,0.22),rgba(15,23,42,0.72))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-2.5 xl:p-3">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent" />
-              <div className="text-[11px] text-slate-400">总胜率</div>
-              <div className="mt-0.5 text-[20px] font-bold text-emerald-200 xl:mt-1 xl:text-[22px]">{summary ? fmtPct(summary.winRate) : '--'}</div>
-              <div className="mt-1 text-[11px] leading-5 text-slate-500">已平仓盈利交易占比</div>
+              <div className="truncate text-[10px] text-slate-400 sm:text-[11px]">总胜率</div>
+              <div className="mt-1 truncate text-[16px] font-bold leading-tight text-emerald-200 sm:text-[20px] xl:mt-1 xl:text-[22px]">{summary ? fmtPct(summary.winRate) : '--'}</div>
+              <div className="mt-1 hidden text-[11px] leading-5 text-slate-500 sm:block">已平仓盈利交易占比</div>
             </div>
-            <div className="relative overflow-hidden rounded-xl border border-cyan-300/28 bg-[linear-gradient(145deg,rgba(14,116,144,0.22),rgba(15,23,42,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:p-3">
+            <div className="relative min-w-0 overflow-hidden rounded-xl border border-cyan-300/28 bg-[linear-gradient(145deg,rgba(14,116,144,0.22),rgba(15,23,42,0.72))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-2.5 xl:p-3">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/40 to-transparent" />
-              <div className="text-[11px] text-slate-400">账户积分</div>
-              <div className="mt-0.5 text-[20px] font-bold text-cyan-200 xl:mt-1 xl:text-[22px]">{summary ? fmtNum(summary.accountScore) : '--'}</div>
-              <div className="mt-1 text-[11px] leading-5 text-slate-500">账户当前积分</div>
+              <div className="truncate text-[10px] text-slate-400 sm:text-[11px]">账户积分</div>
+              <div className="mt-1 truncate text-[16px] font-bold leading-tight text-cyan-200 sm:text-[20px] xl:mt-1 xl:text-[22px]">{summary ? fmtNum(summary.accountScore) : '--'}</div>
+              <div className="mt-1 hidden text-[11px] leading-5 text-slate-500 sm:block">账户当前积分</div>
             </div>
           </div>
         </CardBody>
@@ -209,8 +209,39 @@ export function DashboardPanel({ data, loading, error, currentUserId }: { data?:
               <SectionTitle className="text-slate-100">实时排行榜</SectionTitle>
               <span className="rounded-full border border-slate-600/50 bg-slate-950/35 px-2.5 py-1 text-xs text-slate-400">总参与 {board.length} 人</span>
             </div>
-            <div className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-hidden rounded-xl border border-slate-600/55 bg-slate-950/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
-              <div className="max-h-[clamp(210px,34vh,360px)] min-w-[430px] overflow-y-auto xl:h-full xl:max-h-none xl:min-w-0">
+            <div className="min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-slate-600/55 bg-slate-950/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+              <div className="max-h-[clamp(240px,42vh,420px)] space-y-2 overflow-y-auto p-2 sm:hidden">
+                {board.map((row) => (
+                  <div
+                    key={`${row.rank}-${row.userId}-card`}
+                    className={`rounded-xl border px-3 py-2.5 ${
+                      row.isMe
+                        ? 'border-cyan-300/40 bg-cyan-500/12 text-cyan-100 shadow-[inset_3px_0_0_rgba(34,211,238,0.5)]'
+                        : 'border-slate-700/80 bg-slate-900/55 text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className={`${row.rank <= 3 ? 'rounded-full border border-amber-300/35 bg-amber-400/10 px-2 py-0.5 text-sm font-bold text-amber-200' : 'text-sm font-semibold text-slate-300'}`}>
+                          #{row.rank}
+                        </span>
+                        <span className="min-w-0 truncate text-sm font-semibold">{row.displayName}</span>
+                      </div>
+                      <span className="shrink-0 text-sm font-bold text-cyan-100">{fmtNum(row.accountScore)}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                      <div className="rounded-lg border border-slate-700/65 bg-slate-950/35 px-2 py-1.5">
+                        胜率 <span className="ml-1 font-semibold text-slate-100">{fmtPct(row.winRate)}</span>
+                      </div>
+                      <div className="rounded-lg border border-slate-700/65 bg-slate-950/35 px-2 py-1.5 text-right">
+                        训练 <span className="ml-1 font-semibold text-slate-100">{row.trainingCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {board.length === 0 ? <div className="py-6"><EmptyState title="暂无排行榜数据" className="min-h-[96px]" /></div> : null}
+              </div>
+              <div className="hidden max-h-[clamp(210px,34vh,360px)] min-w-[430px] overflow-y-auto sm:block xl:h-full xl:max-h-none xl:min-w-0">
                 <div className={`sticky top-0 z-10 grid w-full ${leaderboardGridClass} gap-1.5 border-b border-slate-700/70 bg-slate-950/92 px-2 py-1.5 text-xs text-slate-400 backdrop-blur sm:gap-2 sm:px-3`}>
                   <div className="text-center font-medium">排名</div>
                   <div className="text-center font-medium">用户</div>

@@ -21,9 +21,9 @@ export function SignupSection() {
               如果有其他疑问，也随便欢迎微信上找我咨询，会根据你的阶段给出学习与训练建议。
             </p>
 
-            <div className="mt-5 max-w-md rounded-2xl border border-cyan-300/24 bg-[linear-gradient(145deg,rgba(15,23,42,0.85),rgba(8,47,73,0.24))] p-4">
-              <p className="text-xs tracking-[0.14em] text-cyan-200/90">联系信息</p>
-              <p className="mt-2 text-[18px] font-semibold text-slate-100">微信：{wechatId}</p>
+	            <div className="mt-5 max-w-md rounded-2xl border border-cyan-300/24 bg-[linear-gradient(145deg,rgba(15,23,42,0.85),rgba(8,47,73,0.24))] p-4">
+	              <p className="text-xs tracking-[0.14em] text-cyan-200/90">联系信息</p>
+	              <p className="mt-2 break-all text-[18px] font-semibold text-slate-100">微信：{wechatId}</p>
               <p className="mt-1 text-sm text-slate-400">请备注“报名”，便于快速通过。</p>
             </div>
           </div>

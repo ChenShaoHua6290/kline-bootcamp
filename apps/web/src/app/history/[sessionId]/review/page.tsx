@@ -204,30 +204,34 @@ export default function HistoryReviewPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 p-3 sm:p-3">
+      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 p-2.5 sm:p-3">
         <div className="grid min-h-0 min-w-0 grid-cols-1 gap-3 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(380px,32vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,30vw)]">
-          <Card className="h-[clamp(340px,calc(100dvh-76px),680px)] min-h-0 min-w-0 overflow-hidden p-2 xl:h-full">
+          <Card className="h-[calc(100dvh-310px)] min-h-[380px] min-w-0 overflow-hidden p-0 sm:h-[calc(100dvh-330px)] sm:min-h-[430px] sm:p-0 xl:h-full">
             <ReplayChart
               data={visibleBars}
               actions={chartActions}
               timeframe={viewTimeframe}
               onTimeframeChange={setViewTimeframe}
               fitContainerHeight
+              showTradeLegend={false}
+              showActionSummary={false}
+              hideXAxisLabels
+              hideHeaderTime
               highlightedActionId={highlightedActionId}
               focusedTimestamp={focusedTimestamp}
             />
           </Card>
-          <div className="min-h-0 space-y-3 pr-1 xl:overflow-y-auto">
-            <Card className="space-y-3 border-slate-700/80 bg-slate-900/62 p-3">
-              <div className="flex items-center justify-between">
+          <div className="min-h-0 space-y-3 xl:overflow-y-auto xl:pr-1">
+            <Card className="space-y-3 border-slate-700/80 bg-slate-900/62 p-2.5 sm:p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-[11px] tracking-[0.08em] text-slate-400">复盘面板</div>
                 <div className="text-[11px] text-slate-500">按模块查看与记录</div>
               </div>
-              <Tabs className="!grid !grid-cols-4 !gap-1 !overflow-visible !pb-0">
-                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>训练摘要</TabButton>
-                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'trades'} onClick={() => setActiveTab('trades')}>交易记录</TabButton>
-                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')}>行为统计</TabButton>
-                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'summary'} onClick={() => setActiveTab('summary')}>复盘总结</TabButton>
+              <Tabs className="!grid !grid-cols-2 !gap-1 !overflow-visible !pb-0 sm:!grid-cols-4">
+                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>摘要</TabButton>
+                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'trades'} onClick={() => setActiveTab('trades')}>交易</TabButton>
+                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')}>统计</TabButton>
+                <TabButton className="!h-9 !w-full !px-1.5 !text-[12px]" active={activeTab === 'summary'} onClick={() => setActiveTab('summary')}>总结</TabButton>
               </Tabs>
               {activeTab === 'overview' ? <ReviewSummary session={session} /> : null}
               {activeTab === 'trades' ? (

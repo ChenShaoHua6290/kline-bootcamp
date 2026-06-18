@@ -74,7 +74,7 @@ export default function LessonPage() {
         </div>
       </header>
 
-      <section className={`mx-auto grid max-w-[1180px] gap-4 px-4 py-5 ${headings.length > 0 ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
+      <section className={`mx-auto grid max-w-[1180px] gap-4 px-3 py-4 sm:px-4 sm:py-5 ${headings.length > 0 ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
         <div className="space-y-4">
           {shouldShowMediaCard ? (
             <Card className="overflow-hidden border-slate-700/80 bg-slate-950/70">
@@ -115,11 +115,11 @@ export default function LessonPage() {
             </Card>
           ) : null}
 
-          <Card className="border-slate-700/80 bg-slate-900/70 p-5">
+          <Card className="border-slate-700/80 bg-slate-900/70 p-3 sm:p-5">
             {lesson.attachmentUrl ? (
-              <div className="mb-4 flex justify-end">
-                <a href={lesson.attachmentUrl} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="ghost">打开PDF课件</Button>
+              <div className="mb-4 flex justify-stretch sm:justify-end">
+                <a href={lesson.attachmentUrl} target="_blank" rel="noreferrer" className="w-full sm:w-auto">
+                  <Button size="sm" variant="ghost" className="w-full sm:w-auto">打开PDF课件</Button>
                 </a>
               </div>
             ) : null}
@@ -128,8 +128,8 @@ export default function LessonPage() {
           {lesson.trainingAssignment ? (
             <Card className="border-cyan-400/25 bg-cyan-500/10 p-4">
               <div className="flex items-center justify-center">
-                <Link href={buildTrainingAssignmentHref(lesson)}>
-                  <Button className="border-cyan-300/50 bg-cyan-500/20 text-cyan-50 shadow-[0_10px_22px_rgba(6,182,212,0.14)] hover:border-cyan-200/70 hover:bg-cyan-500/30" variant="primary">
+                <Link href={buildTrainingAssignmentHref(lesson)} className="w-full sm:w-auto">
+                  <Button className="w-full border-cyan-300/50 bg-cyan-500/20 text-cyan-50 shadow-[0_10px_22px_rgba(6,182,212,0.14)] hover:border-cyan-200/70 hover:bg-cyan-500/30 sm:w-auto" variant="primary">
                     开始训练
                   </Button>
                 </Link>

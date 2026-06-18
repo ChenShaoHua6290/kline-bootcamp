@@ -58,7 +58,7 @@ export function OfficialLanding() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_8%_-10%,rgba(56,189,248,0.34),transparent_36%),radial-gradient(circle_at_92%_-14%,rgba(14,165,233,0.32),transparent_42%),radial-gradient(circle_at_85%_24%,rgba(245,158,11,0.1),transparent_30%),radial-gradient(circle_at_50%_120%,rgba(59,130,246,0.16),transparent_48%),linear-gradient(165deg,#020617_0%,#04142f_36%,#0a2442_60%,#020617_100%)] text-slate-100">
       <header className="sticky top-0 z-40 border-b border-cyan-400/10 bg-slate-950/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:py-4">
+        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:py-4">
           <a href="#home" className="shrink-0 text-sm font-bold tracking-[0.08em] text-cyan-100 sm:text-base sm:tracking-[0.16em]">只做一种模式</a>
           <nav className="hidden items-center gap-8 text-base text-slate-300 md:flex">
             {navItems.map((item) => (
@@ -72,10 +72,10 @@ export function OfficialLanding() {
               </a>
             ))}
           </nav>
-          <a href="#signup" className="shrink-0 rounded-xl bg-[linear-gradient(135deg,#67e8f9,#22d3ee_35%,#0ea5e9)] px-4 py-2.5 text-sm font-bold text-slate-950 shadow-[0_8px_24px_rgba(14,165,233,0.45)] transition-all hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,#67e8f9,#22d3ee_30%,#0ea5e9_72%,#f59e0b)] hover:shadow-[0_10px_26px_rgba(245,158,11,0.24)] sm:px-5">我要报名</a>
+          <a href="#signup" className="shrink-0 rounded-xl bg-[linear-gradient(135deg,#67e8f9,#22d3ee_35%,#0ea5e9)] px-3 py-2 text-xs font-bold text-slate-950 shadow-[0_8px_24px_rgba(14,165,233,0.45)] transition-all hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,#67e8f9,#22d3ee_30%,#0ea5e9_72%,#f59e0b)] hover:shadow-[0_10px_26px_rgba(245,158,11,0.24)] sm:px-5 sm:py-2.5 sm:text-sm">我要报名</a>
         </div>
         <div className="md:hidden">
-          <nav className="mx-auto flex max-w-[1360px] gap-2 overflow-x-auto px-4 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="mx-auto flex max-w-[1360px] gap-2 overflow-x-auto px-3 pb-2.5 [scrollbar-width:none] sm:px-4 [&::-webkit-scrollbar]:hidden">
             {navItems.map((item) => (
               <a
                 key={item.label}

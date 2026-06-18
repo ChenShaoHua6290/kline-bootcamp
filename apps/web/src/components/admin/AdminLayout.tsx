@@ -39,7 +39,7 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
   }
 
   return (
-    <main className="min-h-screen p-3 sm:p-4">
+    <main className="min-h-screen overflow-x-hidden p-2.5 sm:p-4">
       <header className="app-nav mb-4">
         <div className="app-nav-row">
           <PageTitle className="!text-lg sm:!text-xl">{title}</PageTitle>
@@ -48,7 +48,7 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
           </Link>
         </div>
       </header>
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+      <section className="grid min-w-0 grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
         <AdminSidebar />
         <div className="min-w-0">{children}</div>
       </section>

@@ -54,12 +54,12 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-8">
+    <main className="mx-auto flex min-h-screen w-full items-center justify-center px-3 py-6 sm:px-4 sm:py-8">
       <Card className="w-full max-w-md">
-        <CardBody className="space-y-4 p-5">
-          <div className="flex items-center justify-between gap-2">
+        <CardBody className="space-y-4 p-4 sm:p-5">
+          <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
             <h1 className="text-lg font-semibold text-slate-100">修改密码</h1>
-            <Button type="button" variant="ghost" size="sm" className="h-8 px-3 text-xs" onClick={() => router.push('/')}>
+            <Button type="button" variant="ghost" size="sm" className="h-8 w-full px-3 text-xs sm:w-auto" onClick={() => router.push('/')}>
               返回首页
             </Button>
           </div>

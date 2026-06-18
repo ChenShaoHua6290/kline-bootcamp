@@ -124,6 +124,78 @@ function pendingAssignmentFromLesson(lesson: LessonPlayback): PendingAssignment 
   };
 }
 
+function MobileTrainingSnapshot({
+  session,
+  viewTimeframe,
+  showCurrentPnl,
+}: {
+  session: Session;
+  viewTimeframe: string;
+  showCurrentPnl: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const trainPointer = typeof session.trainPointer === 'number' ? session.trainPointer : session.pointer;
+  const progress = Math.max(0, Math.min(100, (trainPointer / Math.max(1, session.totalBars)) * 100));
+  const lastClose = session.barsData?.[session.pointer]?.close ?? 0;
+  const startBalance = session.initialBalance || 10000;
+  const positionAmount = session.position?.positionAmount ?? (session.position ? session.finalBalance * session.position.positionPercent : 0);
+  const floatingPnl = session.position
+    ? ((session.position.side === 'LONG' ? lastClose - session.position.entryPrice : session.position.entryPrice - lastClose) /
+        session.position.entryPrice) *
+      positionAmount
+    : 0;
+  const equityBalance = session.finalBalance + floatingPnl;
+  const totalPnl = equityBalance - startBalance;
+  const positionText = session.position ? (session.position.side === 'LONG' ? '多仓' : '空仓') : '空仓';
+  const pnlClass = totalPnl >= 0 ? 'text-emerald-300' : 'text-rose-300';
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-slate-700/65 bg-slate-950/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] xl:hidden">
+      <button
+        type="button"
+        className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-left"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <div className="grid min-w-0 grid-cols-3 gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] text-slate-500">进度</div>
+            <div className="truncate text-[12px] font-semibold text-cyan-100">
+              {trainPointer}/{session.totalBars}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] text-slate-500">账户</div>
+            <div className="truncate text-[12px] font-semibold text-slate-100">
+              {equityBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] text-slate-500">{positionText}</div>
+            <div className={`truncate text-[12px] font-semibold ${pnlClass}`}>
+              {totalPnl >= 0 ? '+' : ''}
+              {totalPnl.toFixed(2)}
+            </div>
+          </div>
+        </div>
+        <span className="inline-flex h-7 items-center justify-center rounded-lg border border-slate-700/75 bg-slate-900/70 px-2 text-[11px] font-semibold text-slate-300">
+          {open ? '收起' : '详情'}
+        </span>
+      </button>
+      <div className="h-1 bg-slate-800/80">
+        <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400" style={{ width: `${progress}%` }} />
+      </div>
+      {open ? (
+        <div className="max-h-[46dvh] space-y-1.5 overflow-y-auto border-t border-slate-800/80 p-1.5">
+          <TrainingInfoPanel session={session} viewTimeframe={viewTimeframe} />
+          <AccountPanel session={session} showCurrentPnl={showCurrentPnl} />
+          {showCurrentPnl ? <TradeStatsPanel session={session} /> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export default function TrainPage() {
   const [showConfig, setShowConfig] = useState(false);
   const [pendingAssignment, setPendingAssignment] = useState<PendingAssignment | null>(null);
@@ -817,8 +889,8 @@ export default function TrainPage() {
           maskClosable={false}
         />
       ) : null}
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-0 px-0.5 pb-0.5 pt-0 sm:gap-1 sm:px-1 sm:pb-1 sm:pt-0 xl:grid-cols-[minmax(0,1fr)_290px] 2xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="z-0 flex min-h-[540px] overflow-hidden xl:min-h-0">
+      <div className="grid flex-1 min-h-0 grid-cols-1 gap-1 px-0.5 pb-0.5 pt-0 sm:gap-2 sm:px-1.5 sm:pb-1.5 xl:grid-cols-[minmax(0,1fr)_290px] xl:gap-0 xl:px-0.5 xl:pb-0.5 xl:pt-0 2xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="z-0 flex h-[calc(100dvh-310px)] min-h-[380px] overflow-hidden sm:h-[calc(100dvh-330px)] sm:min-h-[430px] xl:h-auto xl:min-h-0">
           {session ? (
             <div className="relative h-full w-full min-h-0">
               <KLineChart
@@ -842,19 +914,28 @@ export default function TrainPage() {
             </div>
           )}
         </div>
-        <div className="relative z-20 min-h-0 pr-1 xl:overflow-hidden">
+        <div className="relative z-20 min-h-0 pr-0 xl:pr-1 xl:overflow-hidden">
           {session ? (
-            <div className="flex min-h-0 flex-col gap-2 xl:h-full">
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                <div className="surface-panel p-2.5">
-                <div className="space-y-1.5">
-                  <TrainingInfoPanel session={session} viewTimeframe={viewTimeframe} />
-                  <AccountPanel session={session} showCurrentPnl={hasTrainingActions} />
-                  {hasTrainingActions ? <TradeStatsPanel session={session} /> : null}
+            <div className="flex min-h-0 flex-col gap-1 xl:h-full xl:gap-2">
+              <MobileTrainingSnapshot session={session} viewTimeframe={viewTimeframe} showCurrentPnl={hasTrainingActions} />
+              <div className="shrink-0 xl:hidden">
+                <TradePanel
+                  session={session}
+                  busy={actionMutation.isPending || startMutation.isPending || endMutation.isPending || holdBatchActiveRef.current}
+                  onAction={handleTradeAction}
+                  onEnd={() => setConfirmEndOpen(true)}
+                />
+              </div>
+              <div className="hidden min-h-0 flex-1 overflow-y-auto pr-1 xl:block">
+                <div className="surface-panel p-2 sm:p-2.5">
+                  <div className="space-y-1.5">
+                    <TrainingInfoPanel session={session} viewTimeframe={viewTimeframe} />
+                    <AccountPanel session={session} showCurrentPnl={hasTrainingActions} />
+                    {hasTrainingActions ? <TradeStatsPanel session={session} /> : null}
+                  </div>
                 </div>
               </div>
-              </div>
-              <div className="shrink-0 xl:max-h-[58vh] xl:overflow-y-auto">
+              <div className="hidden shrink-0 xl:block xl:max-h-[58vh] xl:overflow-y-auto">
                 <TradePanel
                   session={session}
                   busy={actionMutation.isPending || startMutation.isPending || endMutation.isPending || holdBatchActiveRef.current}
@@ -865,7 +946,7 @@ export default function TrainPage() {
             </div>
           ) : (
             <div className="h-full min-h-0 p-2">
-              <EmptyState title="等待训练启动" description="训练开始后将显示账户信息、交易记录与下单面板。" className="h-full min-h-[320px]" />
+              <EmptyState title="等待训练启动" description="训练开始后将显示账户信息、交易记录与下单面板。" className="h-full min-h-[280px]" />
             </div>
           )}
         </div>

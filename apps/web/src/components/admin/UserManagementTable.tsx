@@ -83,27 +83,29 @@ export function UserManagementTable({
   const desktopCols = 'grid-cols-[0.85fr_1.05fr_0.45fr_0.62fr_0.85fr_0.7fr_0.38fr_0.38fr_0.88fr_1.25fr]';
   return (
     <>
-      <div className="space-y-2 md:hidden">
-        {rows.map((row) => {
-          const isPending = pendingDeleteId === row.id;
-          return (
-            <div key={row.id} className="ui-card p-3 text-[13px] text-slate-200">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="truncate text-sm font-semibold">{row.nickname || '--'}</div>
-                <Badge tone={row.isBanned ? 'danger' : 'success'}>{row.isBanned ? '已封禁' : '正常'}</Badge>
-              </div>
-              <div className="mb-1 truncate text-xs text-slate-300">{row.email}</div>
-              <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-400">
-                <div>角色: <span className={row.role === 'ADMIN' ? 'font-semibold text-cyan-300' : 'text-slate-200'}>{row.role}</span></div>
-                <div>权限: <span className="text-slate-200">{formatAccessType(row.accessType)} / {formatCourseAccess(row)}</span></div>
-                <div>训练: <span className="text-slate-200">{row.trainingCount}</span></div>
-                <div>爆仓: <span className="text-slate-200">{row.liquidationCount}</span></div>
-                <div>封禁原因: <span className="text-slate-200">{row.banReason ?? '--'}</span></div>
-              </div>
-              <div className="mt-2">
-                {row.role !== 'ADMIN' ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {row.isBanned ? (
+	      <div className="space-y-2 md:hidden">
+	        {rows.map((row) => {
+	          const isPending = pendingDeleteId === row.id;
+	          return (
+	            <div key={row.id} className="ui-card p-3 text-[13px] text-slate-200">
+	              <div className="mb-2 flex items-center justify-between gap-2">
+	                <div className="min-w-0 truncate text-sm font-semibold">{row.nickname || '--'}</div>
+	                <Badge tone={row.isBanned ? 'danger' : 'success'}>{row.isBanned ? '已封禁' : '正常'}</Badge>
+	              </div>
+	              <div className="mb-2 break-all text-xs text-slate-300">{row.email}</div>
+	              <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-400">
+	                <div>角色: <span className={row.role === 'ADMIN' ? 'font-semibold text-cyan-300' : 'text-slate-200'}>{row.role}</span></div>
+	                <div>权限: <span className="text-slate-200">{formatAccessType(row.accessType)} / {formatAccessPlan(row.currentPlan)}</span></div>
+	                <div>课程: <span className="text-slate-200">{formatCourseAccess(row)}</span></div>
+	                <div>到期: <span className="text-slate-200">{row.accessExpiresAt ? new Date(row.accessExpiresAt).toLocaleDateString('zh-CN') : '长期'}</span></div>
+	                <div>训练: <span className="text-slate-200">{row.trainingCount}</span></div>
+	                <div>爆仓: <span className="text-slate-200">{row.liquidationCount}</span></div>
+	                <div className="col-span-2">封禁原因: <span className="break-all text-slate-200">{row.banReason ?? '--'}</span></div>
+	              </div>
+	              <div className="mt-2">
+	                {row.role !== 'ADMIN' ? (
+	                  <div className="grid grid-cols-2 gap-2">
+	                    {row.isBanned ? (
                       <Button size="sm" variant="success" className="w-full" disabled={isPending || pendingUnbanId === row.id || pendingBanId === row.id} onClick={() => onUnban(row)}>
                         {pendingUnbanId === row.id ? '处理中...' : '解封'}
                       </Button>
@@ -112,15 +114,28 @@ export function UserManagementTable({
                         {pendingBanId === row.id ? '处理中...' : '封禁'}
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onViewHistory?.(row)}>
-                      历史记录
-                    </Button>
-                    <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onCourseAccess?.(row)}>
-                      课程权限
-                    </Button>
-                    <Button size="sm" variant="danger" className="w-full" disabled={isPending} onClick={() => onDelete?.(row)}>
-                      {isPending ? '删除中...' : '删除'}
-                    </Button>
+	                    <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onViewHistory?.(row)}>
+	                      历史记录
+	                    </Button>
+	                    {row.accessType !== 'INTERNAL' ? (
+	                      <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onAccessAction?.(row, 'renew_monthly')}>
+	                        月续费
+	                      </Button>
+	                    ) : null}
+	                    {row.accessType !== 'INTERNAL' ? (
+	                      <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onAccessAction?.(row, 'to_internal')}>
+	                        设内部
+	                      </Button>
+	                    ) : null}
+	                    <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onCourseAccess?.(row)}>
+	                      课程权限
+	                    </Button>
+	                    <Button size="sm" variant="ghost" className="w-full" disabled={isPending} onClick={() => onResetPassword?.(row)}>
+	                      重置密码
+	                    </Button>
+	                    <Button size="sm" variant="danger" className="w-full" disabled={isPending} onClick={() => onDelete?.(row)}>
+	                      {isPending ? '删除中...' : '删除'}
+	                    </Button>
                   </div>
                 ) : (
                   <span className="text-slate-500">管理员不可操作</span>
@@ -128,8 +143,9 @@ export function UserManagementTable({
               </div>
             </div>
           );
-        })}
-      </div>
+	        })}
+	        {rows.length === 0 ? <div className="ui-card px-3 py-8 text-center text-sm text-slate-400">暂无用户数据</div> : null}
+	      </div>
       <TableWrap className="hidden md:block">
       <Table>
         <thead>

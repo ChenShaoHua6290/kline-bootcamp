@@ -36,8 +36,8 @@ const ids = ['faq-system', 'faq-training', 'faq-access', 'faq-learning', 'faq-re
 function FaqSection({ id, title, items }: { id: string; title: string; items: readonly (readonly [string, string])[] }) {
   const [openIndex, setOpenIndex] = useState(0);
   return (
-    <section id={id} className="scroll-mt-28 rounded-2xl border border-cyan-400/20 bg-slate-900/55 p-5">
-      <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
+    <section id={id} className="scroll-mt-28 rounded-2xl border border-cyan-400/20 bg-slate-900/55 p-4 sm:p-5">
+      <h3 className="text-lg font-semibold text-slate-100 sm:text-xl">{title}</h3>
       <div className="mt-4 space-y-2">
         {items.map(([q, a], idx) => {
           const open = openIndex === idx;
@@ -45,7 +45,7 @@ function FaqSection({ id, title, items }: { id: string; title: string; items: re
             <div key={q} className="rounded-xl border border-cyan-400/20 bg-slate-950/45">
               <button
                 type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-slate-100"
+	                className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-semibold text-slate-100 sm:px-4"
                 onClick={() => setOpenIndex(open ? -1 : idx)}
               >
                 <span>{q}</span>
@@ -69,23 +69,23 @@ export function FaqCenter() {
   const activeId = useActiveAnchor(ids);
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(165deg,#020617_0%,#03112a_45%,#020617_100%)] text-slate-100">
+    <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(165deg,#020617_0%,#03112a_45%,#020617_100%)] text-slate-100">
       <header className="sticky top-0 z-40 border-b border-cyan-400/10 bg-slate-950/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-          <div>
+        <div className="mx-auto grid max-w-7xl gap-3 px-3 py-3 sm:px-6 md:flex md:items-center md:justify-between">
+          <div className="min-w-0">
             <p className="text-xs tracking-[0.14em] text-cyan-200">FAQ 中心</p>
             <h1 className="text-lg font-semibold text-slate-100">常见问题知识库</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/system" className="rounded-lg border border-cyan-400/25 px-3 py-1.5 text-xs text-slate-200">返回体系中心</Link>
-            <button className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 md:hidden" onClick={() => setMobileOpen((v) => !v)} type="button">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <Link href="/system" className="inline-flex items-center justify-center rounded-lg border border-cyan-400/25 px-3 py-2 text-xs text-slate-200 sm:py-1.5">返回体系中心</Link>
+            <button className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 md:hidden" onClick={() => setMobileOpen((v) => !v)} type="button">
               {mobileOpen ? '收起目录' : '展开目录'}
             </button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 md:grid-cols-[280px_minmax(0,1fr)] sm:px-6">
+      <div className="mx-auto grid max-w-7xl gap-4 px-3 py-3 sm:px-6 sm:py-4 md:grid-cols-[280px_minmax(0,1fr)]">
         <div className={mobileOpen ? 'block' : 'hidden md:block'}>
           <div className="md:sticky md:top-24">
             <KnowledgeSidebar title="FAQ 分类" groups={faqNavGroups} activeId={activeId} basePath="/faq" />

@@ -86,31 +86,41 @@ export default function ReplayPage() {
   if (!data) return <div className="p-5"><LoadingState message="复盘数据加载中..." /></div>;
 
   return (
-    <div className="space-y-4 p-4 sm:p-5">
+    <div className="space-y-3 overflow-x-hidden p-3 sm:space-y-4 sm:p-5">
       <PageHeader>
         <div>
           <PageTitle className="text-lg">训练复盘</PageTitle>
           <PageDescription>回看训练过程中的K线演变与交易决策。</PageDescription>
         </div>
       </PageHeader>
-      <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-sm text-slate-200">
-        <span>
-          标的: <span className="font-semibold text-slate-100">{data.symbolDisplayName?.trim() || data.symbol}</span>
+      <Card className="grid grid-cols-2 gap-2 px-3 py-3 text-xs text-slate-300 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-2 sm:px-4 sm:text-sm">
+        <span className="min-w-0">
+          <span className="text-slate-500">标的: </span><span className="font-semibold text-slate-100">{data.symbolDisplayName?.trim() || data.symbol}</span>
           {data.symbolDisplayName?.trim() ? <span className="ml-1 text-xs text-slate-400">({data.symbol})</span> : null}
         </span>
         <span>
-          市场: <span className="font-semibold text-slate-100">{formatMarketLabel(data.market)}</span>
+          <span className="text-slate-500">市场: </span><span className="font-semibold text-slate-100">{formatMarketLabel(data.market)}</span>
         </span>
         <span>
-          推进周期: <span className="font-semibold text-slate-100">{data.drivingTimeframe}</span>
+          <span className="text-slate-500">周期: </span><span className="font-semibold text-slate-100">{data.drivingTimeframe}</span>
         </span>
         <span>
-          训练K线数量: <span className="font-semibold text-slate-100">{data.totalBars}</span>
+          <span className="text-slate-500">K线: </span><span className="font-semibold text-slate-100">{data.totalBars}</span>
         </span>
       </Card>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-        <Card className="p-2 xl:col-span-3">
-          <ReplayChart data={visibleBars} actions={chartActions} timeframe={viewTimeframe} onTimeframeChange={setViewTimeframe} />
+        <Card className="h-[calc(100dvh-310px)] min-h-[380px] min-w-0 overflow-hidden p-0 sm:h-[calc(100dvh-330px)] sm:min-h-[430px] sm:p-0 xl:col-span-3 xl:h-[calc(100dvh-176px)]">
+          <ReplayChart
+            data={visibleBars}
+            actions={chartActions}
+            timeframe={viewTimeframe}
+            onTimeframeChange={setViewTimeframe}
+            fitContainerHeight
+            showTradeLegend={false}
+            showActionSummary={false}
+            hideXAxisLabels
+            hideHeaderTime
+          />
         </Card>
         <div className="space-y-3">
           <ReplayStatsPanel session={data} />

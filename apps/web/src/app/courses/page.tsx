@@ -117,7 +117,7 @@ export default function CoursesPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-[1240px] px-4 py-4">
+      <section className="mx-auto max-w-[1240px] px-3 py-4 sm:px-4">
         {query.isLoading ? <LoadingState message="正在加载课程体系..." /> : null}
         {query.isError ? <ErrorState message="课程中心加载失败，请稍后重试。" /> : null}
         {query.data ? (
@@ -134,7 +134,7 @@ export default function CoursesPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+                <div className="grid min-w-0 grid-cols-3 gap-2 lg:min-w-[360px]">
                   <div className="rounded-lg border border-slate-700/75 bg-slate-950/35 px-3 py-2">
                     <div className="text-lg font-semibold text-slate-100">{programMeta.courseCount}</div>
                     <div className="text-[11px] text-slate-500">课程</div>

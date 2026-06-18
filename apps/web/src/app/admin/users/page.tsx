@@ -289,8 +289,8 @@ export default function AdminUsersPage() {
           <PageDescription>可按昵称或邮箱检索用户，并配置训练套餐、课程权限与账号状态。</PageDescription>
         </div>
       </PageHeader>
-      <Card className="mb-3 p-4">
-        <div className="flex items-center gap-2">
+      <Card className="mb-3 p-3 sm:p-4">
+        <div className="grid gap-2 sm:flex sm:items-center">
           <Input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -298,7 +298,7 @@ export default function AdminUsersPage() {
             autoComplete="off"
             name="admin-user-search"
           />
-          <Button variant="default" className="h-9 min-w-[74px] whitespace-nowrap px-3" onClick={() => reload()}>
+          <Button variant="default" className="h-9 w-full whitespace-nowrap px-3 sm:min-w-[74px] sm:w-auto" onClick={() => reload()}>
             搜索
           </Button>
         </div>
@@ -413,7 +413,7 @@ export default function AdminUsersPage() {
         </div>
       </NoticeModal>
       <Modal open={courseAccessModal.open} onClose={closeCourseAccessModal} className="max-w-3xl">
-        <div className="border-b border-slate-700/70 px-5 py-4">
+        <div className="border-b border-slate-700/70 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-lg font-semibold text-slate-100">课程权限</div>
@@ -422,7 +422,7 @@ export default function AdminUsersPage() {
             <Button size="sm" variant="ghost" className="h-8 w-8 px-0" onClick={closeCourseAccessModal}>×</Button>
           </div>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+        <div className="max-h-[70dvh] overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
           {courseAccessQuery.isLoading ? <LoadingState message="课程权限加载中..." /> : null}
           {courseAccessQuery.isError ? <ErrorState message="课程权限加载失败，请重试" /> : null}
           {courseAccessQuery.data?.isInternal ? (
@@ -452,9 +452,9 @@ export default function AdminUsersPage() {
             </div>
           ) : null}
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-700/70 px-5 py-4">
-          <Button variant="default" onClick={closeCourseAccessModal} disabled={updateCourseAccessMutation.isPending}>取消</Button>
-          <Button variant="primary" onClick={confirmCourseAccess} disabled={updateCourseAccessMutation.isPending || !courseAccessQuery.data || courseAccessQuery.data.isInternal}>
+        <div className="grid gap-2 border-t border-slate-700/70 px-4 py-3 sm:flex sm:justify-end sm:px-5 sm:py-4">
+          <Button variant="default" className="w-full sm:w-auto" onClick={closeCourseAccessModal} disabled={updateCourseAccessMutation.isPending}>取消</Button>
+          <Button variant="primary" className="w-full sm:w-auto" onClick={confirmCourseAccess} disabled={updateCourseAccessMutation.isPending || !courseAccessQuery.data || courseAccessQuery.data.isInternal}>
             {updateCourseAccessMutation.isPending ? '保存中...' : '保存课程权限'}
           </Button>
         </div>

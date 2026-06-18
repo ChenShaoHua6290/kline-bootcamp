@@ -306,12 +306,12 @@ function HistoryPageInner() {
       <section className="mx-auto grid min-h-0 w-full grid-cols-1 gap-4 p-3 sm:p-4 xl:h-[calc(100vh-96px)] xl:grid-cols-[minmax(0,1fr)_minmax(420px,34vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(460px,32vw)]">
         <Card className="min-h-0 overflow-hidden">
           <div className="flex h-full min-h-0 flex-col">
-            <div className="shrink-0 border-b border-slate-700/70 px-4 py-3 sm:px-5">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <label className="ml-1 text-xs text-slate-400" htmlFor="history-search">搜索:</label>
+            <div className="shrink-0 border-b border-slate-700/70 px-3 py-3 sm:px-5">
+              <div className="mb-3 grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+                <label className="ml-1 text-xs text-slate-400 sm:ml-0" htmlFor="history-search">搜索:</label>
                 <input
                   id="history-search"
-                  className="h-9 min-w-[220px] flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/80 focus:ring-2 focus:ring-cyan-400/15"
+                  className="h-9 w-full min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/80 focus:ring-2 focus:ring-cyan-400/15"
                   value={searchText}
                   onChange={(e) => {
                     setSearchText(e.target.value);
@@ -319,20 +319,20 @@ function HistoryPageInner() {
                   placeholder="训练ID、作业、课程、标的"
                 />
                 {searchText ? (
-                  <Button size="sm" variant="ghost" onClick={() => { setSearchText(''); }}>
+                  <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={() => { setSearchText(''); }}>
                     清空
                   </Button>
                 ) : null}
               </div>
               <div className="grid gap-2 xl:grid-cols-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="ml-1 text-xs text-slate-400">状态:</span>
+                  <span className="w-full text-xs text-slate-400 sm:w-auto">状态:</span>
                   <Button size="sm" variant={statusFilter === 'CLOSED' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('CLOSED'); }}>已结束</Button>
                   <Button size="sm" variant={statusFilter === 'ACTIVE' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('ACTIVE'); }}>进行中</Button>
                   <Button size="sm" variant={statusFilter === 'ALL' ? 'primary' : 'ghost'} onClick={() => { setStatusFilter('ALL'); }}>全部</Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="ml-1 text-xs text-slate-400">来源:</span>
+                  <span className="w-full text-xs text-slate-400 sm:w-auto">来源:</span>
                   <Button size="sm" variant={assignmentFilter === 'ALL' ? 'primary' : 'ghost'} onClick={() => { setAssignmentFilter('ALL'); }}>全部</Button>
                   <Button size="sm" variant={assignmentFilter === 'trial' ? 'primary' : 'ghost'} onClick={() => { setAssignmentFilter('trial'); }}>试用训练</Button>
                   <Button size="sm" variant={assignmentFilter === 'courseAssignment' ? 'primary' : 'ghost'} onClick={() => { setAssignmentFilter('courseAssignment'); }}>课程作业</Button>
@@ -340,7 +340,7 @@ function HistoryPageInner() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2.5 sm:p-4">
               {historyQuery.isLoading ? <LoadingState message="正在加载历史记录..." className="min-h-[220px]" /> : null}
               {historyQuery.isError ? <ErrorState message="加载历史记录失败，请稍后重试。" className="min-h-[220px]" /> : null}
               {!historyQuery.isLoading && !historyQuery.isError && items.length === 0 ? (
@@ -364,7 +364,7 @@ function HistoryPageInner() {
                           setSelectedId(item.id);
                         }
                       }}
-                      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition sm:px-4 ${
                         active
                           ? 'border-cyan-300 bg-cyan-500/15'
                           : item.isLiquidated
@@ -372,18 +372,20 @@ function HistoryPageInner() {
                             : 'border-slate-700/90 bg-[linear-gradient(115deg,rgba(30,41,59,0.72),rgba(37,99,235,0.13),rgba(30,41,59,0.72))] hover:border-slate-500'
                       }`}
                     >
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <span className="truncate text-base font-semibold text-slate-100">
-                            {item.symbolDisplayName?.trim() || formatSymbolLabel(item.symbol)}
-                          </span>
-                          {item.symbolDisplayName?.trim() ? <span className="text-xs text-slate-400">{item.symbol}</span> : null}
-                          <Badge>{formatMarketLabel(item.market)}</Badge>
-                          <Badge tone={item.assignmentSource === 'trial' ? 'success' : item.assignmentSource === 'courseAssignment' ? 'info' : 'default'}>
-                            {assignmentSourceLabel(item.assignmentSource)}
-                          </Badge>
-                          <Badge tone="info">{item.totalBars}根</Badge>
-                          <Badge tone={item.hasReview ? 'success' : 'default'}>{item.hasReview ? '已复盘' : '未复盘'}</Badge>
+                      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="min-w-0 max-w-full truncate text-base font-semibold text-slate-100">
+                              {item.symbolDisplayName?.trim() || formatSymbolLabel(item.symbol)}
+                            </span>
+                            {item.symbolDisplayName?.trim() ? <span className="text-xs text-slate-400">{item.symbol}</span> : null}
+                            <Badge>{formatMarketLabel(item.market)}</Badge>
+                            <Badge tone={item.assignmentSource === 'trial' ? 'success' : item.assignmentSource === 'courseAssignment' ? 'info' : 'default'}>
+                              {assignmentSourceLabel(item.assignmentSource)}
+                            </Badge>
+                            <Badge tone="info">{item.totalBars}根</Badge>
+                            <Badge tone={item.hasReview ? 'success' : 'default'}>{item.hasReview ? '已复盘' : '未复盘'}</Badge>
+                          </div>
                           <button
                             type="button"
                             className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-slate-600/80 bg-slate-950/40 px-2 text-[11px] font-semibold text-slate-300 transition hover:border-cyan-400/60 hover:bg-cyan-500/15 hover:text-cyan-100"
@@ -398,14 +400,14 @@ function HistoryPageInner() {
                             复制ID
                           </button>
                         </div>
-                        <span className="text-xs text-slate-400">{formatTime(item.endedAt ?? item.createdAt)}</span>
+                        <span className="shrink-0 text-xs text-slate-400 sm:pt-1">{formatTime(item.endedAt ?? item.createdAt)}</span>
                       </div>
                       {contextTitle ? (
                         <div className="mb-2 truncate text-xs text-slate-300">
                           {contextTitle}
                         </div>
                       ) : null}
-                      <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+                      <div className="grid grid-cols-2 gap-3 text-sm xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
                         <div>
                           <div className="text-xs text-slate-400">盈亏比例</div>
                           <div className={`mt-1 text-sm font-semibold ${percent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -428,8 +430,8 @@ function HistoryPageInner() {
                           <div className="text-xs text-slate-400">最终资金</div>
                           <div className="mt-1 text-sm font-semibold text-slate-100">{(item.finalBalance ?? item.initialBalance).toFixed(2)}</div>
                         </div>
-                        <div className="flex items-end justify-start sm:col-span-2 xl:col-span-1 xl:justify-end">
-                          <div className="flex items-center gap-2">
+                        <div className="col-span-2 flex items-end justify-start xl:col-span-1 xl:justify-end">
+                          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
                             <span
                               className={`rounded-full px-3 py-1 text-xs font-semibold ${
                                 item.isLiquidated
@@ -445,7 +447,7 @@ function HistoryPageInner() {
                             </span>
                             <Link
                               href={reviewQueryString ? `/history/${item.id}/review?${reviewQueryString}` : `/history/${item.id}/review`}
-                              className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/25"
+                              className="inline-flex items-center justify-center rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/25"
                               onClick={(e) => e.stopPropagation()}
                             >
                               查看复盘
@@ -460,11 +462,11 @@ function HistoryPageInner() {
             </div>
 
             <div className="sticky bottom-0 shrink-0 border-t border-slate-700/70 bg-slate-950/95 px-3 py-3 backdrop-blur sm:px-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="text-xs text-slate-400">
                   第 {historyQuery.data?.pagination.page ?? page} / {historyQuery.data?.pagination.totalPages ?? 1} 页
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:flex">
                   <select
                     className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200"
                     value={pageSize}
@@ -476,10 +478,10 @@ function HistoryPageInner() {
                     <option value={20}>20 / 页</option>
                     <option value={50}>50 / 页</option>
                   </select>
-                  <Button size="sm" variant="ghost" disabled={!historyQuery.data?.pagination.hasPrev} onClick={() => setPage(Math.max(1, page - 1))}>
+                  <Button size="sm" variant="ghost" className="px-2" disabled={!historyQuery.data?.pagination.hasPrev} onClick={() => setPage(Math.max(1, page - 1))}>
                     上一页
                   </Button>
-                  <Button size="sm" variant="ghost" disabled={!historyQuery.data?.pagination.hasNext} onClick={() => setPage(page + 1)}>
+                  <Button size="sm" variant="ghost" className="px-2" disabled={!historyQuery.data?.pagination.hasNext} onClick={() => setPage(page + 1)}>
                     下一页
                   </Button>
                 </div>
@@ -488,20 +490,20 @@ function HistoryPageInner() {
           </div>
         </Card>
 
-        <Card className="min-h-0 overflow-hidden p-4 sm:p-5">
+        <Card className="min-h-0 scroll-mt-3 overflow-hidden p-3 sm:p-5">
           {!selectedId ? <EmptyState title="请选择一条记录" description="从左侧选择训练记录后，这里会显示详情与操作轨迹。" className="min-h-[200px]" /> : null}
           {detailQuery.isLoading ? <LoadingState message="正在加载详情..." className="min-h-[200px]" /> : null}
           {detailQuery.isError ? <ErrorState message="加载详情失败，请重试。" className="min-h-[200px]" /> : null}
           {detailQuery.data ? (
             <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
-              <section className="rounded-xl border border-slate-700/70 bg-slate-900/45 p-4">
+              <section className="rounded-xl border border-slate-700/70 bg-slate-900/45 p-3 sm:p-4">
                 <h4 className="text-base font-semibold text-slate-100">买卖行为统计</h4>
-                <div className="mt-2 max-h-[34vh] space-y-2 overflow-y-auto pr-1">
+                <div className="mt-2 max-h-[320px] space-y-2 overflow-y-auto pr-1 xl:max-h-[34vh]">
                   {session?.actions.length === 0 ? (
                     <EmptyState title="暂无操作记录" className="min-h-[96px]" />
                   ) : (
                     (session?.actions ?? []).slice().reverse().map((action) => (
-                      <div key={action.id} className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2">
+                      <div key={action.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2">
                         <div className="flex items-center gap-2"><ActionTag actionType={action.actionType} /><span className="text-xs text-slate-400">{formatTime(action.createdAt)}</span></div>
                         <div className="text-xs font-semibold text-slate-100">¥{action.price.toFixed(2)}</div>
                       </div>

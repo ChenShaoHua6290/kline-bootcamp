@@ -79,14 +79,14 @@ export default function IndicatorsPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1120px] gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <section className="mx-auto grid max-w-[1120px] gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="border-slate-700/80 bg-slate-900/70 p-0">
-          <div className="border-b border-slate-800/90 px-5 py-4">
+          <div className="border-b border-slate-800/90 px-4 py-4 sm:px-5">
             <Badge tone="info">执行辅助</Badge>
-            <h1 className="mt-3 text-2xl font-semibold text-slate-100">先有规则，再用指标</h1>
+            <h1 className="mt-3 text-xl font-semibold text-slate-100 sm:text-2xl">先有规则，再用指标</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-400">统一使用 MarkdownRenderer 展示，方便后续把后台维护的指标说明直接迁移进来。</p>
           </div>
-          <div className="px-5 py-5">
+          <div className="px-4 py-4 sm:px-5 sm:py-5">
             <MarkdownRenderer content={indicatorMarkdown} />
           </div>
         </Card>

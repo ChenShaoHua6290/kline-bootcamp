@@ -85,7 +85,7 @@ export default function CourseDetailPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1120px] gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <section className="mx-auto grid max-w-[1120px] gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-4">
           {hasCourseDescription ? (
             <section className="rounded-xl border border-slate-700/70 bg-slate-900/45 px-4 py-3">
@@ -101,11 +101,11 @@ export default function CourseDetailPage() {
               <h2 className="text-lg font-semibold text-slate-100">内容列表</h2>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900/65 shadow-[0_16px_36px_rgba(0,0,0,0.24)]">
+	            <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65 shadow-[0_16px_36px_rgba(0,0,0,0.24)] sm:rounded-2xl">
               {courseMeta.lessons.length > 0 ? (
                 <div className="divide-y divide-slate-800/80">
-                  {courseMeta.lessons.map((lesson, index) => (
-                    <div key={lesson.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center">
+	                  {courseMeta.lessons.map((lesson, index) => (
+	                    <div key={lesson.id} className="grid gap-3 px-3 py-3 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center sm:px-4">
                       <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-950/45 text-xs text-slate-400">
                         {String(index + 1).padStart(2, '0')}
                       </div>
@@ -116,15 +116,15 @@ export default function CourseDetailPage() {
                         </div>
                         <div className="mt-1 text-xs text-slate-500">{typeLabel(lesson.type)}</div>
                       </div>
-                      <div className="flex flex-wrap gap-2 sm:justify-end">
-                        {lesson.locked ? (
-                          <Button className="w-full sm:w-auto" size="sm" variant="ghost" disabled title={lesson.lockReason ?? undefined}>权限不足</Button>
-                        ) : (
-                          <>
-                            <Link href={`/lessons/${lesson.id}`}><Button className="w-full sm:w-auto" size="sm" variant="primary">学习</Button></Link>
-                            {lesson.trainingAssignment ? (
-                              <Link href={buildTrainingAssignmentHref(lesson)}>
-                                <Button
+	                      <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+	                        {lesson.locked ? (
+	                          <Button className="w-full sm:w-auto" size="sm" variant="ghost" disabled title={lesson.lockReason ?? undefined}>权限不足</Button>
+	                        ) : (
+	                          <>
+	                            <Link href={`/lessons/${lesson.id}`} className="w-full sm:w-auto"><Button className="w-full sm:w-auto" size="sm" variant="primary">学习</Button></Link>
+	                            {lesson.trainingAssignment ? (
+	                              <Link href={buildTrainingAssignmentHref(lesson)} className="w-full sm:w-auto">
+	                                <Button
                                   className="w-full border-cyan-400/55 bg-cyan-500/15 text-cyan-100 shadow-[0_10px_22px_rgba(6,182,212,0.12)] hover:border-cyan-300/80 hover:bg-cyan-500/25 hover:text-white sm:w-auto"
                                   size="sm"
                                   variant="ghost"

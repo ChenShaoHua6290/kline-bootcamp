@@ -83,6 +83,7 @@ export function TradePanel({
 }) {
   const [positionPercent, setPositionPercent] = useState(0.1);
   const [closePercent, setClosePercent] = useState(100);
+  const [showClosePercent, setShowClosePercent] = useState(false);
   const [riskModalOpen, setRiskModalOpen] = useState(false);
   const [riskMode, setRiskMode] = useState<RiskMode>('price');
   const [riskSide, setRiskSide] = useState<RiskSide>('LONG');
@@ -128,6 +129,7 @@ export function TradePanel({
       setTakeProfitInput('');
       setStopLossPercentInput('');
       setTakeProfitPercentInput('');
+      setShowClosePercent(false);
     }
     prevHasPositionRef.current = hasPositionNow;
   }, [session.position, session.actions]);
@@ -268,15 +270,39 @@ export function TradePanel({
   };
 
   return (
-    <section className="surface-panel relative z-10 flex flex-col bg-[#0b152b] p-2 md:p-2.5">
-      {ended ? <div className="surface-muted mb-1.5 px-2 py-1 text-[11px] text-slate-300 md:py-1.5">本局已结束，无法继续下单。</div> : null}
+    <section className="surface-panel relative z-10 flex flex-col bg-[#0b152b] p-1.5 md:p-2.5">
+      {ended ? <div className="surface-muted mb-1 px-2 py-1 text-[11px] text-slate-300 md:mb-1.5 md:py-1.5">本局已结束，无法继续下单。</div> : null}
 
-      <Card className="mb-1.5 shrink-0 p-2">
-        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-300 md:mb-1.5 md:text-[12px]">
+      <Card className="mb-1 shrink-0 p-1.5 md:mb-1.5 md:p-2">
+        <div className="grid grid-cols-[34px_repeat(4,minmax(0,1fr))_48px] items-center gap-1 md:hidden">
+          <span className="text-[11px] font-medium text-slate-300">仓位</span>
+          {[10, 20, 50, 100].map((n) => {
+            const active = Math.round(positionPercent * 100) === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                className={`h-8 rounded-lg border px-0.5 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                  active
+                    ? 'border-cyan-300/65 bg-cyan-500/18 text-cyan-100 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.12)]'
+                    : 'border-slate-700/75 bg-slate-950/45 text-slate-300 hover:border-slate-500'
+                }`}
+                onClick={() => setPositionPercent(n / 100)}
+                disabled={busy}
+              >
+                {n}%
+              </button>
+            );
+          })}
+          <span className="inline-flex h-8 items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-1 text-[10px] font-semibold text-cyan-100">
+            当前价
+          </span>
+        </div>
+        <div className="mb-1 hidden items-center justify-between gap-2 text-[11px] text-slate-300 md:mb-1.5 md:flex md:text-[12px]">
           <span className="text-[11px] font-medium tracking-normal text-slate-300 md:text-[12px]">下单数量</span>
           <div className="flex items-center gap-1.5 text-[10px] text-slate-400 md:text-[11px]">
             <span>仓位 {(positionPercent * 100).toFixed(0)}%</span>
-            <Badge tone="info">按当前价格估算</Badge>
+            <Badge tone="info" className="whitespace-nowrap">按当前价</Badge>
           </div>
         </div>
         <Slider
@@ -284,16 +310,16 @@ export function TradePanel({
           max={100}
           value={positionPercent * 100}
           onChange={(e) => setPositionPercent(Number(e.target.value) / 100)}
-          className="slider-compact w-full"
+          className="slider-compact hidden w-full md:block"
           disabled={busy}
         />
-        <div className="mt-1 grid grid-cols-5 gap-1 text-[10px] md:text-[11px]">
-          <Button variant="outline" size="sm" className="h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.1)} disabled={busy}>10%</Button>
-          <Button variant="outline" size="sm" className="h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.2)} disabled={busy}>20%</Button>
-          <Button variant="outline" size="sm" className="h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.5)} disabled={busy}>50%</Button>
-          <Button variant="outline" size="sm" className="col-span-2 h-7 px-0.5 text-[10px] md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(1)} disabled={busy}>100%</Button>
+        <div className="mt-1 hidden grid-cols-4 gap-1 text-[10px] md:grid md:grid-cols-5 md:text-[11px]">
+          <Button variant="outline" size="sm" className="h-6 px-0.5 text-[10px] md:h-7 md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.1)} disabled={busy}>10%</Button>
+          <Button variant="outline" size="sm" className="h-6 px-0.5 text-[10px] md:h-7 md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.2)} disabled={busy}>20%</Button>
+          <Button variant="outline" size="sm" className="h-6 px-0.5 text-[10px] md:h-7 md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(0.5)} disabled={busy}>50%</Button>
+          <Button variant="outline" size="sm" className="h-6 px-0.5 text-[10px] md:col-span-2 md:h-7 md:px-0.5 md:text-[11px]" onClick={() => setPositionPercent(1)} disabled={busy}>100%</Button>
         </div>
-        {hasPosition ? (
+        {hasPosition && showClosePercent ? (
           <>
             <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300 md:text-[12px]">
               <span className="text-[11px] font-medium tracking-normal text-slate-300 md:text-[12px]">平仓比例</span>
@@ -301,14 +327,14 @@ export function TradePanel({
             </div>
             <div className="mt-1 grid grid-cols-4 gap-1">
               {[25, 50, 75, 100].map((n) => (
-                <Button key={n} variant={closePercent === n ? 'primary' : 'outline'} size="sm" className="h-8 text-[10px] md:text-[11px]" onClick={() => setClosePercent(n)} disabled={busy}>
+                <Button key={n} variant={closePercent === n ? 'primary' : 'outline'} size="sm" className="h-7 text-[10px] md:h-8 md:text-[11px]" onClick={() => setClosePercent(n)} disabled={busy}>
                   {n}%
                 </Button>
               ))}
             </div>
           </>
         ) : null}
-        <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/35 px-2 py-1.5 text-[10px] md:text-[11px]">
+        <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/35 px-2 py-1 text-[10px] md:mt-2 md:py-1.5 md:text-[11px]">
           <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-slate-500">
             <div className="min-w-0 truncate">
               止损 <span className="font-semibold text-rose-200">{formatRiskPrice(displayStopLossPrice)}</span>
@@ -330,12 +356,12 @@ export function TradePanel({
         </div>
       </Card>
 
-      <div className="mb-1.5 grid shrink-0 grid-cols-2 gap-1.5">
+      <div className="mb-1 grid shrink-0 grid-cols-4 gap-1 md:mb-1.5 md:grid-cols-2 md:gap-1.5">
         <Button
           size="sm"
           disabled={!(canBuy || canAddLong)}
           variant="success"
-          className="h-8.5 !bg-emerald-700/70 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
+          className="h-9 px-0.5 !bg-emerald-700/70 !shadow-none !text-[10px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
           onClick={() => {
             const riskPayload = buildCommittedRiskPayload('LONG');
             onAction(
@@ -351,16 +377,22 @@ export function TradePanel({
           size="sm"
           disabled={!canCloseAny}
           variant="danger"
-          className="h-8.5 !bg-rose-700/70 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
-          onClick={() => onAction({ actionType: 'PARTIAL_CLOSE', closePercent })}
+          className="h-9 px-0.5 !bg-rose-700/70 !shadow-none !text-[10px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
+          onClick={() => {
+            if (!showClosePercent) {
+              setShowClosePercent(true);
+              return;
+            }
+            onAction({ actionType: 'PARTIAL_CLOSE', closePercent });
+          }}
         >
-          部分平仓
+          {showClosePercent ? '确认平仓' : '部分平仓'}
         </Button>
         <Button
           size="sm"
           disabled={!(canBuy || canAddShort)}
           variant="warning"
-          className="h-8.5 !bg-amber-700/70 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
+          className="h-9 px-0.5 !bg-amber-700/70 !shadow-none !text-[10px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
           onClick={() => {
             const riskPayload = buildCommittedRiskPayload('SHORT');
             onAction(
@@ -376,32 +408,37 @@ export function TradePanel({
           size="sm"
           disabled={!canCloseAny}
           variant="outline"
-          className="h-8.5 !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
-          onClick={() => onAction({ actionType: 'FULL_CLOSE', closePercent: 100 })}
+          className="h-9 px-0.5 !text-[10px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
+          onClick={() => {
+            setShowClosePercent(false);
+            onAction({ actionType: 'FULL_CLOSE', closePercent: 100 });
+          }}
         >
           全部平仓
         </Button>
       </div>
 
-      <Button
-        size="sm"
-        variant="primary"
-        className="mb-1.5 h-9 w-full shrink-0 !bg-blue-700/80 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
-        onClick={() => onAction({ action: 'HOLD', ...buildCommittedRiskPayload(committedRiskSide) })}
-        disabled={!canHold}
-      >
-        下一条
-      </Button>
+      <div className="grid shrink-0 grid-cols-[minmax(0,2fr)_minmax(82px,0.75fr)] gap-1 md:block">
+        <Button
+          size="sm"
+          variant="primary"
+          className="h-9 w-full !bg-blue-700/80 !shadow-none !text-[11px] font-semibold disabled:opacity-40 md:mb-1.5 md:h-7 md:!text-[12px]"
+          onClick={() => onAction({ action: 'HOLD', ...buildCommittedRiskPayload(committedRiskSide) })}
+          disabled={!canHold}
+        >
+          下一条
+        </Button>
 
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
-        onClick={onEnd}
-        disabled={!canEnd}
-      >
-        结束
-      </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-9 w-full !text-[11px] font-semibold disabled:opacity-40 md:h-7 md:!text-[12px]"
+          onClick={onEnd}
+          disabled={!canEnd}
+        >
+          结束
+        </Button>
+      </div>
 
       <Modal open={riskModalOpen} onClose={() => setRiskModalOpen(false)} className="max-w-md p-0" maskClosable={false}>
         <div className="border-b border-slate-800 px-4 py-3">

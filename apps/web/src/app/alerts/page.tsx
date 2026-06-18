@@ -76,14 +76,14 @@ export default function AlertsPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1120px] gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <section className="mx-auto grid max-w-[1120px] gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="border-slate-700/80 bg-slate-900/70 p-0">
-          <div className="border-b border-slate-800/90 px-5 py-4">
+          <div className="border-b border-slate-800/90 px-4 py-4 sm:px-5">
             <Badge tone="warning">辅助观察</Badge>
-            <h1 className="mt-3 text-2xl font-semibold text-slate-100">提醒只负责把你带回观察点</h1>
+            <h1 className="mt-3 text-xl font-semibold text-slate-100 sm:text-2xl">提醒只负责把你带回观察点</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-400">统一使用 MarkdownRenderer 展示，后续可直接把后台维护的共振提醒说明迁移到同一套内容字段。</p>
           </div>
-          <div className="px-5 py-5">
+          <div className="px-4 py-4 sm:px-5 sm:py-5">
             <MarkdownRenderer content={alertsMarkdown} />
           </div>
         </Card>

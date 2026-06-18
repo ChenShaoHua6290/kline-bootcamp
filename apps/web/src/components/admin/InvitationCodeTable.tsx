@@ -50,21 +50,22 @@ export function InvitationCodeTable({
   const desktopCols = 'grid-cols-[1.05fr_0.55fr_0.65fr_0.6fr_0.55fr_0.62fr_0.9fr_0.9fr_0.85fr]';
   return (
     <>
-      <div className="space-y-2 md:hidden">
-        {rows.map((row) => (
-          <div key={row.id} className="ui-card p-3 text-[13px] text-slate-200">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="font-mono text-sm font-semibold">{row.code}</div>
-              <Badge tone={row.isActive ? 'success' : 'default'}>{row.isActive ? '启用' : '停用'}</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-400">
-              <div>最大次数: <span className="text-slate-200">{row.maxUses}</span></div>
-              <div>类型: <span className="text-slate-200">{formatInviteType(row.type)}</span></div>
-              <div>已使用: <span className="text-slate-200">{row.usedCount}</span></div>
-              <div>过期时间: <span className="text-slate-200">{row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN') : '--'}</span></div>
-              <div>创建时间: <span className="text-slate-200">{new Date(row.createdAt).toLocaleString('zh-CN')}</span></div>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+	      <div className="space-y-2 md:hidden">
+	        {rows.map((row) => (
+	          <div key={row.id} className="ui-card p-3 text-[13px] text-slate-200">
+	            <div className="mb-2 flex items-center justify-between gap-2">
+	              <div className="min-w-0 break-all font-mono text-sm font-semibold">{row.code}</div>
+	              <Badge tone={row.isActive ? 'success' : 'default'}>{row.isActive ? '启用' : '停用'}</Badge>
+	            </div>
+	            <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-400">
+	              <div>最大次数: <span className="text-slate-200">{row.maxUses}</span></div>
+	              <div>类型: <span className="text-slate-200">{formatInviteType(row.type)}</span></div>
+	              <div>已使用: <span className="text-slate-200">{row.usedCount}</span></div>
+	              <div>套餐: <span className="text-slate-200">{row.type === 'PAID' ? formatPaidPlan(row.paidPlan) : row.type === 'TRIAL' ? `${row.trialDays ?? DEFAULT_TRIAL_DAYS}天` : '--'}</span></div>
+	              <div className="col-span-2">过期时间: <span className="text-slate-200">{row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN') : '--'}</span></div>
+	              <div className="col-span-2">创建时间: <span className="text-slate-200">{new Date(row.createdAt).toLocaleString('zh-CN')}</span></div>
+	            </div>
+	            <div className="mt-2 grid grid-cols-2 gap-2">
               <Button size="sm" variant="ghost" onClick={() => onCopyInviteText?.(row)}>
                 复制文本
               </Button>
@@ -74,10 +75,11 @@ export function InvitationCodeTable({
               <Button size="sm" variant="danger" disabled={pendingToggleId === row.id || pendingDeleteId === row.id} onClick={() => onDelete(row)}>
                 {pendingDeleteId === row.id ? '删除中...' : '删除'}
               </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+	            </div>
+	          </div>
+	        ))}
+	        {rows.length === 0 ? <div className="ui-card px-3 py-8 text-center text-sm text-slate-400">暂无邀请码</div> : null}
+	      </div>
       <TableWrap className="hidden md:block">
       <Table>
         <thead>

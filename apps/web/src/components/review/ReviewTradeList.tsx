@@ -17,8 +17,31 @@ export function ReviewTradeList({
       {trades.length === 0 ? (
         <EmptyState title="暂无交易记录" className="min-h-[120px]" />
       ) : (
-        <div className="max-h-[400px] overflow-auto rounded-xl border border-slate-700/80">
-          <table className="w-full text-left text-[13px]">
+        <>
+        <div className="space-y-2 sm:hidden">
+          {trades.map((trade) => (
+            <button
+              key={trade.id}
+              type="button"
+              className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${activeTradeId === trade.id ? 'border-cyan-400/50 bg-cyan-500/12' : 'border-slate-700/80 bg-slate-900/50 hover:border-slate-500'}`}
+              onClick={() => onTradeClick?.(trade)}
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-slate-100">{trade.direction === 'LONG' ? '买涨' : '买跌'}</span>
+                <span className={`text-sm font-semibold ${(trade.pnl ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {trade.pnl == null ? '--' : `${trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}`}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                <div>开仓 <span className="text-slate-200">{trade.openPrice?.toFixed?.(2) ?? '--'}</span></div>
+                <div>平仓 <span className="text-slate-200">{trade.closePrice != null ? trade.closePrice.toFixed(2) : '--'}</span></div>
+                <div className="col-span-2">原因 <span className="text-slate-200">{trade.closeReason ?? '--'}</span></div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="hidden max-h-[400px] overflow-auto rounded-xl border border-slate-700/80 sm:block">
+          <table className="w-full min-w-[520px] text-left text-[13px]">
             <thead className="bg-slate-900/80 text-[12px] text-slate-400">
               <tr>
                 <th className="px-3 py-2">方向</th>
@@ -49,6 +72,7 @@ export function ReviewTradeList({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

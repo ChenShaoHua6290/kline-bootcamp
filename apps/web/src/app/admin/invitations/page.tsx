@@ -129,10 +129,10 @@ export default function AdminInvitationsPage() {
           <PageDescription>创建、启停、维护邀请码有效期和使用次数。</PageDescription>
         </div>
       </PageHeader>
-      <Card className="mb-3 p-4">
-        <div className="flex items-center justify-between">
+      <Card className="mb-3 p-3 sm:p-4">
+        <div className="grid gap-3 sm:flex sm:items-center sm:justify-between">
           <div className="text-sm text-slate-300">管理邀请码的创建、启用、停用与删除。</div>
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>创建邀请码</Button>
+          <Button variant="primary" className="w-full sm:w-auto" onClick={() => setCreateOpen(true)}>创建邀请码</Button>
         </div>
         {error ? <div className="mt-2 text-sm text-rose-300">{error}</div> : null}
       </Card>

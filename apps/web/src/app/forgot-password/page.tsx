@@ -25,9 +25,9 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-8">
+    <main className="mx-auto flex min-h-screen w-full items-center justify-center px-3 py-6 sm:px-4 sm:py-8">
       <Card className="w-full max-w-md">
-        <CardBody className="space-y-4 p-5">
+        <CardBody className="space-y-4 p-4 sm:p-5">
           <h1 className="text-lg font-semibold text-slate-100">忘记密码</h1>
           <form className="space-y-3" onSubmit={onSubmit}>
             <label className="block text-sm">

@@ -650,7 +650,7 @@ export default function AdminCoursesPage() {
 
       {!coursesQuery.isLoading && !coursesQuery.isError ? (
         <div className="space-y-3">
-          <div className="grid gap-2 md:grid-cols-3">
+	          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
             <div className="rounded-xl border border-slate-700/80 bg-slate-900/65 px-3 py-2.5">
               <div className="text-xl font-semibold text-slate-100">{courses.length}</div>
               <div className="mt-0.5 text-xs text-slate-500">课程</div>
@@ -659,28 +659,28 @@ export default function AdminCoursesPage() {
               <div className="text-xl font-semibold text-slate-100">{stats.lessonCount}</div>
               <div className="mt-0.5 text-xs text-slate-500">课时</div>
             </div>
-            <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2.5">
+	            <div className="col-span-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2.5 md:col-span-1">
               <div className="text-xl font-semibold text-cyan-100">{stats.publishedLessonCount}</div>
               <div className="mt-0.5 text-xs text-cyan-100/70">已上架课时 · {stats.previewLessonCount} 试看</div>
             </div>
           </div>
 
           <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_minmax(620px,760px)]">
-            <Card className="overflow-hidden">
+	            <Card className="min-w-0 overflow-hidden">
               <div className="border-b border-slate-800/90 px-3 py-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+	                <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
                   <div>
                     <div className="text-sm font-semibold text-slate-100">内容结构</div>
                     <div className="mt-0.5 text-xs text-slate-500">课程 → 课时，先选择左侧课程，再在右侧编辑。</div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="ghost" onClick={startCreateCourse}>新建课程</Button>
-                    <Button size="sm" variant="ghost" disabled={!selectedCourse} onClick={() => startCreateLesson()}>新建课时</Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid min-h-[500px] divide-y divide-slate-800/90 lg:grid-cols-[280px_minmax(300px,1fr)] lg:divide-x lg:divide-y-0 2xl:grid-cols-[300px_minmax(360px,1fr)]">
+	                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+	                    <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={startCreateCourse}>新建课程</Button>
+	                    <Button size="sm" variant="ghost" className="w-full sm:w-auto" disabled={!selectedCourse} onClick={() => startCreateLesson()}>新建课时</Button>
+	                  </div>
+	                </div>
+	              </div>
+	
+	              <div className="grid min-h-0 divide-y divide-slate-800/90 lg:min-h-[500px] lg:grid-cols-[280px_minmax(300px,1fr)] lg:divide-x lg:divide-y-0 2xl:grid-cols-[300px_minmax(360px,1fr)]">
                 <section className="min-w-0 p-2.5">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div>
@@ -739,8 +739,8 @@ export default function AdminCoursesPage() {
                       <div className="rounded-xl border border-slate-700/70 bg-slate-950/35 px-3 py-2 text-xs text-slate-400">
                         所属课程：<span className="text-slate-200">{selectedCourse.title}</span>
                       </div>
-                      {selectedCourseLessons.map((lesson) => (
-                        <div key={lesson.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-xl border border-slate-700/75 bg-slate-900/55 px-3 py-2.5 transition hover:border-slate-500">
+	                      {selectedCourseLessons.map((lesson) => (
+	                        <div key={lesson.id} className="grid gap-2 rounded-xl border border-slate-700/75 bg-slate-900/55 px-3 py-2.5 transition hover:border-slate-500 sm:grid-cols-[minmax(0,1fr)_auto]">
                           <button type="button" className="min-w-0 text-left" onClick={() => startEditLesson(lesson)}>
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="truncate text-sm font-medium text-slate-100">{lesson.title}</span>
@@ -754,7 +754,7 @@ export default function AdminCoursesPage() {
                               {lesson.videoFileId ? `fileId: ${lesson.videoFileId}` : lesson.videoUrl ? '已填写 videoUrl' : lesson.attachmentUrl ? '已填写附件' : '未绑定媒体'}
                             </div>
                           </button>
-                          <div className="flex items-center">
+	                          <div className="flex items-center justify-end">
                             <ActionIconButton label="删除课时" tone="danger" onClick={() => setDeleteTarget({ type: 'lesson', row: lesson })}>
                               <TrashIcon />
                             </ActionIconButton>
@@ -770,7 +770,7 @@ export default function AdminCoursesPage() {
               </div>
             </Card>
 
-            <Card className="p-4 2xl:sticky 2xl:top-3 2xl:max-h-[calc(100vh-96px)] 2xl:self-start 2xl:overflow-y-auto">
+	            <Card className="min-w-0 p-3 sm:p-4 2xl:sticky 2xl:top-3 2xl:max-h-[calc(100vh-96px)] 2xl:self-start 2xl:overflow-y-auto">
               <div className="mb-3">
                 <div className="text-sm font-semibold text-slate-100">编辑器</div>
                 <div className="mt-1 truncate text-xs leading-5 text-slate-500">
@@ -784,7 +784,7 @@ export default function AdminCoursesPage() {
 
               {activeEditor === 'course' ? (
                 <form className="space-y-3" onSubmit={submitCourse}>
-                  <div className="flex items-center justify-between gap-3">
+	                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-slate-100">{editingCourseId ? '编辑课程' : '创建课程'}</div>
                     {editingCourseId ? <Badge tone="info">{editingCourseId}</Badge> : <Badge tone="warning">新课程</Badge>}
                   </div>
@@ -793,7 +793,7 @@ export default function AdminCoursesPage() {
                   <Field label="课程封面图 URL" hint="支持本地上传图片">
                     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                       <Input value={editingCourse.coverImage} onChange={(e) => setEditingCourse((p) => ({ ...p, coverImage: e.target.value }))} placeholder="课程封面图片 URL" />
-                      <Button size="sm" variant="ghost" disabled={uploadingCover} onClick={() => coverInputRef.current?.click()}>
+	                      <Button size="sm" variant="ghost" className="w-full sm:w-auto" disabled={uploadingCover} onClick={() => coverInputRef.current?.click()}>
                         {uploadingCover ? '上传中...' : '上传封面'}
                       </Button>
                     </div>
@@ -825,16 +825,16 @@ export default function AdminCoursesPage() {
                             </optgroup>
                           ))}
                         </Select>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => addRelatedLink()}>
-                            自定义
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={applyDefaultRelatedLinks}>
-                            默认
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={clearRelatedLinks}>
-                            清空
-                          </Button>
+	                        <div className="grid grid-cols-3 gap-2 sm:flex">
+	                          <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={() => addRelatedLink()}>
+	                            自定义
+	                          </Button>
+	                          <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={applyDefaultRelatedLinks}>
+	                            默认
+	                          </Button>
+	                          <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={clearRelatedLinks}>
+	                            清空
+	                          </Button>
                         </div>
                       </div>
 
@@ -862,9 +862,11 @@ export default function AdminCoursesPage() {
                                   placeholder="排序"
                                   aria-label="相关入口排序"
                                 />
-                                <ActionIconButton label="删除入口" tone="danger" onClick={() => removeRelatedLink(index)}>
-                                  <TrashIcon />
-                                </ActionIconButton>
+	                                <div className="flex justify-end">
+	                                  <ActionIconButton label="删除入口" tone="danger" onClick={() => removeRelatedLink(index)}>
+	                                    <TrashIcon />
+	                                  </ActionIconButton>
+	                                </div>
                               </div>
                             </div>
                           ))}
@@ -886,17 +888,17 @@ export default function AdminCoursesPage() {
                       </Select>
                     </Field>
                   </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    {editingCourseRow ? <Button variant="danger" onClick={() => setDeleteTarget({ type: 'course', row: editingCourseRow })}>删除课程</Button> : null}
-                    {editingCourseId ? <Button variant="ghost" onClick={startCreateCourse}>取消编辑</Button> : null}
-                    <Button variant="primary" type="submit" disabled={saveCourseMutation.isPending}>{saveCourseMutation.isPending ? '保存中...' : '保存课程'}</Button>
-                  </div>
+	                  <div className="grid gap-2 pt-1 sm:flex sm:justify-end">
+	                    {editingCourseRow ? <Button className="w-full sm:w-auto" variant="danger" onClick={() => setDeleteTarget({ type: 'course', row: editingCourseRow })}>删除课程</Button> : null}
+	                    {editingCourseId ? <Button className="w-full sm:w-auto" variant="ghost" onClick={startCreateCourse}>取消编辑</Button> : null}
+	                    <Button className="w-full sm:w-auto" variant="primary" type="submit" disabled={saveCourseMutation.isPending}>{saveCourseMutation.isPending ? '保存中...' : '保存课程'}</Button>
+	                  </div>
                 </form>
               ) : null}
 
               {activeEditor === 'lesson' ? (
                 <form className="space-y-3" onSubmit={submitLesson}>
-                  <div className="flex items-center justify-between gap-3">
+	                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-slate-100">{editingLessonId ? '编辑课时' : '创建课时'}</div>
                     <Badge tone={selectedCourse ? 'info' : 'warning'}>{selectedCourse ? selectedCourse.title : '未选择课程'}</Badge>
                   </div>
@@ -943,7 +945,7 @@ export default function AdminCoursesPage() {
                   <Field label="PDF 附件 URL" hint="可选，任何课时类型都可绑定">
                     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                       <Input value={editingLesson.attachmentUrl} onChange={(e) => setEditingLesson((p) => ({ ...p, attachmentUrl: e.target.value }))} placeholder="PDF课件URL" />
-                      <Button size="sm" variant="ghost" disabled={uploadingPdf} onClick={() => pdfInputRef.current?.click()}>
+	                      <Button size="sm" variant="ghost" className="w-full sm:w-auto" disabled={uploadingPdf} onClick={() => pdfInputRef.current?.click()}>
                         {uploadingPdf ? '上传中...' : '上传PDF'}
                       </Button>
                     </div>
@@ -974,11 +976,11 @@ export default function AdminCoursesPage() {
                       </Select>
                     </Field>
                   </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    {editingLessonRow ? <Button variant="danger" onClick={() => setDeleteTarget({ type: 'lesson', row: editingLessonRow })}>删除课时</Button> : null}
-                    {editingLessonId ? <Button variant="ghost" onClick={() => startCreateLesson()}>取消编辑</Button> : null}
-                    <Button variant="primary" type="submit" disabled={!selectedCourse || saveLessonMutation.isPending}>{saveLessonMutation.isPending ? '保存中...' : '保存课时'}</Button>
-                  </div>
+	                  <div className="grid gap-2 pt-1 sm:flex sm:justify-end">
+	                    {editingLessonRow ? <Button className="w-full sm:w-auto" variant="danger" onClick={() => setDeleteTarget({ type: 'lesson', row: editingLessonRow })}>删除课时</Button> : null}
+	                    {editingLessonId ? <Button className="w-full sm:w-auto" variant="ghost" onClick={() => startCreateLesson()}>取消编辑</Button> : null}
+	                    <Button className="w-full sm:w-auto" variant="primary" type="submit" disabled={!selectedCourse || saveLessonMutation.isPending}>{saveLessonMutation.isPending ? '保存中...' : '保存课时'}</Button>
+	                  </div>
                 </form>
               ) : null}
             </Card>
@@ -997,10 +999,11 @@ export default function AdminCoursesPage() {
           </div>
           <div className="mt-4 text-xs leading-5 text-slate-500">该操作不可撤销。确认前请检查是否只是需要改为草稿或归档。</div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
-          <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>取消</Button>
-          <Button
-            variant="danger"
+	        <div className="grid gap-2 border-t border-slate-800 px-5 py-4 sm:flex sm:justify-end">
+	          <Button className="w-full sm:w-auto" variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>取消</Button>
+	          <Button
+	            variant="danger"
+	            className="w-full sm:w-auto"
             disabled={!deleteTarget || deleteMutation.isPending}
             onClick={() => {
               if (deleteTarget) deleteMutation.mutate(deleteTarget);

@@ -98,14 +98,14 @@ export function InvitationCodeFormModal({
   return (
     <Modal open={open} onClose={onClose} className="max-w-lg overflow-hidden p-0">
       <div className="flex max-h-[min(86vh,760px)] flex-col">
-        <div className="border-b border-slate-700/70 px-5 py-4">
+        <div className="border-b border-slate-700/70 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="text-lg font-semibold text-slate-100">创建邀请码</div>
             <Badge tone="info">管理员</Badge>
           </div>
           <p className="mt-1 text-xs text-slate-400">邀请码支持手动输入或自动生成。</p>
         </div>
-        <div className="min-h-0 space-y-4 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
           <label className="block">
             <span className="field-label mb-1.5 block text-[13px]">邀请码</span>
             <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -113,7 +113,7 @@ export function InvitationCodeFormModal({
               <Button
                 type="button"
                 variant="default"
-                className="h-10 min-w-[96px] shrink-0 whitespace-nowrap px-3 text-sm"
+                className="h-10 w-full shrink-0 whitespace-nowrap px-3 text-sm sm:min-w-[96px] sm:w-auto"
                 onClick={() => setCode(generateInviteCode(10))}
               >
                 自动生成
@@ -173,10 +173,11 @@ export function InvitationCodeFormModal({
             启用
           </label>
         </div>
-        <div className="mt-2 flex items-center justify-end gap-2 border-t border-slate-700/60 bg-slate-950/70 px-5 py-4">
-          <Button variant="ghost" onClick={onClose}>取消</Button>
+        <div className="mt-2 grid gap-2 border-t border-slate-700/60 bg-slate-950/70 px-4 py-3 sm:flex sm:items-center sm:justify-end sm:px-5 sm:py-4">
+          <Button variant="ghost" className="w-full sm:w-auto" onClick={onClose}>取消</Button>
           <Button
             variant="primary"
+            className="w-full sm:w-auto"
             disabled={submitting || !code.trim()}
             onClick={() =>
               onSubmit({
