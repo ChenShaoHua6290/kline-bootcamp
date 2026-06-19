@@ -57,12 +57,12 @@ export default function CourseDetailPage() {
   if (query.isLoading) return <main className="min-h-screen p-5"><LoadingState message="课程详情加载中..." /></main>;
   if (query.isError || !course) {
     const status = responseStatus(query.error);
-    const message = status === 404 ? '该课程已删除或下架，请返回课程中心选择其他内容。' : '课程详情加载失败，请稍后重试。';
+    const message = status === 404 ? '该课程已删除或下架，请返回学习中心选择其他内容。' : '课程详情加载失败，请稍后重试。';
     return (
       <main className="min-h-screen bg-[#020617] p-5 text-slate-100">
         <ErrorState
           message={message}
-          action={<Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>}
+          action={<Link href="/courses"><Button size="sm" variant="ghost">返回学习中心</Button></Link>}
         />
       </main>
     );
@@ -80,7 +80,7 @@ export default function CourseDetailPage() {
             <PageDescription className="app-nav-description">{course.subtitle || '课程详情'}</PageDescription>
           </div>
           <div className="app-nav-actions">
-            <Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>
+            <Link href="/courses"><Button size="sm" variant="ghost">返回学习中心</Button></Link>
           </div>
         </div>
       </header>

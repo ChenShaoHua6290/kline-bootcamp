@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RefreshTokenDto, RegisterDto, ResetPasswordDto } from './dto';
+import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RefreshTokenDto, RegisterDto, ResetPasswordDto, SendRegisterEmailCodeDto } from './dto';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -12,6 +12,12 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('register/email-code')
+  sendRegisterEmailCode(@Body() dto: SendRegisterEmailCodeDto) {
+    return this.authService.sendRegisterEmailCode(dto);
   }
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })

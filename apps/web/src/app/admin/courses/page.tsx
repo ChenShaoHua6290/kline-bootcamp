@@ -101,7 +101,7 @@ const defaultRelatedLinks: CourseRelatedLink[] = [
 ];
 
 const commonRelatedLinkOptions: RelatedLinkOption[] = [
-  { label: '课程中心', href: '/courses' },
+  { label: '学习中心', href: '/courses' },
   { label: '开始训练', href: '/train' },
   { label: '历史训练记录', href: '/history' },
   { label: '指标系统说明', href: '/indicators' },

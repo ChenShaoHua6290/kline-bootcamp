@@ -39,7 +39,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
 api.interceptors.request.use(async (config) => {
   if (typeof window === 'undefined') return config;
-  const anonymousAuthEndpoints = new Set(['/auth/login', '/auth/register', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password']);
+  const anonymousAuthEndpoints = new Set(['/auth/login', '/auth/register', '/auth/register/email-code', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password']);
   if (config.url && anonymousAuthEndpoints.has(config.url)) return config;
   let token = getToken();
   if (!token) {

@@ -42,4 +42,27 @@ export class EmailService {
       html: `<p>你正在重置密码。请在 <b>30 分钟</b> 内点击以下链接完成操作：</p><p><a href="${params.resetLink}">${params.resetLink}</a></p><p>如果不是你本人操作，请忽略本邮件。</p>`,
     });
   }
+
+  async sendRegistrationEmailCode(params: { to: string; code: string; expiresInMinutes: number }) {
+    const from = process.env.SMTP_FROM;
+    const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+    const transport = this.buildTransport();
+
+    if (!transport || !from) {
+      if ((process.env.NODE_ENV ?? 'development') !== 'production') {
+        this.logger.log(`SMTP 未配置，注册邮箱验证码: ${params.code}，收件人: ${params.to}`);
+      } else {
+        this.logger.warn('SMTP 未配置，生产环境将无法发送注册验证码邮件');
+      }
+      return;
+    }
+
+    await transport.sendMail({
+      from,
+      to: params.to,
+      subject: '注册邮箱验证码',
+      text: `你正在注册账号。邮箱验证码：${params.code}。验证码 ${params.expiresInMinutes} 分钟内有效。\n\n如果不是你本人操作，请忽略本邮件。\n\n${appUrl}`,
+      html: `<p>你正在注册账号。</p><p>邮箱验证码：<b style="font-size:20px;letter-spacing:4px;">${params.code}</b></p><p>验证码 <b>${params.expiresInMinutes} 分钟</b> 内有效。</p><p>如果不是你本人操作，请忽略本邮件。</p>`,
+    });
+  }
 }

@@ -1,14 +1,18 @@
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomBytes, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'crypto';
 import { EmailService } from '../common/email.service';
 import { PrismaService } from '../common/prisma.service';
 import { SecurityLogService } from '../common/security-log.service';
 import { DEFAULT_TRIAL_DAILY_TRAINING_LIMIT, DEFAULT_TRIAL_DAYS } from '../common/trial-access';
 import { UsersService } from '../users/users.service';
-import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RefreshTokenDto, RegisterDto, ResetPasswordDto } from './dto';
+import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RefreshTokenDto, RegisterDto, ResetPasswordDto, SendRegisterEmailCodeDto } from './dto';
 import { isPasswordStrong, passwordStrengthMessage } from './password-policy';
+
+const REGISTER_EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+const REGISTER_EMAIL_CODE_RESEND_MS = 60 * 1000;
+const REGISTER_EMAIL_CODE_MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class AuthService {
@@ -19,6 +23,46 @@ export class AuthService {
     private readonly securityLogService: SecurityLogService,
     private readonly emailService: EmailService,
   ) {}
+
+  async sendRegisterEmailCode(dto: SendRegisterEmailCodeDto) {
+    const existing = await this.usersService.findAnyByEmail(dto.email);
+    if (existing) throw new BadRequestException('Email already exists');
+
+    const now = new Date();
+    const recentSince = new Date(now.getTime() - REGISTER_EMAIL_CODE_RESEND_MS);
+    const recentRows = await this.prisma.$queryRaw<Array<{ c: number | string }>>`
+      SELECT COUNT(1) as c
+      FROM "registration_email_codes"
+      WHERE email = ${dto.email}
+        AND "createdAt" > ${recentSince}
+    `;
+    const recentCount = Number(recentRows[0]?.c ?? 0);
+    if (recentCount > 0) throw new BadRequestException('验证码发送过于频繁，请稍后再试');
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = this.hashRegistrationEmailCode(dto.email, code);
+    const expiresAt = new Date(now.getTime() + REGISTER_EMAIL_CODE_TTL_MS);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE "registration_email_codes"
+        SET "usedAt" = ${now}
+        WHERE email = ${dto.email}
+          AND "usedAt" IS NULL
+      `;
+      await tx.$executeRaw`
+        DELETE FROM "registration_email_codes"
+        WHERE "expiresAt" <= ${now}
+      `;
+      await tx.$executeRaw`
+        INSERT INTO "registration_email_codes" (id, email, "codeHash", "expiresAt", "createdAt")
+        VALUES (${`rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`}, ${dto.email}, ${codeHash}, ${expiresAt}, ${now})
+      `;
+    });
+
+    await this.emailService.sendRegistrationEmailCode({ to: dto.email, code, expiresInMinutes: Math.round(REGISTER_EMAIL_CODE_TTL_MS / 60_000) });
+    return { message: '验证码已发送，请查收邮箱' };
+  }
 
   async register(dto: RegisterDto) {
     const prisma = this.prisma as any;
@@ -59,6 +103,8 @@ export class AuthService {
 
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await prisma.$transaction(async (tx: any) => {
+      await this.verifyRegisterEmailCode(tx, dto.email, dto.emailCode);
+
       const latestInvite = invite
         ? await tx.inviteCode.findUnique({
             where: { id: invite.id },
@@ -119,6 +165,46 @@ export class AuthService {
       SELECT role FROM "User" WHERE id = ${user.id} AND "deletedAt" IS NULL LIMIT 1
     `;
     return this.issueTokens(user.id, user.email, rows[0]?.role ?? 'USER', user.nickname ?? null);
+  }
+
+  private hashRegistrationEmailCode(email: string, code: string) {
+    const secret = process.env.EMAIL_CODE_SECRET ?? process.env.JWT_SECRET ?? 'dev-secret';
+    return createHash('sha256').update(`${email}:${code}:${secret}`).digest('hex');
+  }
+
+  private async verifyRegisterEmailCode(tx: any, email: string, code: string) {
+    const now = new Date();
+    const rows = await tx.$queryRaw<
+      Array<{ id: string; codeHash: string; expiresAt: Date; attempts: number }>
+    >`
+      SELECT id, "codeHash", "expiresAt", attempts
+      FROM "registration_email_codes"
+      WHERE email = ${email}
+        AND "usedAt" IS NULL
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+      FOR UPDATE
+    `;
+    const record = rows[0];
+    if (!record) throw new BadRequestException('请先获取邮箱验证码');
+    if (record.expiresAt.getTime() <= now.getTime()) throw new BadRequestException('邮箱验证码已过期，请重新获取');
+    if (record.attempts >= REGISTER_EMAIL_CODE_MAX_ATTEMPTS) throw new BadRequestException('邮箱验证码错误次数过多，请重新获取');
+
+    const codeHash = this.hashRegistrationEmailCode(email, code);
+    if (record.codeHash !== codeHash) {
+      await tx.$executeRaw`
+        UPDATE "registration_email_codes"
+        SET attempts = attempts + 1
+        WHERE id = ${record.id}
+      `;
+      throw new BadRequestException('邮箱验证码错误');
+    }
+
+    await tx.$executeRaw`
+      UPDATE "registration_email_codes"
+      SET "usedAt" = ${now}
+      WHERE id = ${record.id}
+    `;
   }
 
   async login(dto: LoginDto, meta?: { ip?: string; userAgent?: string }) {

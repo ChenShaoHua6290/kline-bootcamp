@@ -70,7 +70,7 @@ export default function AlertsPage() {
             <PageDescription className="app-nav-description">提醒是辅助观察，不是喊单，也不是预测。</PageDescription>
           </div>
           <div className="app-nav-actions">
-            <Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>
+            <Link href="/courses"><Button size="sm" variant="ghost">返回学习中心</Button></Link>
             <Link href="/indicators"><Button size="sm" variant="primary">查看指标说明</Button></Link>
           </div>
         </div>

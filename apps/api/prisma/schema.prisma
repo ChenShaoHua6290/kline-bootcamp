@@ -60,6 +60,20 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model RegistrationEmailCode {
+  id          String    @id @default(cuid())
+  email       String
+  codeHash    String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@index([expiresAt])
+  @@map("registration_email_codes")
+}
+
 model Symbol {
   id          String            @id @default(cuid())
   market      Market

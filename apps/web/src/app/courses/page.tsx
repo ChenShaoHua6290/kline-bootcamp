@@ -107,7 +107,7 @@ export default function CoursesPage() {
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.13),transparent_32%),radial-gradient(circle_at_top_right,rgba(245,158,11,0.1),transparent_28%),#020617] text-slate-100">
       <header className="app-nav">
         <div className="app-nav-row">
-          <h1 className="app-title">课程中心</h1>
+          <h1 className="app-title">学习中心</h1>
           <div className="app-nav-actions">
             {query.data?.userTier ? <Badge tone="info">{formatTier(query.data.userTier)}</Badge> : null}
             <Link href="/">
@@ -119,7 +119,7 @@ export default function CoursesPage() {
 
       <section className="mx-auto max-w-[1240px] px-3 py-4 sm:px-4">
         {query.isLoading ? <LoadingState message="正在加载课程体系..." /> : null}
-        {query.isError ? <ErrorState message="课程中心加载失败，请稍后重试。" /> : null}
+        {query.isError ? <ErrorState message="课程加载失败，请稍后重试。" /> : null}
         {query.data ? (
           <div className="space-y-5">
             <section className="rounded-xl border border-cyan-400/20 bg-[linear-gradient(145deg,rgba(8,47,73,0.28),rgba(15,23,42,0.82))] px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.22)] sm:px-5">

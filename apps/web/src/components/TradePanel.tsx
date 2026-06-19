@@ -334,7 +334,7 @@ export function TradePanel({
             </div>
           </div>
         ) : null}
-        <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/35 px-2 py-1 text-[10px] md:mt-2 md:py-1.5 md:text-[11px]">
+        <div className="mt-1 flex h-8 items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-950/30 px-1.5 text-[10px] leading-none md:h-7 md:rounded-md md:text-[10px]">
           <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-slate-500">
             <div className="min-w-0 truncate">
               止损 <span className="font-semibold text-rose-200">{formatRiskPrice(displayStopLossPrice)}</span>
@@ -347,7 +347,7 @@ export function TradePanel({
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 shrink-0 rounded-lg border border-[rgba(100,141,199,0.3)] bg-[rgba(8,21,43,0.82)] px-2 !text-[10px] font-semibold text-slate-300 hover:border-cyan-400/45 hover:bg-cyan-500/10 hover:text-cyan-100 disabled:opacity-40 md:!text-[11px]"
+            className="!h-6 shrink-0 rounded-md !border !border-amber-300/45 !bg-[linear-gradient(135deg,rgba(245,158,11,0.28),rgba(14,165,233,0.18))] !px-2 !text-[10px] !leading-none font-semibold text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_6px_14px_rgba(245,158,11,0.12)] hover:!border-amber-200/65 hover:!bg-[linear-gradient(135deg,rgba(245,158,11,0.36),rgba(14,165,233,0.22))] hover:text-white disabled:opacity-40"
             onClick={openRiskModal}
             disabled={ended || busy}
           >

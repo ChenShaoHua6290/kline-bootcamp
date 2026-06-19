@@ -313,7 +313,7 @@ export default function TrainPage() {
           const msg = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
           setNotice({
             title: '课程训练加载失败',
-            message: normalizeErrorMessage(msg, '课时训练配置加载失败，请返回课程中心重试'),
+            message: normalizeErrorMessage(msg, '课时训练配置加载失败，请返回学习中心重试'),
             tone: 'warning',
           });
         });

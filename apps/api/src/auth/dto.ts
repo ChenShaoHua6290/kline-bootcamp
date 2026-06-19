@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 import { PASSWORD_MIN_LENGTH } from './password-policy';
 
 function sanitizeText(value: unknown) {
@@ -43,6 +43,18 @@ export class RegisterDto {
   @MaxLength(20)
   @Matches(/^[\u4e00-\u9fa5A-Za-z0-9_]+$/)
   nickname?: string;
+
+  @Transform(({ value }) => sanitizeText(value))
+  @IsString()
+  @Length(6, 6, { message: '邮箱验证码必须为6位数字' })
+  @Matches(/^\d{6}$/, { message: '邮箱验证码必须为6位数字' })
+  emailCode!: string;
+}
+
+export class SendRegisterEmailCodeDto {
+  @Transform(({ value }) => String(sanitizeText(String(value ?? ''))).toLowerCase())
+  @IsEmail()
+  email!: string;
 }
 
 export class RefreshTokenDto {

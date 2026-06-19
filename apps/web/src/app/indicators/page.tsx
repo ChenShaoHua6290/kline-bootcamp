@@ -73,7 +73,7 @@ export default function IndicatorsPage() {
             <PageDescription className="app-nav-description">指标不是预测工具，而是固定模式的执行辅助工具。</PageDescription>
           </div>
           <div className="app-nav-actions">
-            <Link href="/courses"><Button size="sm" variant="ghost">返回课程中心</Button></Link>
+            <Link href="/courses"><Button size="sm" variant="ghost">返回学习中心</Button></Link>
             <Link href="/alerts"><Button size="sm" variant="primary">查看共振提醒</Button></Link>
           </div>
         </div>
