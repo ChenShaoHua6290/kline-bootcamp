@@ -14,6 +14,14 @@ type TCPlayerInstance = {
   off?: (type: string, listener: (...args: unknown[]) => void) => void;
   width?: (value?: string | number) => unknown;
   height?: (value?: string | number) => unknown;
+  currentTime?: (value?: number) => number;
+  paused?: () => boolean;
+  play?: () => Promise<void> | void;
+};
+
+type PlaybackSnapshot = {
+  currentTime: number;
+  shouldResume: boolean;
 };
 
 declare global {
@@ -61,6 +69,31 @@ function safeId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
+function getVideoElement(id: string) {
+  return document.getElementById(id) as HTMLVideoElement | null;
+}
+
+function getCurrentTime(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
+  const currentTime = player?.currentTime?.();
+  if (typeof currentTime === 'number' && Number.isFinite(currentTime)) {
+    return Math.max(0, currentTime);
+  }
+
+  if (video && Number.isFinite(video.currentTime)) {
+    return Math.max(0, video.currentTime);
+  }
+
+  return 0;
+}
+
+function isPlaying(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
+  if (typeof player?.paused === 'function') {
+    return !player.paused();
+  }
+
+  return video ? !video.paused : false;
+}
+
 function teardownPlayer(player: TCPlayerInstance | null) {
   if (!player) return;
   try {
@@ -87,14 +120,20 @@ export function TencentVodPlayer({
   licenseUrl?: string | null;
 }) {
   const [playerRevision, setPlayerRevision] = useState(0);
+  const [isPageVisible, setIsPageVisible] = useState(() =>
+    typeof document === 'undefined' ? true : document.visibilityState !== 'hidden',
+  );
   const playerId = useMemo(
-    () => `tcplayer-${safeId(fileId)}-${playerRevision}-${Math.random().toString(36).slice(2)}`,
+    () => `tcplayer-${safeId(fileId)}-${playerRevision}`,
     [fileId, playerRevision],
   );
   const playerRef = useRef<TCPlayerInstance | null>(null);
-  const needsRecreateRef = useRef(false);
+  const playerIdRef = useRef(playerId);
+  const playbackSnapshotRef = useRef<PlaybackSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  playerIdRef.current = playerId;
 
   function disposeActivePlayer() {
     const player = playerRef.current;
@@ -103,40 +142,73 @@ export function TencentVodPlayer({
     teardownPlayer(player);
   }
 
-  function markPlayerStale() {
-    needsRecreateRef.current = true;
-    disposeActivePlayer();
+  function capturePlaybackSnapshot() {
+    const player = playerRef.current;
+    const video = getVideoElement(playerIdRef.current);
+    playbackSnapshotRef.current = {
+      currentTime: getCurrentTime(player, video),
+      shouldResume: isPlaying(player, video),
+    };
   }
 
-  function restorePlayerIfNeeded() {
-    if (!needsRecreateRef.current) return;
-    needsRecreateRef.current = false;
-    setLoading(true);
-    setError(null);
-    setPlayerRevision((revision) => revision + 1);
+  function restorePlaybackSnapshot(player: TCPlayerInstance) {
+    const snapshot = playbackSnapshotRef.current;
+    if (!snapshot) return;
+
+    const video = getVideoElement(playerIdRef.current);
+    const seekTo = Math.max(0, snapshot.currentTime);
+
+    try {
+      if (typeof player.currentTime === 'function') {
+        player.currentTime(seekTo);
+      } else if (video) {
+        video.currentTime = seekTo;
+      }
+    } catch {
+      // Best-effort restore.
+    }
+
+    if (snapshot.shouldResume) {
+      const maybePlay = player.play?.() ?? video?.play();
+      if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
+        (maybePlay as Promise<void>).catch(() => {
+          // Ignore autoplay-style rejections; the progress is still restored.
+        });
+      }
+    }
+
+    playbackSnapshotRef.current = null;
   }
 
   useLayoutEffect(() => {
-    let cancelled = false;
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        markPlayerStale();
+      const visible = document.visibilityState !== 'hidden';
+      if (!visible) {
+        capturePlaybackSnapshot();
+        disposeActivePlayer();
+        setIsPageVisible(false);
+        setLoading(true);
         return;
       }
-      restorePlayerIfNeeded();
-    };
-    const handlePageHide = () => {
-      markPlayerStale();
-    };
-    const handlePageShow = () => {
-      restorePlayerIfNeeded();
+
+      setLoading(true);
+      setError(null);
+      setPlayerRevision((revision) => revision + 1);
+      setIsPageVisible(true);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handlePageHide);
-    window.addEventListener('pageshow', handlePageShow);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  useLayoutEffect(() => {
+    let cancelled = false;
 
     async function setupPlayer() {
+      if (!isPageVisible) {
+        disposeActivePlayer();
+        return;
+      }
       if (!appId) {
         setLoading(false);
         setError('腾讯云点播 AppID 未配置，fileId 暂时无法播放。');
@@ -174,7 +246,9 @@ export function TencentVodPlayer({
         player.one?.('loadedmetadata', () => {
           if (cancelled || playerRef.current !== player) return;
 
-          const video = document.getElementById(playerId) as HTMLVideoElement | null;
+          restorePlaybackSnapshot(player);
+
+          const video = getVideoElement(playerId);
           video?.setAttribute('controlsList', 'nodownload noremoteplayback');
           video?.setAttribute('disablePictureInPicture', 'true');
           setLoading(false);
@@ -195,12 +269,9 @@ export function TencentVodPlayer({
 
     return () => {
       cancelled = true;
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handlePageHide);
-      window.removeEventListener('pageshow', handlePageShow);
       disposeActivePlayer();
     };
-  }, [appId, fileId, licenseUrl, playerId, psign]);
+  }, [appId, fileId, isPageVisible, licenseUrl, playerId, psign]);
 
   return (
     <div className="tencent-vod-player relative aspect-video w-full overflow-hidden bg-black">
