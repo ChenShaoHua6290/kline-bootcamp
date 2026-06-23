@@ -86,15 +86,55 @@ export function TencentVodPlayer({
   psign?: string | null;
   licenseUrl?: string | null;
 }) {
-  const playerId = useMemo(() => `tcplayer-${safeId(fileId)}-${Math.random().toString(36).slice(2)}`, [fileId]);
+  const [playerRevision, setPlayerRevision] = useState(0);
+  const playerId = useMemo(
+    () => `tcplayer-${safeId(fileId)}-${playerRevision}-${Math.random().toString(36).slice(2)}`,
+    [fileId, playerRevision],
+  );
   const playerRef = useRef<TCPlayerInstance | null>(null);
-  const canDisposeRef = useRef(false);
+  const needsRecreateRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  function disposeActivePlayer() {
+    const player = playerRef.current;
+    playerRef.current = null;
+    if (!player) return;
+    teardownPlayer(player);
+  }
+
+  function markPlayerStale() {
+    needsRecreateRef.current = true;
+    disposeActivePlayer();
+  }
+
+  function restorePlayerIfNeeded() {
+    if (!needsRecreateRef.current) return;
+    needsRecreateRef.current = false;
+    setLoading(true);
+    setError(null);
+    setPlayerRevision((revision) => revision + 1);
+  }
+
   useLayoutEffect(() => {
     let cancelled = false;
-    canDisposeRef.current = false;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        markPlayerStale();
+        return;
+      }
+      restorePlayerIfNeeded();
+    };
+    const handlePageHide = () => {
+      markPlayerStale();
+    };
+    const handlePageShow = () => {
+      restorePlayerIfNeeded();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
 
     async function setupPlayer() {
       if (!appId) {
@@ -132,11 +172,7 @@ export function TencentVodPlayer({
         });
         playerRef.current = player;
         player.one?.('loadedmetadata', () => {
-          canDisposeRef.current = true;
-          if (cancelled) {
-            teardownPlayer(player);
-            return;
-          }
+          if (cancelled || playerRef.current !== player) return;
 
           const video = document.getElementById(playerId) as HTMLVideoElement | null;
           video?.setAttribute('controlsList', 'nodownload noremoteplayback');
@@ -144,7 +180,7 @@ export function TencentVodPlayer({
           setLoading(false);
         });
         player.one?.('error', () => {
-          if (cancelled) return;
+          if (cancelled || playerRef.current !== player) return;
           setLoading(false);
           setError('视频播放失败，请稍后重试。');
         });
@@ -159,22 +195,17 @@ export function TencentVodPlayer({
 
     return () => {
       cancelled = true;
-      const player = playerRef.current;
-      playerRef.current = null;
-      if (!player) return;
-      if (canDisposeRef.current) {
-        teardownPlayer(player);
-        return;
-      }
-      player.one?.('loadedmetadata', () => {
-        teardownPlayer(player);
-      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+      disposeActivePlayer();
     };
   }, [appId, fileId, licenseUrl, playerId, psign]);
 
   return (
     <div className="tencent-vod-player relative aspect-video w-full overflow-hidden bg-black">
       <video
+        key={playerId}
         id={playerId}
         className="h-full w-full bg-black"
         preload="metadata"
