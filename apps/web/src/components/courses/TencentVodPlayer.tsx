@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 const TCPLAYER_CSS = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5.4/tcplayer.min.css';
 const TCPLAYER_SCRIPT = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5.4/tcplayer.v4.5.4.min.js';
 
 type TCPlayerInstance = {
+  unload?: () => void;
   dispose?: () => void;
+  ready?: (callback: () => void) => void;
+  on?: (type: string, listener: (...args: unknown[]) => void) => void;
+  one?: (type: string, listener: (...args: unknown[]) => void) => void;
+  off?: (type: string, listener: (...args: unknown[]) => void) => void;
   width?: (value?: string | number) => unknown;
   height?: (value?: string | number) => unknown;
 };
@@ -56,6 +61,20 @@ function safeId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
+function teardownPlayer(player: TCPlayerInstance | null) {
+  if (!player) return;
+  try {
+    player.unload?.();
+  } catch {
+    // Best-effort cleanup.
+  }
+  try {
+    player.dispose?.();
+  } catch {
+    // Best-effort cleanup.
+  }
+}
+
 export function TencentVodPlayer({
   fileId,
   appId,
@@ -69,11 +88,13 @@ export function TencentVodPlayer({
 }) {
   const playerId = useMemo(() => `tcplayer-${safeId(fileId)}-${Math.random().toString(36).slice(2)}`, [fileId]);
   const playerRef = useRef<TCPlayerInstance | null>(null);
+  const canDisposeRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
+    canDisposeRef.current = false;
 
     async function setupPlayer() {
       if (!appId) {
@@ -97,8 +118,7 @@ export function TencentVodPlayer({
         const TCPlayer = window.TCPlayer;
         if (!TCPlayer) throw new Error('TCPlayer SDK 未就绪');
 
-        playerRef.current?.dispose?.();
-        playerRef.current = TCPlayer(playerId, {
+        const player = TCPlayer(playerId, {
           appID: String(appId),
           fileID: fileId,
           ...(psign ? { psign } : {}),
@@ -110,14 +130,24 @@ export function TencentVodPlayer({
           fill: true,
           aspectRatio: '16:9',
         });
+        playerRef.current = player;
+        player.one?.('loadedmetadata', () => {
+          canDisposeRef.current = true;
+          if (cancelled) {
+            teardownPlayer(player);
+            return;
+          }
 
-        const video = document.getElementById(playerId) as HTMLVideoElement | null;
-        video?.setAttribute('controlsList', 'nodownload noremoteplayback');
-        video?.setAttribute('disablePictureInPicture', 'true');
-        playerRef.current?.width?.('100%');
-        playerRef.current?.height?.('100%');
-        window.dispatchEvent(new Event('resize'));
-        setLoading(false);
+          const video = document.getElementById(playerId) as HTMLVideoElement | null;
+          video?.setAttribute('controlsList', 'nodownload noremoteplayback');
+          video?.setAttribute('disablePictureInPicture', 'true');
+          setLoading(false);
+        });
+        player.one?.('error', () => {
+          if (cancelled) return;
+          setLoading(false);
+          setError('视频播放失败，请稍后重试。');
+        });
       } catch (err) {
         if (cancelled) return;
         setLoading(false);
@@ -129,8 +159,16 @@ export function TencentVodPlayer({
 
     return () => {
       cancelled = true;
-      playerRef.current?.dispose?.();
+      const player = playerRef.current;
       playerRef.current = null;
+      if (!player) return;
+      if (canDisposeRef.current) {
+        teardownPlayer(player);
+        return;
+      }
+      player.one?.('loadedmetadata', () => {
+        teardownPlayer(player);
+      });
     };
   }, [appId, fileId, licenseUrl, playerId, psign]);
 
