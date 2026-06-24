@@ -16,6 +16,7 @@ type TCPlayerInstance = {
   height?: (value?: string | number) => unknown;
   currentTime?: (value?: number) => number;
   paused?: () => boolean;
+  pause?: () => void;
   play?: () => Promise<void> | void;
 };
 
@@ -94,6 +95,67 @@ function isPlaying(player: TCPlayerInstance | null, video: HTMLVideoElement | nu
   return video ? !video.paused : false;
 }
 
+function createPlayerWithoutPageLifecycleHooks(playerId: string, options: Record<string, unknown>) {
+  const documentTarget = document as typeof document & {
+    addEventListener: typeof document.addEventListener;
+  };
+  const windowTarget = window as typeof window & {
+    addEventListener: typeof window.addEventListener;
+  };
+  const originalDocumentAddEventListener = documentTarget.addEventListener.bind(documentTarget);
+  const originalWindowAddEventListener = windowTarget.addEventListener.bind(windowTarget);
+
+  const block = (type: string) => type === 'visibilitychange' || type === 'pagehide';
+
+  documentTarget.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+    if (block(type)) return;
+    return originalDocumentAddEventListener(type, listener, options);
+  }) as typeof document.addEventListener;
+
+  windowTarget.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+    if (block(type)) return;
+    return originalWindowAddEventListener(type, listener, options);
+  }) as typeof window.addEventListener;
+
+  try {
+    const TCPlayer = window.TCPlayer;
+    if (!TCPlayer) throw new Error('TCPlayer SDK 未就绪');
+    return TCPlayer(playerId, options);
+  } finally {
+    documentTarget.addEventListener = originalDocumentAddEventListener;
+    windowTarget.addEventListener = originalWindowAddEventListener;
+  }
+}
+
+function restorePlaybackSnapshot(
+  player: TCPlayerInstance,
+  video: HTMLVideoElement | null,
+  snapshot: PlaybackSnapshot,
+) {
+  const seekTo = Math.max(0, snapshot.currentTime);
+
+  try {
+    if (typeof player.currentTime === 'function') {
+      player.currentTime(seekTo);
+    } else if (video) {
+      video.currentTime = seekTo;
+    }
+  } catch {
+    return false;
+  }
+
+  if (snapshot.shouldResume) {
+    const maybePlay = player.play?.() ?? video?.play();
+    if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
+      (maybePlay as Promise<void>).catch(() => {
+        // Ignore autoplay-style rejections; the progress is still restored.
+      });
+    }
+  }
+
+  return true;
+}
+
 function teardownPlayer(player: TCPlayerInstance | null) {
   if (!player) return;
   try {
@@ -119,13 +181,9 @@ export function TencentVodPlayer({
   psign?: string | null;
   licenseUrl?: string | null;
 }) {
-  const [playerRevision, setPlayerRevision] = useState(0);
-  const [isPageVisible, setIsPageVisible] = useState(() =>
-    typeof document === 'undefined' ? true : document.visibilityState !== 'hidden',
-  );
   const playerId = useMemo(
-    () => `tcplayer-${safeId(fileId)}-${playerRevision}`,
-    [fileId, playerRevision],
+    () => `tcplayer-${safeId(fileId)}-${Math.random().toString(36).slice(2)}`,
+    [fileId],
   );
   const playerRef = useRef<TCPlayerInstance | null>(null);
   const playerIdRef = useRef(playerId);
@@ -138,6 +196,7 @@ export function TencentVodPlayer({
   function disposeActivePlayer() {
     const player = playerRef.current;
     playerRef.current = null;
+    playbackSnapshotRef.current = null;
     if (!player) return;
     teardownPlayer(player);
   }
@@ -151,64 +210,52 @@ export function TencentVodPlayer({
     };
   }
 
-  function restorePlaybackSnapshot(player: TCPlayerInstance) {
+  function restoreCurrentPlayback(player: TCPlayerInstance) {
     const snapshot = playbackSnapshotRef.current;
     if (!snapshot) return;
 
     const video = getVideoElement(playerIdRef.current);
-    const seekTo = Math.max(0, snapshot.currentTime);
-
-    try {
-      if (typeof player.currentTime === 'function') {
-        player.currentTime(seekTo);
-      } else if (video) {
-        video.currentTime = seekTo;
-      }
-    } catch {
-      // Best-effort restore.
+    if (restorePlaybackSnapshot(player, video, snapshot)) {
+      playbackSnapshotRef.current = null;
     }
-
-    if (snapshot.shouldResume) {
-      const maybePlay = player.play?.() ?? video?.play();
-      if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
-        (maybePlay as Promise<void>).catch(() => {
-          // Ignore autoplay-style rejections; the progress is still restored.
-        });
-      }
-    }
-
-    playbackSnapshotRef.current = null;
   }
 
   useLayoutEffect(() => {
     const handleVisibilityChange = () => {
-      const visible = document.visibilityState !== 'hidden';
-      if (!visible) {
+      if (document.visibilityState === 'hidden') {
         capturePlaybackSnapshot();
-        disposeActivePlayer();
-        setIsPageVisible(false);
-        setLoading(true);
+        playerRef.current?.pause?.();
         return;
       }
 
-      setLoading(true);
-      setError(null);
-      setPlayerRevision((revision) => revision + 1);
-      setIsPageVisible(true);
+      if (playerRef.current) {
+        restoreCurrentPlayback(playerRef.current);
+      }
+    };
+    const handlePageHide = () => {
+      capturePlaybackSnapshot();
+      playerRef.current?.pause?.();
+    };
+    const handlePageShow = () => {
+      if (playerRef.current) {
+        restoreCurrentPlayback(playerRef.current);
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, []);
 
   useLayoutEffect(() => {
     let cancelled = false;
 
     async function setupPlayer() {
-      if (!isPageVisible) {
-        disposeActivePlayer();
-        return;
-      }
       if (!appId) {
         setLoading(false);
         setError('腾讯云点播 AppID 未配置，fileId 暂时无法播放。');
@@ -227,10 +274,7 @@ export function TencentVodPlayer({
         await loadScript(TCPLAYER_SCRIPT);
         if (cancelled) return;
 
-        const TCPlayer = window.TCPlayer;
-        if (!TCPlayer) throw new Error('TCPlayer SDK 未就绪');
-
-        const player = TCPlayer(playerId, {
+        const player = createPlayerWithoutPageLifecycleHooks(playerId, {
           appID: String(appId),
           fileID: fileId,
           ...(psign ? { psign } : {}),
@@ -246,11 +290,10 @@ export function TencentVodPlayer({
         player.one?.('loadedmetadata', () => {
           if (cancelled || playerRef.current !== player) return;
 
-          restorePlaybackSnapshot(player);
-
           const video = getVideoElement(playerId);
           video?.setAttribute('controlsList', 'nodownload noremoteplayback');
           video?.setAttribute('disablePictureInPicture', 'true');
+          restoreCurrentPlayback(player);
           setLoading(false);
         });
         player.one?.('error', () => {
@@ -269,9 +312,13 @@ export function TencentVodPlayer({
 
     return () => {
       cancelled = true;
-      disposeActivePlayer();
+      const player = playerRef.current;
+      playerRef.current = null;
+      playbackSnapshotRef.current = null;
+      if (!player) return;
+      teardownPlayer(player);
     };
-  }, [appId, fileId, isPageVisible, licenseUrl, playerId, psign]);
+  }, [appId, fileId, licenseUrl, playerId, psign]);
 
   return (
     <div className="tencent-vod-player relative aspect-video w-full overflow-hidden bg-black">
