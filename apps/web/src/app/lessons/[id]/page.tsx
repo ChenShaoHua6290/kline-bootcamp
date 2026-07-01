@@ -36,6 +36,9 @@ export default function LessonPage() {
     queryKey: ['lesson', params.id],
     enabled: ready && authed && Boolean(params.id),
     queryFn: async () => (await api.get<LessonPlayback>(`/lessons/${params.id}`)).data,
+    // psign 每次请求都会变，但旧签名在有效期内仍可用；避免切页/回焦时 refetch 触发播放器重建。
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const lesson = query.data;
