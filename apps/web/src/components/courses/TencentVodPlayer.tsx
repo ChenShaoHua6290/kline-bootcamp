@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const TCPLAYER_CSS = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5.4/tcplayer.min.css';
 const TCPLAYER_SCRIPT = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5.4/tcplayer.v4.5.4.min.js';
@@ -8,12 +8,7 @@ const TCPLAYER_SCRIPT = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5
 type TCPlayerInstance = {
   unload?: () => void;
   dispose?: () => void;
-  ready?: (callback: () => void) => void;
-  on?: (type: string, listener: (...args: unknown[]) => void) => void;
   one?: (type: string, listener: (...args: unknown[]) => void) => void;
-  off?: (type: string, listener: (...args: unknown[]) => void) => void;
-  width?: (value?: string | number) => unknown;
-  height?: (value?: string | number) => unknown;
   currentTime?: (value?: number) => number;
   paused?: () => boolean;
   pause?: () => void;
@@ -93,9 +88,13 @@ function getVideoElement(id: string) {
 }
 
 function getCurrentTime(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
-  const currentTime = player?.currentTime?.();
-  if (typeof currentTime === 'number' && Number.isFinite(currentTime)) {
-    return Math.max(0, currentTime);
+  try {
+    const currentTime = player?.currentTime?.();
+    if (typeof currentTime === 'number' && Number.isFinite(currentTime)) {
+      return Math.max(0, currentTime);
+    }
+  } catch {
+    // Player may already be disposed.
   }
 
   if (video && Number.isFinite(video.currentTime)) {
@@ -106,8 +105,12 @@ function getCurrentTime(player: TCPlayerInstance | null, video: HTMLVideoElement
 }
 
 function isPlaying(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
-  if (typeof player?.paused === 'function') {
-    return !player.paused();
+  try {
+    if (typeof player?.paused === 'function') {
+      return !player.paused();
+    }
+  } catch {
+    // Player may already be disposed.
   }
 
   return video ? !video.paused : false;
@@ -188,20 +191,19 @@ function restorePlaybackSnapshot(
   }
 
   if (snapshot.shouldResume) {
-    const maybePlay = player.play?.() ?? video?.play();
-    if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
-      (maybePlay as Promise<void>).catch(() => {
-        // Ignore autoplay-style rejections; the progress is still restored.
-      });
+    try {
+      const maybePlay = player.play?.() ?? video?.play();
+      if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
+        (maybePlay as Promise<void>).catch(() => {
+          // Ignore autoplay-style rejections; the progress is still restored.
+        });
+      }
+    } catch {
+      // Ignore play errors after tab switch.
     }
   }
 
   return true;
-}
-
-function isPlayerReady(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
-  if (!player || !video) return false;
-  return video.readyState >= 2 || video.networkState === 2;
 }
 
 function teardownPlayer(player: TCPlayerInstance | null) {
@@ -229,32 +231,19 @@ export function TencentVodPlayer({
   psign?: string | null;
   licenseUrl?: string | null;
 }) {
-  const [instanceKey, setInstanceKey] = useState(0);
-  const playerId = useMemo(
-    () => `tcplayer-${safeId(fileId)}-${instanceKey}`,
-    [fileId, instanceKey],
-  );
+  const playerId = useMemo(() => `tcplayer-${safeId(fileId)}`, [fileId]);
   const playerRef = useRef<TCPlayerInstance | null>(null);
   const playerIdRef = useRef(playerId);
-  const playbackSnapshotRef = useRef<PlaybackSnapshot | null>(readStoredProgress(fileId));
+  const mountedRef = useRef(false);
   const psignRef = useRef(psign);
   const licenseUrlRef = useRef(licenseUrl);
-  const loadingRef = useRef(true);
+  const playbackSnapshotRef = useRef<PlaybackSnapshot | null>(readStoredProgress(fileId));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   playerIdRef.current = playerId;
   psignRef.current = psign;
   licenseUrlRef.current = licenseUrl;
-  loadingRef.current = loading;
-
-  useLayoutEffect(() => {
-    playbackSnapshotRef.current = readStoredProgress(fileId);
-    loadingRef.current = true;
-    setInstanceKey(0);
-    setError(null);
-    setLoading(true);
-  }, [fileId]);
 
   function capturePlaybackSnapshot(shouldResume: boolean) {
     const player = playerRef.current;
@@ -277,63 +266,39 @@ export function TencentVodPlayer({
     }
   }
 
-  function requestPlayerRebuild() {
-    capturePlaybackSnapshot(false);
-    loadingRef.current = true;
-    setLoading(true);
-    setError(null);
-    setInstanceKey((value) => value + 1);
-  }
+  useEffect(() => {
+    mountedRef.current = true;
+    playbackSnapshotRef.current = readStoredProgress(fileId);
 
-  function schedulePlayerHealthCheck() {
-    window.setTimeout(() => {
-      if (loadingRef.current) return;
-      const video = getVideoElement(playerIdRef.current);
-      if (!isPlayerReady(playerRef.current, video)) {
-        requestPlayerRebuild();
-      }
-    }, 800);
-  }
-
-  useLayoutEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        capturePlaybackSnapshot(isPlaying(playerRef.current, getVideoElement(playerIdRef.current)));
-        playerRef.current?.pause?.();
+        try {
+          capturePlaybackSnapshot(isPlaying(playerRef.current, getVideoElement(playerIdRef.current)));
+          playerRef.current?.pause?.();
+        } catch {
+          // Ignore pause errors during tab switch.
+        }
         return;
       }
 
       const player = playerRef.current;
       if (!player) return;
 
-      restoreCurrentPlayback(player);
-      schedulePlayerHealthCheck();
-    };
-
-    const handlePageHide = () => {
-      capturePlaybackSnapshot(isPlaying(playerRef.current, getVideoElement(playerIdRef.current)));
-      playerRef.current?.pause?.();
-    };
-
-    const handlePageShow = () => {
-      const player = playerRef.current;
-      if (!player) return;
-
-      restoreCurrentPlayback(player);
-      schedulePlayerHealthCheck();
+      try {
+        restoreCurrentPlayback(player);
+      } catch {
+        // Ignore restore errors during tab switch.
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handlePageHide);
-    window.addEventListener('pageshow', handlePageShow);
     return () => {
+      mountedRef.current = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handlePageHide);
-      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [fileId]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     let cancelled = false;
     let loadTimeout: number | undefined;
 
@@ -342,22 +307,25 @@ export function TencentVodPlayer({
       const activeLicenseUrl = licenseUrlRef.current;
 
       if (!appId) {
-        loadingRef.current = false;
-        setLoading(false);
-        setError('腾讯云点播 AppID 未配置，fileId 暂时无法播放。');
+        if (!cancelled) {
+          setLoading(false);
+          setError('腾讯云点播 AppID 未配置，fileId 暂时无法播放。');
+        }
         return;
       }
       if (!activePsign) {
-        loadingRef.current = false;
-        setLoading(false);
-        setError('腾讯云点播播放器签名未配置，请在 API 环境变量中配置 TENCENT_VOD_PLAYER_SIGN_KEY 后重启服务。');
+        if (!cancelled) {
+          setLoading(false);
+          setError('腾讯云点播播放器签名未配置，请在 API 环境变量中配置 TENCENT_VOD_PLAYER_SIGN_KEY 后重启服务。');
+        }
         return;
       }
 
       try {
-        loadingRef.current = true;
-        setLoading(true);
-        setError(null);
+        if (!cancelled) {
+          setLoading(true);
+          setError(null);
+        }
         ensureStylesheet(TCPLAYER_CSS);
         await loadScript(TCPLAYER_SCRIPT);
         if (cancelled) return;
@@ -377,33 +345,29 @@ export function TencentVodPlayer({
         playerRef.current = player;
 
         loadTimeout = window.setTimeout(() => {
-          if (cancelled || playerRef.current !== player) return;
-          loadingRef.current = false;
+          if (cancelled || playerRef.current !== player || !mountedRef.current) return;
           setLoading(false);
         }, 12_000);
 
         player.one?.('loadedmetadata', () => {
-          if (cancelled || playerRef.current !== player) return;
+          if (cancelled || playerRef.current !== player || !mountedRef.current) return;
           if (loadTimeout) window.clearTimeout(loadTimeout);
 
           const video = getVideoElement(playerId);
           video?.setAttribute('controlsList', 'nodownload noremoteplayback');
           video?.setAttribute('disablePictureInPicture', 'true');
           restoreCurrentPlayback(player);
-          loadingRef.current = false;
           setLoading(false);
         });
         player.one?.('error', () => {
-          if (cancelled || playerRef.current !== player) return;
+          if (cancelled || playerRef.current !== player || !mountedRef.current) return;
           if (loadTimeout) window.clearTimeout(loadTimeout);
-          loadingRef.current = false;
           setLoading(false);
           setError('视频播放失败，请稍后重试。');
         });
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || !mountedRef.current) return;
         if (loadTimeout) window.clearTimeout(loadTimeout);
-        loadingRef.current = false;
         setLoading(false);
         setError(err instanceof Error ? err.message : '腾讯云播放器初始化失败');
       }
@@ -414,7 +378,11 @@ export function TencentVodPlayer({
     return () => {
       cancelled = true;
       if (loadTimeout) window.clearTimeout(loadTimeout);
-      capturePlaybackSnapshot(false);
+      try {
+        capturePlaybackSnapshot(false);
+      } catch {
+        // Ignore snapshot errors during unmount.
+      }
       const player = playerRef.current;
       playerRef.current = null;
       if (!player) return;
@@ -425,7 +393,6 @@ export function TencentVodPlayer({
   return (
     <div className="tencent-vod-player relative aspect-video w-full overflow-hidden bg-black">
       <video
-        key={playerId}
         id={playerId}
         className="h-full w-full bg-black"
         preload="metadata"
