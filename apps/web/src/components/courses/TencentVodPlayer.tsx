@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const TCPLAYER_CSS = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5.4/tcplayer.min.css';
 const TCPLAYER_SCRIPT = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5.4/tcplayer.v4.5.4.min.js';
@@ -8,12 +8,7 @@ const TCPLAYER_SCRIPT = 'https://web.sdk.qcloud.com/player/tcplayer/release/v4.5
 type TCPlayerInstance = {
   unload?: () => void;
   dispose?: () => void;
-  ready?: (callback: () => void) => void;
-  on?: (type: string, listener: (...args: unknown[]) => void) => void;
   one?: (type: string, listener: (...args: unknown[]) => void) => void;
-  off?: (type: string, listener: (...args: unknown[]) => void) => void;
-  width?: (value?: string | number) => unknown;
-  height?: (value?: string | number) => unknown;
   currentTime?: (value?: number) => number;
   paused?: () => boolean;
   pause?: () => void;
@@ -33,6 +28,10 @@ declare global {
 
 let tcPlayerScriptPromise: Promise<void> | null = null;
 
+function progressStorageKey(fileId: string) {
+  return `tencent-vod-progress:${fileId}`;
+}
+
 function ensureStylesheet(href: string) {
   if (typeof document === 'undefined') return;
   if (document.querySelector(`link[href="${href}"]`)) return;
@@ -50,7 +49,18 @@ function loadScript(src: string) {
   tcPlayerScriptPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
     if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
+      if (window.TCPlayer || existing.dataset.loaded === 'true') {
+        resolve();
+        return;
+      }
+      existing.addEventListener(
+        'load',
+        () => {
+          existing.dataset.loaded = 'true';
+          resolve();
+        },
+        { once: true },
+      );
       existing.addEventListener('error', () => reject(new Error('TCPlayer SDK 加载失败')), { once: true });
       return;
     }
@@ -58,7 +68,10 @@ function loadScript(src: string) {
     const script = document.createElement('script');
     script.src = src;
     script.async = true;
-    script.onload = () => resolve();
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
     script.onerror = () => reject(new Error('TCPlayer SDK 加载失败'));
     document.body.appendChild(script);
   });
@@ -75,9 +88,13 @@ function getVideoElement(id: string) {
 }
 
 function getCurrentTime(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
-  const currentTime = player?.currentTime?.();
-  if (typeof currentTime === 'number' && Number.isFinite(currentTime)) {
-    return Math.max(0, currentTime);
+  try {
+    const currentTime = player?.currentTime?.();
+    if (typeof currentTime === 'number' && Number.isFinite(currentTime)) {
+      return Math.max(0, currentTime);
+    }
+  } catch {
+    // Player may already be disposed.
   }
 
   if (video && Number.isFinite(video.currentTime)) {
@@ -88,11 +105,40 @@ function getCurrentTime(player: TCPlayerInstance | null, video: HTMLVideoElement
 }
 
 function isPlaying(player: TCPlayerInstance | null, video: HTMLVideoElement | null) {
-  if (typeof player?.paused === 'function') {
-    return !player.paused();
+  try {
+    if (typeof player?.paused === 'function') {
+      return !player.paused();
+    }
+  } catch {
+    // Player may already be disposed.
   }
 
   return video ? !video.paused : false;
+}
+
+function readStoredProgress(fileId: string): PlaybackSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(progressStorageKey(fileId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PlaybackSnapshot>;
+    if (typeof parsed.currentTime !== 'number' || !Number.isFinite(parsed.currentTime)) return null;
+    return {
+      currentTime: Math.max(0, parsed.currentTime),
+      shouldResume: Boolean(parsed.shouldResume),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function storeProgress(fileId: string, snapshot: PlaybackSnapshot) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(progressStorageKey(fileId), JSON.stringify(snapshot));
+  } catch {
+    // Ignore quota / privacy mode errors.
+  }
 }
 
 function createPlayerWithoutPageLifecycleHooks(playerId: string, options: Record<string, unknown>) {
@@ -145,11 +191,15 @@ function restorePlaybackSnapshot(
   }
 
   if (snapshot.shouldResume) {
-    const maybePlay = player.play?.() ?? video?.play();
-    if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
-      (maybePlay as Promise<void>).catch(() => {
-        // Ignore autoplay-style rejections; the progress is still restored.
-      });
+    try {
+      const maybePlay = player.play?.() ?? video?.play();
+      if (maybePlay && typeof (maybePlay as Promise<void>).catch === 'function') {
+        (maybePlay as Promise<void>).catch(() => {
+          // Ignore autoplay-style rejections; the progress is still restored.
+        });
+      }
+    } catch {
+      // Ignore play errors after tab switch.
     }
   }
 
@@ -181,37 +231,33 @@ export function TencentVodPlayer({
   psign?: string | null;
   licenseUrl?: string | null;
 }) {
-  const playerId = useMemo(
-    () => `tcplayer-${safeId(fileId)}-${Math.random().toString(36).slice(2)}`,
-    [fileId],
-  );
+  const playerId = useMemo(() => `tcplayer-${safeId(fileId)}`, [fileId]);
   const playerRef = useRef<TCPlayerInstance | null>(null);
   const playerIdRef = useRef(playerId);
-  const playbackSnapshotRef = useRef<PlaybackSnapshot | null>(null);
+  const mountedRef = useRef(false);
+  const psignRef = useRef(psign);
+  const licenseUrlRef = useRef(licenseUrl);
+  const playbackSnapshotRef = useRef<PlaybackSnapshot | null>(readStoredProgress(fileId));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   playerIdRef.current = playerId;
+  psignRef.current = psign;
+  licenseUrlRef.current = licenseUrl;
 
-  function disposeActivePlayer() {
-    const player = playerRef.current;
-    playerRef.current = null;
-    playbackSnapshotRef.current = null;
-    if (!player) return;
-    teardownPlayer(player);
-  }
-
-  function capturePlaybackSnapshot() {
+  function capturePlaybackSnapshot(shouldResume: boolean) {
     const player = playerRef.current;
     const video = getVideoElement(playerIdRef.current);
-    playbackSnapshotRef.current = {
+    const snapshot: PlaybackSnapshot = {
       currentTime: getCurrentTime(player, video),
-      shouldResume: isPlaying(player, video),
+      shouldResume,
     };
+    playbackSnapshotRef.current = snapshot;
+    storeProgress(fileId, snapshot);
   }
 
   function restoreCurrentPlayback(player: TCPlayerInstance) {
-    const snapshot = playbackSnapshotRef.current;
+    const snapshot = playbackSnapshotRef.current ?? readStoredProgress(fileId);
     if (!snapshot) return;
 
     const video = getVideoElement(playerIdRef.current);
@@ -220,56 +266,66 @@ export function TencentVodPlayer({
     }
   }
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    mountedRef.current = true;
+    playbackSnapshotRef.current = readStoredProgress(fileId);
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        capturePlaybackSnapshot();
-        playerRef.current?.pause?.();
+        try {
+          capturePlaybackSnapshot(isPlaying(playerRef.current, getVideoElement(playerIdRef.current)));
+          playerRef.current?.pause?.();
+        } catch {
+          // Ignore pause errors during tab switch.
+        }
         return;
       }
 
-      if (playerRef.current) {
-        restoreCurrentPlayback(playerRef.current);
-      }
-    };
-    const handlePageHide = () => {
-      capturePlaybackSnapshot();
-      playerRef.current?.pause?.();
-    };
-    const handlePageShow = () => {
-      if (playerRef.current) {
-        restoreCurrentPlayback(playerRef.current);
+      const player = playerRef.current;
+      if (!player) return;
+
+      try {
+        restoreCurrentPlayback(player);
+      } catch {
+        // Ignore restore errors during tab switch.
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handlePageHide);
-    window.addEventListener('pageshow', handlePageShow);
     return () => {
+      mountedRef.current = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handlePageHide);
-      window.removeEventListener('pageshow', handlePageShow);
     };
-  }, []);
+  }, [fileId]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     let cancelled = false;
+    let loadTimeout: number | undefined;
 
     async function setupPlayer() {
+      const activePsign = psignRef.current;
+      const activeLicenseUrl = licenseUrlRef.current;
+
       if (!appId) {
-        setLoading(false);
-        setError('腾讯云点播 AppID 未配置，fileId 暂时无法播放。');
+        if (!cancelled) {
+          setLoading(false);
+          setError('腾讯云点播 AppID 未配置，fileId 暂时无法播放。');
+        }
         return;
       }
-      if (!psign) {
-        setLoading(false);
-        setError('腾讯云点播播放器签名未配置，请在 API 环境变量中配置 TENCENT_VOD_PLAYER_SIGN_KEY 后重启服务。');
+      if (!activePsign) {
+        if (!cancelled) {
+          setLoading(false);
+          setError('腾讯云点播播放器签名未配置，请在 API 环境变量中配置 TENCENT_VOD_PLAYER_SIGN_KEY 后重启服务。');
+        }
         return;
       }
 
       try {
-        setLoading(true);
-        setError(null);
+        if (!cancelled) {
+          setLoading(true);
+          setError(null);
+        }
         ensureStylesheet(TCPLAYER_CSS);
         await loadScript(TCPLAYER_SCRIPT);
         if (cancelled) return;
@@ -277,8 +333,8 @@ export function TencentVodPlayer({
         const player = createPlayerWithoutPageLifecycleHooks(playerId, {
           appID: String(appId),
           fileID: fileId,
-          ...(psign ? { psign } : {}),
-          ...(licenseUrl ? { licenseUrl } : {}),
+          psign: activePsign,
+          ...(activeLicenseUrl ? { licenseUrl: activeLicenseUrl } : {}),
           controls: true,
           preload: 'metadata',
           width: '100%',
@@ -287,8 +343,15 @@ export function TencentVodPlayer({
           aspectRatio: '16:9',
         });
         playerRef.current = player;
+
+        loadTimeout = window.setTimeout(() => {
+          if (cancelled || playerRef.current !== player || !mountedRef.current) return;
+          setLoading(false);
+        }, 12_000);
+
         player.one?.('loadedmetadata', () => {
-          if (cancelled || playerRef.current !== player) return;
+          if (cancelled || playerRef.current !== player || !mountedRef.current) return;
+          if (loadTimeout) window.clearTimeout(loadTimeout);
 
           const video = getVideoElement(playerId);
           video?.setAttribute('controlsList', 'nodownload noremoteplayback');
@@ -297,12 +360,14 @@ export function TencentVodPlayer({
           setLoading(false);
         });
         player.one?.('error', () => {
-          if (cancelled || playerRef.current !== player) return;
+          if (cancelled || playerRef.current !== player || !mountedRef.current) return;
+          if (loadTimeout) window.clearTimeout(loadTimeout);
           setLoading(false);
           setError('视频播放失败，请稍后重试。');
         });
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || !mountedRef.current) return;
+        if (loadTimeout) window.clearTimeout(loadTimeout);
         setLoading(false);
         setError(err instanceof Error ? err.message : '腾讯云播放器初始化失败');
       }
@@ -312,18 +377,22 @@ export function TencentVodPlayer({
 
     return () => {
       cancelled = true;
+      if (loadTimeout) window.clearTimeout(loadTimeout);
+      try {
+        capturePlaybackSnapshot(false);
+      } catch {
+        // Ignore snapshot errors during unmount.
+      }
       const player = playerRef.current;
       playerRef.current = null;
-      playbackSnapshotRef.current = null;
       if (!player) return;
       teardownPlayer(player);
     };
-  }, [appId, fileId, licenseUrl, playerId, psign]);
+  }, [appId, fileId, playerId]);
 
   return (
     <div className="tencent-vod-player relative aspect-video w-full overflow-hidden bg-black">
       <video
-        key={playerId}
         id={playerId}
         className="h-full w-full bg-black"
         preload="metadata"
