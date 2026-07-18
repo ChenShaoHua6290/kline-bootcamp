@@ -28,6 +28,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV WEB_PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
@@ -39,4 +41,5 @@ COPY --from=builder /app/apps/web/next.config.ts ./apps/web/next.config.ts
 COPY --from=builder /app/apps/web/package.json ./apps/web/package.json
 
 EXPOSE 3000
+USER nextjs
 CMD ["npm", "--prefix", "apps/web", "run", "start"]

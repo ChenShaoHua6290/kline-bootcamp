@@ -136,6 +136,14 @@ services:
         condition: service_started
     expose:
       - '${WEB_PORT}'
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /var/tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     logging:
       driver: json-file
       options:
