@@ -1,0 +1,51 @@
+{
+  "name": "kline-bootcamp",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:api": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run start:dev",
+    "dev:web": "PATH=./node_modules/.bin:$PATH npm --prefix apps/web run dev",
+    "build": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run build && PATH=./node_modules/.bin:$PATH npm --prefix apps/web run build",
+    "test": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run test",
+    "import:crypto": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run import:crypto",
+    "import:crypto:offline": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run import:crypto:offline",
+    "aggregate:bars": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run aggregate:bars",
+    "dev:up": "bash scripts/dev-up.sh",
+    "dev:down": "bash scripts/dev-down.sh",
+    "preflight:prod": "bash scripts/preflight-prod.sh",
+    "deploy:update": "bash scripts/deploy-update.sh",
+    "prod:local:up": "bash scripts/prod-local-up.sh",
+    "prod:local:down": "bash scripts/prod-local-down.sh",
+    "prod:local:logs:api": "docker compose --env-file .env.production.local -f docker-compose.prod.yml logs -f api",
+    "prod:local:logs:web": "docker compose --env-file .env.production.local -f docker-compose.prod.yml logs -f web",
+    "prod:local:logs:nginx": "docker compose --env-file .env.production.local -f docker-compose.prod.yml logs -f nginx",
+    "dev:up:local": "bash scripts/dev-up-local.sh",
+    "data:download-binance": "tsx scripts/data/download-binance-data.ts",
+    "data:verify-binance-symbols": "tsx scripts/data/verify-binance-symbols.ts",
+    "data:unzip": "tsx scripts/data/unzip-market-data.ts",
+    "data:normalize": "tsx scripts/data/normalize-bars.ts",
+    "data:normalize-all": "tsx scripts/data/normalize-bars.ts",
+    "data:import": "tsx scripts/data/import-bars.ts",
+    "data:import-all": "tsx scripts/data/import-bars.ts",
+    "data:aggregate": "PATH=./node_modules/.bin:$PATH npm --prefix apps/api run prisma:generate:pg && PATH=./node_modules/.bin:$PATH npm --prefix apps/api run aggregate:bars",
+    "data:verify": "tsx scripts/data/verify-bars.ts",
+    "data:audit-bars": "tsx scripts/data/audit-bars-integrity.ts",
+    "data:pipeline": "tsx scripts/data/run-pipeline.ts",
+    "data:normalize-a-share": "tsx scripts/data/normalize-a-share-bars.ts",
+    "data:import-a-share": "tsx scripts/data/import-a-share-bars.ts",
+    "data:audit-indexes": "tsx scripts/data/audit-bars-indexes.ts"
+  },
+  "dependencies": {
+    "axios": "^1.16.0",
+    "dayjs": "^1.11.20",
+    "fast-csv": "^5.0.7",
+    "fs-extra": "^11.3.5",
+    "pg": "^8.20.0",
+    "pg-copy-streams": "^7.0.0",
+    "tsx": "^4.21.0",
+    "unzipper": "^0.12.3"
+  }
+}

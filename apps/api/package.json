@@ -1,0 +1,51 @@
+{
+  "name": "@kline/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:generate:pg": "npm run prisma:generate",
+    "prisma:push": "prisma db push --schema prisma/schema.prisma",
+    "prisma:push:pg": "npm run prisma:push",
+    "prisma:migrate:dev:pg": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:migrate:deploy:pg": "prisma migrate deploy --schema prisma/schema.prisma",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "import:crypto": "ts-node --transpile-only src/scripts/import-market-data.ts",
+    "import:crypto:offline": "ts-node --transpile-only src/scripts/import-market-data-offline.ts",
+    "aggregate:bars": "ts-node --transpile-only src/scripts/aggregate-bars.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.2",
+    "@nestjs/config": "^3.2.3",
+    "@nestjs/core": "^10.4.2",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/platform-express": "^10.4.2",
+    "@nestjs/throttler": "^6.5.0",
+    "@prisma/client": "^5.19.1",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.56.7",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "ioredis": "^5.4.1",
+    "nodemailer": "^6.10.1",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.4",
+    "@types/nodemailer": "^6.4.16",
+    "prisma": "^5.19.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}
